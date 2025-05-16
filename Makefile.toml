@@ -1,0 +1,15 @@
+[tasks.clippy]
+args          = ["clippy", "--workspace", "--all-targets", "--all-features"]
+command       = "cargo"
+install_crate = "clippy"
+toolchain     = "nightly"
+
+[tasks.format]
+args          = ["fmt", "--all"]
+command       = "cargo"
+install_crate = "rustfmt"
+toolchain     = "nightly"
+workspace     = false
+
+[tasks.fmt]
+alias = "format"
