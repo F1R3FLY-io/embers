@@ -7,8 +7,7 @@ use anyhow::{Context, Ok, anyhow};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
-use firefly_client::models::rhoapi::expr::ExprInstance;
-use firefly_client::write_node_client::helpers::FromExpr;
+use firefly_client::{helpers::FromExpr, models::rhoapi::expr::ExprInstance};
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 use tokio::select;
@@ -64,12 +63,9 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut client = firefly_client::WriteNodeClient::new(
-        args.wallet_key,
-        args.deploy_service_url,
-        args.propose_service_url,
-    )
-    .await?;
+    let mut client =
+        firefly_client::WriteNodeClient::new(args.deploy_service_url, args.propose_service_url)
+            .await?;
 
     match args.command {
         Commands::Upload { db_url, interval } => {
@@ -87,7 +83,9 @@ async fn main() -> anyhow::Result<()> {
                 let sql = run_pg_dump(&db_url)?;
 
                 let rho_code = rho_sql_dump_template(channel_name, sql);
-                let hash = client.full_deploy(rho_code).await?;
+                let hash = client
+                    .full_deploy(&args.wallet_key, rho_code.into())
+                    .await?;
                 println!("dump hash: {hash}");
 
                 let rho_code = rho_save_hash_template(
@@ -97,7 +95,9 @@ async fn main() -> anyhow::Result<()> {
                         channel_name,
                     },
                 );
-                let hash = client.full_deploy(rho_code).await?;
+                let hash = client
+                    .full_deploy(&args.wallet_key, rho_code.into())
+                    .await?;
                 println!("save hash: {hash}");
             }
         }
@@ -119,7 +119,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Init => {
             let rho_code = rho_save_hash_contract(&args.service_id);
-            let hash = client.full_deploy(rho_code).await?;
+            let hash = client
+                .full_deploy(&args.wallet_key, rho_code.into())
+                .await?;
             println!("{hash}");
         }
     }

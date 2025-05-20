@@ -1,0 +1,21 @@
+use etc::SignedContract;
+use poem_openapi::Object;
+
+#[derive(Debug, Clone, Object)]
+pub struct TransferSendDto {
+    code: Vec<u8>,
+    sig: Vec<u8>,
+    sig_algorithm: String,
+    deployer: Vec<u8>,
+}
+
+impl From<TransferSendDto> for SignedContract {
+    fn from(value: TransferSendDto) -> Self {
+        Self {
+            contract: value.code.into(),
+            sig: value.sig,
+            sig_algorithm: value.sig_algorithm,
+            deployer: value.deployer,
+        }
+    }
+}

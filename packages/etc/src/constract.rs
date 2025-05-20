@@ -1,18 +1,38 @@
-use std::string::FromUtf8Error;
+use std::{ops::Deref, string::FromUtf8Error};
 
-#[derive(Debug)]
-pub struct Contract(Vec<u8>);
+#[derive(Debug, Clone)]
+pub struct Code(Vec<u8>);
 
-impl TryFrom<Contract> for String {
+impl TryFrom<Code> for String {
     type Error = FromUtf8Error;
 
-    fn try_from(value: Contract) -> Result<Self, Self::Error> {
+    fn try_from(value: Code) -> Result<Self, Self::Error> {
         String::from_utf8(value.0)
     }
 }
 
-impl From<String> for Contract {
+impl From<Vec<u8>> for Code {
+    fn from(value: Vec<u8>) -> Self {
+        Self(value)
+    }
+}
+
+impl From<String> for Code {
     fn from(value: String) -> Self {
-        Contract(value.into_bytes())
+        Code(value.into_bytes())
+    }
+}
+
+impl Deref for Code {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<Code> for Vec<u8> {
+    fn from(value: Code) -> Self {
+        value.0
     }
 }

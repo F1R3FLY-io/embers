@@ -1,7 +1,6 @@
 use anyhow::Context;
+use etc::Code;
 use serde_json::Value;
-
-use crate::firefly::Contract;
 
 #[derive(Clone)]
 pub struct ReadNodeClient {
@@ -17,7 +16,7 @@ impl ReadNodeClient {
         }
     }
 
-    pub async fn get_data<T>(&self, rholang_code: Contract) -> anyhow::Result<T>
+    pub async fn get_data<T>(&self, rholang_code: Code) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -32,10 +31,11 @@ impl ReadNodeClient {
             .context("failed to deserialize response data into target type")
     }
 
-    async fn get_value(&self, rholang_code: String) -> anyhow::Result<Value> {
+    async fn get_value(&self, rholang_code: Code) -> anyhow::Result<Value> {
+        let body: Vec<u8> = rholang_code.into();
         self.client
             .post(format!("{}/api/explore-deploy", self.url))
-            .body(rholang_code)
+            .body(body)
             .header("Content-Type", "text/plain")
             .send()
             .await?

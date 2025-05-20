@@ -1,0 +1,10 @@
+[package]
+edition = "2024"
+name    = "wallet"
+version = "0.1.0"
+
+[dependencies]
+chrono = "0.4.41"
+etc            = { path = "../etc" }
+firefly-client = { path = "../firefly-client" }
+prost = "0.13.5"

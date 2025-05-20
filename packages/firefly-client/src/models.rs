@@ -57,7 +57,7 @@ pub struct Block {
 
 type Balance = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct WalletStateAndHistory {
     pub address: WalletAddress,
     pub balance: Balance,
@@ -104,9 +104,6 @@ pub enum RequestStatus {
     Ongoing,
     Cancelled,
 }
-
-#[derive(Debug, Clone)]
-pub struct Cost(pub u64);
 
 #[derive(Debug, Clone)]
 pub enum Direction {

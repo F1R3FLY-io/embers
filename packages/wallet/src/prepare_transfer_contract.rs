@@ -1,4 +1,4 @@
-use etc::{Contract, WalletAddress};
+use etc::WalletAddress;
 
 const TEMPLATE: &str = r#"
 //FIREFLY_OPERATION;{"type": "TRANSFER", "wallet_address_from": "<%= wallet_address_from %>", "wallet_address_to": "<%= wallet_address_to %>", "amount": <%= amount %>, "description": "<%= description %>"}
@@ -44,7 +44,7 @@ pub(crate) fn create_transfer_contract(
     to: WalletAddress,
     amount: u64,
     description: &str,
-) -> Contract {
+) -> String {
     TEMPLATE
         .replace("<%= wallet_address_from %>", from.as_str())
         .replace("<%= wallet_address_to %>", to.as_str())

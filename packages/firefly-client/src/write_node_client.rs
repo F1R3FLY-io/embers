@@ -1,15 +1,19 @@
-use anyhow::{Context, anyhow};
-use helpers::FromExpr;
-use secp256k1::SecretKey;
+use std::error::Error;
 
+use anyhow::{Context, anyhow};
+use blake2::digest::consts::U32;
+use blake2::{Blake2b, Digest};
+use etc::{Code, SignedContract};
+use prost::Message as _;
+use secp256k1::{Message, Secp256k1, SecretKey};
+
+use crate::helpers::FromExpr;
 use crate::models::casper::v1::deploy_service_client::DeployServiceClient;
 use crate::models::casper::v1::propose_service_client::ProposeServiceClient;
-use crate::models::casper::v1::{deploy_response, propose_response, rho_data_response};
+use crate::models::casper::v1::{propose_response, rho_data_response};
 use crate::models::casper::{DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
-
-pub mod helpers;
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -19,7 +23,6 @@ pub struct WriteNodeClient {
 
 impl WriteNodeClient {
     pub async fn new(
-        secret_key: SecretKey,
         deploy_service_url: String,
         propose_service_url: String,
     ) -> anyhow::Result<Self> {
@@ -37,17 +40,14 @@ impl WriteNodeClient {
         })
     }
 
-    pub async fn deploy(
+    pub async fn deploy_signed_contract(
         &mut self,
-        code: String,
-        sig: Vec<u8>,
-        sig_algorithm: String,
-        deployer: Vec<u8>,
-    ) -> anyhow::Result<String> {
+        contract: SignedContract,
+    ) -> std::result::Result<(), Box<dyn Error + Send + Sync>> {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
-                term: code,
+                term: contract.contract.try_into()?,
                 timestamp,
                 phlo_price: 1,
                 phlo_limit: 500_000,
@@ -56,35 +56,16 @@ impl WriteNodeClient {
                 ..Default::default()
             };
 
-            msg.sig = sig;
-            msg.sig_algorithm = sig_algorithm;
+            msg.sig = contract.sig;
+            msg.sig_algorithm = contract.sig_algorithm;
 
-            msg.deployer = deployer;
+            msg.deployer = contract.deployer;
             msg
         };
 
-        let deploy_response = self
-            .deploy_client
-            .do_deploy(msg)
-            .await
-            .context("do_deploy grpc error")?
-            .into_inner();
+        let _ = self.deploy_client.do_deploy(msg).await;
 
-        let resp_message = deploy_response
-            .message
-            .context("missing do_deploy responce")?;
-
-        let message = match resp_message {
-            deploy_response::Message::Result(message) => message,
-            deploy_response::Message::Error(err) => {
-                return Err(anyhow!("do_deploy error: {err:?}"));
-            }
-        };
-
-        message
-            .strip_prefix("Success!\nDeployId is: ")
-            .map(Into::into)
-            .context("failed to extract response hash")
+        Ok(())
     }
 
     pub async fn propose(&mut self) -> anyhow::Result<String> {
@@ -109,16 +90,41 @@ impl WriteNodeClient {
             .context("failed to extract block hash")
     }
 
-    pub async fn full_deploy(
-        &mut self,
-        code: String,
-        sig: Vec<u8>,
-        sig_algorithm: String,
-        deployer: Vec<u8>,
-    ) -> anyhow::Result<String> {
-        self.deploy(code, sig, sig_algorithm, deployer)
+    pub async fn full_deploy(&mut self, key: &SecretKey, code: Code) -> anyhow::Result<String> {
+        let msg = {
+            let timestamp = chrono::Utc::now().timestamp_millis();
+            let mut msg = DeployDataProto {
+                term: code.try_into()?,
+                timestamp,
+                phlo_price: 1,
+                phlo_limit: 500_000,
+                valid_after_block_number: 0,
+                shard_id: "root".into(),
+                ..Default::default()
+            };
+
+            let secp = Secp256k1::new();
+
+            let hash = Blake2b::<U32>::new()
+                .chain_update(msg.encode_to_vec())
+                .finalize();
+
+            let signature = secp.sign_ecdsa(Message::from_digest(hash.into()), key);
+
+            msg.sig = signature.serialize_der().to_vec();
+            msg.sig_algorithm = "secp256k1".into();
+
+            let public_key = key.public_key(&secp);
+            msg.deployer = public_key.serialize_uncompressed().into();
+            msg
+        };
+
+        self.deploy_client
+            .do_deploy(msg)
             .await
-            .context("deploy error")?;
+            .context("do_deploy grpc error")?
+            .into_inner();
+
         self.propose().await.context("propose error")
     }
 

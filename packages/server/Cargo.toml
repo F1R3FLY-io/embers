@@ -22,6 +22,7 @@ serde              = { version = "1.0" }
 serde_json         = { version = "1.0" }
 structural-convert = { version = "0.13" }
 tokio              = { version = "1.45", features = ["macros", "rt-multi-thread", "signal"] }
+wallet             = { path = "../wallet" }
 
 [lints.clippy]
 default_trait_access = "allow"

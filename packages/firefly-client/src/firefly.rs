@@ -1,11 +1,11 @@
-use etc::{Stringified, WalletAddress};
+use std::error::Error;
+
+use etc::{Code, SignedContract, WalletAddress};
 
 use crate::{
     BlocksClient, ReadNodeClient, WriteNodeClient,
-    models::{Direction, Operation, Transfer, WalletStateAndHistory},
+    models::{Deploy, Direction, Operation, Transfer, WalletStateAndHistory},
 };
-
-pub type Contract = String;
 
 #[derive(Clone)]
 pub struct FireflyClient {
@@ -27,29 +27,25 @@ impl FireflyClient {
         }
     }
 
-    fn create_check_balance_contract(address: &WalletAddress) -> Contract {
+    fn create_check_balance_contract(address: &WalletAddress) -> Code {
         (include_str!("check_balance.rho"))
             .replace("<%= &wallet_address %>", address.to_string().as_str())
+            .into()
     }
 
     pub async fn get_state_and_history(
         &self,
-        wallet_address: WalletAddress,
-    ) -> anyhow::Result<WalletStateAndHistory> {
-        let check_balance_contract = Self::create_check_balance_contract(&wallet_address);
-        let balance = self
-            .read_client
-            .get_data::<Stringified>(check_balance_contract)
-            .await?;
-        let deploys = self.blocks_client.get_deploys().await?;
-
-        let operations = deploys
+        address: WalletAddress,
+    ) -> Result<WalletStateAndHistory, Box<dyn Error>> {
+        let code = Self::create_check_balance_contract(&address);
+        let balance = self.read_client.get_data(code).await?;
+        let transfers = self
+            .blocks_client
+            .get_deploys()
+            .await?
             .into_iter()
-            .filter_map(|deploy| {
-                if deploy.errored {
-                    return None;
-                }
-
+            .filter(|deploy| !deploy.errored)
+            .map(|deploy| {
                 deploy
                     .term
                     .lines()
@@ -58,61 +54,60 @@ impl FireflyClient {
                     .map(ToOwned::to_owned)
                     .map(|meta| (deploy, meta))
             })
-            .map(|(deploy, meta)| serde_json::from_str(&meta).map(|operation| (deploy, operation)))
-            .collect::<Result<Vec<(_, _)>, _>>()?;
+            .flatten()
+            .map(|(deploy, meta): (Deploy, String)| {
+                serde_json::from_str(&meta)
+                    .map(|operation| (deploy, operation))
+                    .ok()
+            })
+            .flatten()
+            .filter(|(_, operation): &(Deploy, Operation)| {
+                matches!(
+                    operation,
+                    Operation::Transfer {
+                        wallet_address_from,
+                        wallet_address_to,
+                        ..
+                    } if wallet_address_from == address || wallet_address_to == address
+                )
+            })
+            .map(|(deploy, operation): (Deploy, Operation)| {
+                let Operation::Transfer {
+                    wallet_address_from,
+                    wallet_address_to,
+                    amount,
+                    ..
+                } = operation;
+
+                let direction = if &address == wallet_address_from {
+                    Direction::Outgoing
+                } else {
+                    Direction::Incoming
+                };
+
+                Transfer {
+                    id: deploy.sig,
+                    direction,
+                    date: deploy.timestamp.to_string(),
+                    amount: amount.to_string(),
+                    to_address: wallet_address_to,
+                    cost: deploy.cost.to_string(),
+                }
+            })
+            .collect();
 
         Ok(WalletStateAndHistory {
             balance,
-            requests: vec![],
-            exchanges: vec![],
-            boosts: vec![],
-            transfers: operations
-                .into_iter()
-                .filter(|(_, operation)| {
-                    matches!(
-                        operation,
-                        Operation::Transfer {
-                            wallet_address_from,
-                            wallet_address_to,
-                            ..
-                        } if wallet_address_from == wallet_address || wallet_address_to == wallet_address
-                    )
-                })
-                .map(|(deploy, operation)| {
-                    let Operation::Transfer {
-                        wallet_address_from,
-                        wallet_address_to,
-                        amount,
-                        ..
-                    } = operation;
-
-                    Transfer {
-                        id: deploy.sig,
-                        direction: if wallet_address == wallet_address_from {
-                            Direction::Outgoing
-                        } else {
-                            Direction::Incoming
-                        },
-                        date: deploy.timestamp.to_string(),
-                        amount: amount.to_string(),
-                        to_address: wallet_address_to,
-                        cost: deploy.cost.to_string(),
-                    }
-                })
-                .collect(),
-            address: wallet_address,
+            transfers,
+            address,
+            ..Default::default()
         })
     }
 
-    pub async fn deploy(
+    pub async fn deploy_signed_contract(
         &mut self,
-        code: String,
-        sig: Vec<u8>,
-        sig_algorithm: String,
-        deployer: Vec<u8>,
-    ) -> anyhow::Result<String> {
-        self.write_client
-            .deploy(code, sig, sig_algorithm, deployer)
-            .await
+        contract: SignedContract,
+    ) -> std::result::Result<(), Box<dyn Error + Send + Sync>> {
+        self.write_client.deploy_signed_contract(contract).await
     }
 }

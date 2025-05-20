@@ -1,3 +1,5 @@
+mod contracts;
+
 use std::fmt::Display;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -7,6 +9,8 @@ use anyhow::Context;
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
+use contracts::{rho_init_events_channels, rho_subscribe_to_service, rho_unsubscribe_from_service};
+use etc::Code;
 use futures::stream::select_all;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, future};
 use secp256k1::SecretKey;
@@ -85,13 +89,10 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut client = firefly_client::WriteNodeClient::new(
-        args.wallet_key,
-        args.deploy_service_url,
-        args.propose_service_url,
-    )
-    .await
-    .context("failed to create firefly client")?;
+    let mut client =
+        firefly_client::WriteNodeClient::new(args.deploy_service_url, args.propose_service_url)
+            .await
+            .context("failed to create firefly client")?;
 
     match args.command {
         Commands::Listen {
@@ -109,6 +110,7 @@ async fn main() -> anyhow::Result<()> {
             let task = tokio::spawn(async move {
                 let mut all_sources = select_all([
                     subscribe_to_firefly(
+                        &args.wallet_key,
                         client,
                         args.service_id,
                         &external_hostname,
@@ -174,9 +176,9 @@ async fn main() -> anyhow::Result<()> {
                     let events = events.into_iter().collect::<Result<Vec<_>, _>>()?;
                     let channel_name = Uuid::new_v4();
                     println!("events: {}", events.len());
-                    let rho_code = rho_save_events(channel_name, &events);
+                    let rho_code = rho_save_events(channel_name, &events)?;
                     let hash = client
-                        .full_deploy(rho_code)
+                        .full_deploy(&args.wallet_key, rho_code)
                         .await
                         .context("failed save events")?;
                     println!("events deployed");
@@ -189,7 +191,7 @@ async fn main() -> anyhow::Result<()> {
                         },
                     );
                     client
-                        .full_deploy(rho_code)
+                        .full_deploy(&args.wallet_key, rho_code.into())
                         .await
                         .context("failed to notify listeners")?;
                     println!("notified");
@@ -206,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init => {
             let rho_code = rho_init_events_channels(&args.service_id);
             let hash = client
-                .full_deploy(rho_code)
+                .full_deploy(&args.wallet_key, rho_code.into())
                 .await
                 .context("failed to init channels")?;
             println!("{hash}");
@@ -216,64 +218,14 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn rho_init_events_channels(service_id: &str) -> String {
-    format!(
-        r#"
-        @"{service_id}-listeners"!({{}})|
-        contract @"{service_id}-notify-listeners"(@payload) = {{
-            new loop, grpcTell(`rho:io:grpcTell`) in {{
-                contract loop(@listeners, @payload) = {{
-                    match listeners {{
-                        [] => Nil
-                        [head ...tail] => {{
-                            grpcTell!(head.nth(1).get("hostname"), head.nth(1).get("port"), payload)|
-                            loop!(tail)
-                        }}
-                    }}
-                }}|
-                for(@listeners <<- @"{service_id}-listeners") {{
-                    loop!(listeners.toList(), payload)
-                }}
-            }}
-        }}
-        "#
-    )
-}
-
-fn rho_subscribe_to_service(
-    service_id: &str,
-    self_id: impl Display,
-    hostname: &str,
-    port: u16,
-) -> String {
-    format!(
-        r#"
-        for(@listeners <- @"{service_id}-listeners") {{
-            @"{service_id}-listeners"!(listeners.set("{self_id}", {{
-                "hostname": "{hostname}",
-                "port": {port},
-            }}))
-        }}
-        "#
-    )
-}
-
-fn rho_unsubscribe_from_service(service_id: &str, self_id: impl Display) -> String {
-    format!(
-        r#"
-        for(@listeners <- @"{service_id}-listeners") {{
-            @"{service_id}-listeners"!(listeners.delete("{self_id}"))
-        }}
-        "#
-    )
-}
-
-fn rho_save_events(channel_name: impl Display, entries: &[Entry]) -> String {
-    let data = bitcode::serialize(&entries).unwrap();
-    format!(
-        r#"@"{channel_name}"!("{}".hexToBytes())"#,
-        hex::encode(data)
-    )
+fn rho_save_events(channel_name: impl Display, entries: &[Entry]) -> Result<Code, bitcode::Error> {
+    bitcode::serialize(&entries).map(|data| {
+        let value = format!(
+            r#"@"{channel_name}"!("{}".hexToBytes())"#,
+            hex::encode(data)
+        );
+        Code::from(value)
+    })
 }
 
 fn rho_notify_listeners(service_id: &str, msg: &NotifyMsg) -> String {
@@ -380,6 +332,7 @@ async fn subscribe_to_event_source(
 }
 
 async fn subscribe_to_firefly(
+    key: &SecretKey,
     mut client: firefly_client::WriteNodeClient,
     service_id: String,
     external_hostname: &str,
@@ -390,15 +343,16 @@ async fn subscribe_to_firefly(
 
     let rho_code = rho_subscribe_to_service(&service_id, self_id, external_hostname, grpc_port);
     client
-        .full_deploy(rho_code)
+        .full_deploy(key, rho_code.into())
         .await
         .context("failed to subscribe to service")?;
 
+    let key = key.clone();
     let mut client = scopeguard::guard(client, move |mut client| {
         tokio::spawn(async move {
             let rho_code = rho_unsubscribe_from_service(&service_id, self_id);
             client
-                .full_deploy(rho_code)
+                .full_deploy(&key, rho_code.into())
                 .await
                 .context("failed to unsubscribe from service")?;
             println!("unsubscribed");

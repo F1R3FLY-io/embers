@@ -3,7 +3,7 @@ use std::ops::Deref;
 use blake2::{Blake2b, Digest, digest::consts::U32};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct WalletAddress(String);
 
 impl PartialEq<WalletAddress> for &WalletAddress {

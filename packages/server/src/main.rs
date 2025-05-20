@@ -1,6 +1,5 @@
 use crate::configuration::collect_config;
 use api::wallet::WalletApi;
-use domain::wallet::WalletService;
 use firefly_client::FireflyClient;
 use firefly_client::{BlocksClient, ReadNodeClient, WriteNodeClient};
 use poem::listener::TcpListener;
@@ -10,8 +9,7 @@ use poem_openapi::OpenApiService;
 
 mod api;
 mod configuration;
-mod domain;
-mod handlers;
+mod dtos;
 
 const DEFAULT_PORT: &str = "80";
 
@@ -29,11 +27,14 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let open_api = OpenApiService::new(WalletApi, "Embers API", "0.1.0").url_prefix("/api");
-    let docs = open_api.swagger_ui();
+
+    let ui = open_api.swagger_ui();
+    let spec = open_api.spec_endpoint();
 
     let routes = Route::new()
         .nest("/api", open_api)
-        .nest("/docs", docs)
+        .nest("/swagger-ui/index.html", ui)
+        .nest("/swagger-ui/openapi.json", spec)
         .data(firefly_client)
         .with(Cors::new().allow_origin_regex("*"));
 
