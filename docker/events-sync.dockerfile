@@ -6,7 +6,7 @@ RUN apt-get update && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY firefly-api firefly-api
+COPY firefly-client firefly-client
 COPY events-sync events-sync
 
 WORKDIR /app/events-sync

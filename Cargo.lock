@@ -524,16 +524,7 @@ version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a9b99b9cbbe49445b21764dc0625032a89b145a2642e67603e1c936f5458d05"
 dependencies = [
- "derive_more-impl 1.0.0",
-]
-
-[[package]]
-name = "derive_more"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
-dependencies = [
- "derive_more-impl 2.0.1",
+ "derive_more-impl",
 ]
 
 [[package]]
@@ -546,17 +537,6 @@ dependencies = [
  "quote",
  "syn 2.0.101",
  "unicode-xid",
-]
-
-[[package]]
-name = "derive_more-impl"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.101",
 ]
 
 [[package]]
@@ -613,6 +593,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "etc"
+version = "0.1.0"
+dependencies = [
+ "blake2",
+ "bs58",
+ "hex",
+ "serde",
+]
+
+[[package]]
 name = "events-sync"
 version = "0.1.0"
 dependencies = [
@@ -621,7 +611,7 @@ dependencies = [
  "base64 0.22.1",
  "bitcode",
  "clap",
- "firefly-api",
+ "firefly-client",
  "futures",
  "hex",
  "scopeguard",
@@ -668,7 +658,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "firefly-api"
+name = "firefly-client"
 version = "0.1.0"
 dependencies = [
  "anyhow",
@@ -676,10 +666,12 @@ dependencies = [
  "base64 0.22.1",
  "blake2",
  "chrono",
+ "etc",
  "futures",
  "hex",
  "prost",
  "reqwest",
+ "sailfish",
  "secp256k1",
  "serde",
  "serde_json",
@@ -1745,7 +1737,7 @@ checksum = "d108867305d77d731e3a1c2e7ef71c54791638e270753b3f1485a4f8d384f5d5"
 dependencies = [
  "base64 0.22.1",
  "bytes",
- "derive_more 1.0.0",
+ "derive_more",
  "futures-util",
  "indexmap",
  "itertools",
@@ -2330,12 +2322,14 @@ dependencies = [
  "anyhow",
  "blake2",
  "bs58",
- "derive_more 2.0.1",
+ "chrono",
+ "etc",
  "figment",
- "firefly-api",
+ "firefly-client",
  "hex",
  "poem",
  "poem-openapi",
+ "prost",
  "sailfish",
  "secp256k1",
  "serde",
@@ -2414,7 +2408,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "clap",
- "firefly-api",
+ "firefly-client",
  "secp256k1",
  "serde",
  "serde_json",
