@@ -39,7 +39,7 @@ new rl(`rho:registry:lookup`), RevVaultCh in {
 }
 "#;
 
-pub(crate) fn create_transfer_contract(
+pub fn create_transfer_contract(
     from: WalletAddress,
     to: WalletAddress,
     amount: u64,

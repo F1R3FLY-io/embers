@@ -1,4 +1,4 @@
-use etc::{Stringified, WalletAddress};
+use etc::WalletAddress;
 use serde::{Deserialize, Serialize};
 
 pub mod servicemodelapi {
@@ -70,8 +70,8 @@ pub struct WalletStateAndHistory {
 #[derive(Debug, Clone)]
 pub struct Request {
     pub id: String,
-    pub date: Stringified,
-    pub amount: Stringified,
+    pub date: String,
+    pub amount: String,
     pub status: RequestStatus,
 }
 
@@ -80,8 +80,8 @@ pub struct Boost {
     pub id: String,
     pub username: String,
     pub direction: Direction,
-    pub date: Stringified,
-    pub amount: Stringified,
+    pub date: String,
+    pub amount: String,
     pub post: String,
 }
 
@@ -89,10 +89,10 @@ pub struct Boost {
 pub struct Transfer {
     pub id: String,
     pub direction: Direction,
-    pub date: Stringified,
-    pub amount: Stringified,
+    pub date: String,
+    pub amount: String,
     pub to_address: WalletAddress,
-    pub cost: Stringified,
+    pub cost: String,
 }
 
 #[derive(Debug, Clone)]
