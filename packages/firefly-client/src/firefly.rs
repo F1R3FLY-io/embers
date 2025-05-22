@@ -100,7 +100,9 @@ impl FireflyClient {
             balance,
             transfers,
             address,
-            ..Default::default()
+            boosts: vec![],
+            exchanges: vec![],
+            requests: vec![],
         })
     }
 

@@ -6,8 +6,8 @@ RUN apt-get update && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY firefly-client firefly-client
-COPY state-sync state-sync
+COPY packages/firefly-client firefly-client
+COPY packages/state-sync state-sync
 
 WORKDIR /app/state-sync
 RUN cargo build --release

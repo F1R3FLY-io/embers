@@ -3,7 +3,7 @@ use poem_openapi::Object;
 
 #[derive(Debug, Clone, Object)]
 pub struct TransferSendDto {
-    code: Vec<u8>,
+    code: String,
     sig: Vec<u8>,
     sig_algorithm: String,
     deployer: Vec<u8>,

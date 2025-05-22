@@ -57,7 +57,7 @@ pub struct Block {
 
 type Balance = String;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct WalletStateAndHistory {
     pub address: WalletAddress,
     pub balance: Balance,

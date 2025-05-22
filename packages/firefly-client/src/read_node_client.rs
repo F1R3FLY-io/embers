@@ -32,7 +32,7 @@ impl ReadNodeClient {
     }
 
     async fn get_value(&self, rholang_code: Code) -> anyhow::Result<Value> {
-        let body: Vec<u8> = rholang_code.into();
+        let body: String = rholang_code.into();
         self.client
             .post(format!("{}/api/explore-deploy", self.url))
             .body(body)
