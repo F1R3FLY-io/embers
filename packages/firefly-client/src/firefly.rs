@@ -68,7 +68,7 @@ impl FireflyClient {
                         wallet_address_from,
                         wallet_address_to,
                         ..
-                    } if wallet_address_from == address || wallet_address_to == address
+                    } if wallet_address_from == &address || wallet_address_to == &address
                 )
             })
             .map(|(deploy, operation): (Deploy, Operation)| {
@@ -79,7 +79,7 @@ impl FireflyClient {
                     ..
                 } = operation;
 
-                let direction = if &address == wallet_address_from {
+                let direction = if &address == &wallet_address_from {
                     Direction::Outgoing
                 } else {
                     Direction::Incoming

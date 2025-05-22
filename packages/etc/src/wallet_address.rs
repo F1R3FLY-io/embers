@@ -6,12 +6,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct WalletAddress(String);
 
-impl PartialEq<WalletAddress> for &WalletAddress {
-    fn eq(&self, other: &WalletAddress) -> bool {
-        self.0 == other.0
-    }
-}
-
 impl Deref for WalletAddress {
     type Target = String;
 
