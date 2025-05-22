@@ -1,24 +1,9 @@
-use std::ops::Deref;
-
 use blake2::{Blake2b, Digest, digest::consts::U32};
+use derive_more::Display;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Display)]
 pub struct WalletAddress(String);
-
-impl Deref for WalletAddress {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl ToString for WalletAddress {
-    fn to_string(&self) -> String {
-        self.0.clone()
-    }
-}
 
 #[derive(Debug)]
 pub enum ParseWalletAddressError {

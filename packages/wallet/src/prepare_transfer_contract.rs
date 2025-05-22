@@ -46,8 +46,8 @@ pub fn create_transfer_contract(
     description: &str,
 ) -> String {
     TEMPLATE
-        .replace("<%= wallet_address_from %>", from.as_str())
-        .replace("<%= wallet_address_to %>", to.as_str())
+        .replace("<%= wallet_address_from %>", &from.to_string())
+        .replace("<%= wallet_address_to %>", &to.to_string())
         .replace("<%= amount %>", &amount.to_string())
         .replace("<%= description %>", description)
         .into()
