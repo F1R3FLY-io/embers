@@ -7,6 +7,7 @@ use anyhow::{Context, Ok, anyhow};
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
+use etc::escape_string;
 use firefly_client::{helpers::FromExpr, models::rhoapi::expr::ExprInstance};
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
@@ -141,6 +142,8 @@ fn rho_save_hash_template(service_id: impl Display, service_hash: &ServiceHash) 
 }
 
 fn rho_save_hash_contract(service_id: &str) -> String {
+    let service_id = escape_string(service_id);
+
     format!(
         r#"
         @"{service_id}-hashes"!([])

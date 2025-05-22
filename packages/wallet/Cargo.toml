@@ -4,7 +4,8 @@ name    = "wallet"
 version = "0.1.0"
 
 [dependencies]
-chrono = "0.4.41"
+chrono         = "0.4.41"
+derive_more    = { version = "2.0.1", features = ["display"] }
 etc            = { path = "../etc" }
 firefly-client = { path = "../firefly-client" }
-prost = "0.13.5"
+prost          = "0.13.5"

@@ -73,7 +73,7 @@ impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
             from,
             to,
             amount: value.amount,
-            description: value.description,
+            description: value.description.map(Into::into),
         })
     }
 }

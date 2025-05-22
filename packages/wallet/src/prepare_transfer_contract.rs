@@ -1,5 +1,7 @@
 use etc::WalletAddress;
 
+use crate::Description;
+
 const TEMPLATE: &str = r#"
 //FIREFLY_OPERATION;{"type": "TRANSFER", "wallet_address_from": "<%= wallet_address_from %>", "wallet_address_to": "<%= wallet_address_to %>", "amount": <%= amount %>, "description": "<%= description %>"}
 new rl(`rho:registry:lookup`), RevVaultCh in {
@@ -43,12 +45,12 @@ pub fn create_transfer_contract(
     from: WalletAddress,
     to: WalletAddress,
     amount: u64,
-    description: &str,
+    description: Description,
 ) -> String {
     TEMPLATE
         .replace("<%= wallet_address_from %>", &from.to_string())
         .replace("<%= wallet_address_to %>", &to.to_string())
         .replace("<%= amount %>", &amount.to_string())
-        .replace("<%= description %>", description)
+        .replace("<%= description %>", &description.to_string())
         .into()
 }

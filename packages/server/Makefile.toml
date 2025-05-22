@@ -1,9 +1,9 @@
 [tasks.run]
-args = ["run"]
-command = "cargo"
-env.PORT = "8080"
+args                               = ["run"]
+command                            = "cargo"
 env.EMBERS__DEFAULT_WALLET_ADDRESS = "1111EjdAxnKb5zKUc8ikuxfdi3kwSGH7BJCHKWjnVzfAF3SjCBvjh"
-env.EMBERS__DEFAULT_WALLET_KEY = "6a786ec387aff99fcce1bd6faa35916bfad3686d5c98e90a89f77670f535607c"
-env.EMBERS__DEPLOY_SERVICE_URL = "http://localhost:40401"
-env.EMBERS__PROPOSE_SERVICE_URL = "http://localhost:40402"
-env.EMBERS__READ_NODE_URL = "http://localhost:40413"
+env.EMBERS__DEFAULT_WALLET_KEY     = "6a786ec387aff99fcce1bd6faa35916bfad3686d5c98e90a89f77670f535607c"
+env.EMBERS__DEPLOY_SERVICE_URL     = "http://localhost:40401"
+env.EMBERS__PROPOSE_SERVICE_URL    = "http://localhost:40402"
+env.EMBERS__READ_NODE_URL          = "http://localhost:40413"
+env.PORT                           = "8080"
