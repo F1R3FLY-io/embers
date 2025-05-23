@@ -6,8 +6,9 @@ RUN apt-get update && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY firefly-api firefly-api
-COPY events-sync events-sync
+COPY packages/etc etc
+COPY packages/firefly-client firefly-client
+COPY packages/events-sync events-sync
 
 WORKDIR /app/events-sync
 RUN cargo build --release
