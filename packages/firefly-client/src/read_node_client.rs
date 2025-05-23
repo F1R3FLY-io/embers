@@ -1,0 +1,47 @@
+use anyhow::Context;
+use etc::Code;
+use serde_json::Value;
+
+#[derive(Clone)]
+pub struct ReadNodeClient {
+    url: String,
+    client: reqwest::Client,
+}
+
+impl ReadNodeClient {
+    pub fn new(url: String) -> Self {
+        Self {
+            url,
+            client: Default::default(),
+        }
+    }
+
+    pub async fn get_data<T>(&self, rholang_code: Code) -> anyhow::Result<T>
+    where
+        T: serde::de::DeserializeOwned,
+    {
+        let mut response_json = self.get_value(rholang_code).await?;
+
+        let data_value = response_json
+            .pointer_mut("/expr/0/ExprInt/data")
+            .map(Value::take)
+            .context("failed to extract data from response structure")?;
+
+        serde_json::from_value(data_value)
+            .context("failed to deserialize response data into target type")
+    }
+
+    async fn get_value(&self, rholang_code: Code) -> anyhow::Result<Value> {
+        let body: String = rholang_code.into();
+        self.client
+            .post(format!("{}/api/explore-deploy", self.url))
+            .body(body)
+            .header("Content-Type", "text/plain")
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await
+            .context("failed to parse responce as json")
+    }
+}
