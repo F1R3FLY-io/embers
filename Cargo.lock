@@ -3531,6 +3531,7 @@ dependencies = [
  "serde_json",
  "structural-convert",
  "taplo-cli",
+ "thiserror 2.0.12",
  "tokio",
  "wallet",
 ]

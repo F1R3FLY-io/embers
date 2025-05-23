@@ -1,8 +1,7 @@
-use std::error::Error;
-
 use etc::ParseWalletAddressError;
 use poem::{error::ResponseError, http::StatusCode};
 use poem_openapi::Object;
+use thiserror::Error;
 use wallet::PrepareTransferInput;
 
 #[derive(Debug, Object)]
@@ -13,28 +12,16 @@ pub(crate) struct PrepareTransferInputDto {
     description: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum PrepareContractRequestProblem {
+    #[error("Amount field can't be empty")]
     EmptyAmount,
+    #[error("Receiver address field can't be empty")]
     EmptyReceiverAddress,
+    #[error("Serder address field can't be empty")]
     EmptySenderAddress,
+    #[error("Wallet adress has wrong format")]
     WrongAddressFormat(ParseWalletAddressError),
-}
-
-impl std::fmt::Display for PrepareContractRequestProblem {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{:?}", self)
-    }
-}
-
-impl Error for PrepareContractRequestProblem {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        None
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        self.source()
-    }
 }
 
 impl ResponseError for PrepareContractRequestProblem {
