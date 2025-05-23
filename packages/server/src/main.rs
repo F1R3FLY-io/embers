@@ -11,8 +11,6 @@ mod api;
 mod configuration;
 mod dtos;
 
-const DEFAULT_PORT: &str = "80";
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = collect_config().expect("Can't read bootstrap configuration");
@@ -38,7 +36,7 @@ async fn main() -> anyhow::Result<()> {
         .data(firefly_client)
         .with(Cors::new().allow_origin_regex("*"));
 
-    let port = std::env::var("PORT").unwrap_or(DEFAULT_PORT.into());
+    let port = config.port;
     let address = format!("::1:{port}");
 
     Server::new(TcpListener::bind(address))
