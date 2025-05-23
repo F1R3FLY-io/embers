@@ -1,6 +1,7 @@
 use blake2::{Blake2b, Digest, digest::consts::U32};
 use derive_more::Display;
 use serde::{Deserialize, Serialize};
+use crate::escape_string;
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Display)]
 pub struct WalletAddress(String);
@@ -17,12 +18,9 @@ fn validate(rev_bytes: Vec<u8>) -> Result<(), ParseWalletAddressError> {
         .split_at_checked(rev_bytes.len() - 4)
         .ok_or(ParseWalletAddressError::InvalidRevAddressSize)?;
 
-    let checksum = hex::encode(checksum);
-
     let hash = Blake2b::<U32>::new().chain_update(payload).finalize();
-    let checksum_calc = hex::encode(&hash[..4]);
 
-    if checksum != checksum_calc {
+    if checksum != &hash[..4] {
         return Err(ParseWalletAddressError::InvalidAddress(rev_bytes));
     }
 
@@ -37,6 +35,7 @@ impl TryFrom<String> for WalletAddress {
             .into_vec()
             .map_err(ParseWalletAddressError::EncoderError)
             .and_then(validate)
-            .and(Ok(WalletAddress(value)))
+            .map(|()|escape_string(&value).to_string())
+            .map(WalletAddress)
     }
 }

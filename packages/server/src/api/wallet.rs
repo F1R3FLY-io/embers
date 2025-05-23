@@ -7,7 +7,8 @@ use wallet::{deploy_signed_contract, get_wallet_state_and_history, prepare_contr
 
 use super::Tag;
 use crate::dtos::{
-    PrepareTransferInputDto, PreparedContractDto, TransferSendDto, WalletStateAndHistoryDto,
+    prepare_transfer::PrepareTransferInputDto, prepared_contract::PreparedContractDto,
+    transfer_send::TransferSendDto, wallet_state_and_history::WalletStateAndHistoryDto,
 };
 
 pub struct WalletApi;

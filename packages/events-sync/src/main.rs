@@ -219,12 +219,12 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn rho_save_events(channel_name: impl Display, entries: &[Entry]) -> Result<Code, bitcode::Error> {
-    bitcode::serialize(&entries).map(|data| {
+    bitcode::serialize(&entries).and_then(|data| {
         let value = format!(
             r#"@"{channel_name}"!("{}".hexToBytes())"#,
             hex::encode(data)
         );
-        Code::from(value)
+        Ok(Code::from(value))
     })
 }
 

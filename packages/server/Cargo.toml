@@ -14,7 +14,7 @@ figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }
 hex                = { version = "0.4" }
 poem               = { version = "3.1", features = ["anyhow"] }
-poem-openapi       = { version = "5.1", features = ["swagger-ui"] }
+poem-openapi       = { version = "5.1", features = ["swagger-ui","chrono"] }
 prost              = "0.13.5"
 secp256k1          = { version = "0.31", features = ["serde"] }
 serde              = { version = "1.0" }
@@ -37,3 +37,7 @@ priority = -1
 [lints.clippy.nursery]
 level    = "warn"
 priority = -1
+
+[dev-dependencies]
+cargo-make = "0.37.24"
+taplo-cli = "0.10.0"

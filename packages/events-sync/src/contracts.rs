@@ -1,8 +1,6 @@
-use etc::escape_string;
 use uuid::Uuid;
 
 pub fn rho_init_events_channels(service_id: &str) -> String {
-    let service_id = escape_string(service_id);
     format!(
         r#"
         @"{service_id}-listeners"!({{}})|
@@ -32,9 +30,6 @@ pub fn rho_subscribe_to_service(
     hostname: &str,
     port: u16,
 ) -> String {
-    let service_id = escape_string(service_id);
-    let hostname = escape_string(hostname);
-
     format!(
         r#"
         for(@listeners <- @"{service_id}-listeners") {{
@@ -48,8 +43,6 @@ pub fn rho_subscribe_to_service(
 }
 
 pub fn rho_unsubscribe_from_service(service_id: &str, self_id: Uuid) -> String {
-    let service_id = escape_string(service_id);
-
     format!(
         r#"
         for(@listeners <- @"{service_id}-listeners") {{

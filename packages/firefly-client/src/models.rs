@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use etc::WalletAddress;
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +56,7 @@ pub struct Block {
     pub deploys: Vec<Deploy>,
 }
 
-type Balance = String;
+type Balance = u64;
 
 #[derive(Debug, Clone)]
 pub struct WalletStateAndHistory {
@@ -70,8 +71,8 @@ pub struct WalletStateAndHistory {
 #[derive(Debug, Clone)]
 pub struct Request {
     pub id: String,
-    pub date: String,
-    pub amount: String,
+    pub date: DateTime<Utc>,
+    pub amount: u64,
     pub status: RequestStatus,
 }
 
@@ -80,8 +81,8 @@ pub struct Boost {
     pub id: String,
     pub username: String,
     pub direction: Direction,
-    pub date: String,
-    pub amount: String,
+    pub date: DateTime<Utc>,
+    pub amount: u64,
     pub post: String,
 }
 
@@ -89,8 +90,8 @@ pub struct Boost {
 pub struct Transfer {
     pub id: String,
     pub direction: Direction,
-    pub date: String,
-    pub amount: String,
+    pub date: u64,
+    pub amount: u64,
     pub to_address: WalletAddress,
     pub cost: String,
 }

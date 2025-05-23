@@ -19,8 +19,8 @@ impl From<Boost> for BoostDto {
             id: value.id,
             username: value.username,
             direction: value.direction.into(),
-            date: value.date,
-            amount: value.amount,
+            date: value.date.to_string(),
+            amount: value.amount.to_string(),
             post: value.post,
         }
     }

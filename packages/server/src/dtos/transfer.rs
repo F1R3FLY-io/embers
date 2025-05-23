@@ -18,8 +18,8 @@ impl From<Transfer> for TransferDto {
         Self {
             id: value.id,
             direction: value.direction.into(),
-            date: value.date,
-            amount: value.amount,
+            date: value.date.to_string(),
+            amount: value.amount.to_string(),
             to_address: value.to_address.to_string(),
             cost: value.cost,
         }

@@ -88,8 +88,8 @@ impl FireflyClient {
                 Transfer {
                     id: deploy.sig,
                     direction,
-                    date: deploy.timestamp.to_string(),
-                    amount: amount.to_string(),
+                    date: deploy.timestamp,
+                    amount: amount,
                     to_address: wallet_address_to,
                     cost: deploy.cost.to_string(),
                 }
