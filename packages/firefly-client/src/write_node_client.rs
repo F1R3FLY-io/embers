@@ -63,7 +63,7 @@ impl WriteNodeClient {
             msg
         };
 
-        let _ = self.deploy_client.do_deploy(msg).await;
+        self.deploy_client.do_deploy(msg).await?;
 
         Ok(())
     }
