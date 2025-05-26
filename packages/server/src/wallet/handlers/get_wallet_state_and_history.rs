@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use firefly_client::models::Deploy;
 use firefly_client::{BlocksClient, ReadNodeClient};
 
@@ -10,7 +8,7 @@ pub async fn get_wallet_state_and_history(
     read_client: &ReadNodeClient,
     block_client: &BlocksClient,
     address: WalletAddress,
-) -> Result<WalletStateAndHistory, Box<dyn Error>> {
+) -> anyhow::Result<WalletStateAndHistory> {
     let code = create_check_balance_contract(&address);
     let balance = read_client.get_data(code).await?;
     let transfers = block_client
@@ -42,7 +40,7 @@ pub async fn get_wallet_state_and_history(
                 } if wallet_address_from == &address || wallet_address_to == &address
             )
         })
-        .map(|(deploy, operation): (Deploy, Operation)| -> Transfer {
+        .filter_map(|(deploy, operation): (Deploy, Operation)| {
             let Operation::Transfer {
                 wallet_address_from,
                 wallet_address_to,
@@ -56,14 +54,15 @@ pub async fn get_wallet_state_and_history(
                 Direction::Incoming
             };
 
-            Transfer {
+            #[allow(clippy::cast_possible_wrap)]
+            chrono::DateTime::from_timestamp_millis(deploy.timestamp as i64).map(|date| Transfer {
                 id: deploy.sig,
                 direction,
-                date: deploy.timestamp,
+                date,
                 amount,
                 to_address: wallet_address_to,
-                cost: deploy.cost.to_string(),
-            }
+                cost: deploy.cost,
+            })
         })
         .collect();
 

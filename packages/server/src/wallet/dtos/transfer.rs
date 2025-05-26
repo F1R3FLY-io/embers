@@ -10,7 +10,7 @@ pub struct TransferDto {
     pub date: String,
     pub amount: String,
     pub to_address: String,
-    pub cost: String,
+    pub cost: u64,
 }
 
 impl From<Transfer> for TransferDto {

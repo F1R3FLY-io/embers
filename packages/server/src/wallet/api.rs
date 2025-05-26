@@ -4,14 +4,16 @@ use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::payload::Json;
 
+use super::dtos::{PreparedContractDto, WalletStateAndHistoryDto};
 use crate::FireFlyClients;
 use crate::wallet::dtos::{PrepareTransferInputDto, TransferSendDto};
 use crate::wallet::handlers::{
-    PrepareTransferInput, deploy_signed_contract, get_wallet_state_and_history, prepare_contract,
+    PrepareTransferInput,
+    deploy_signed_contract,
+    get_wallet_state_and_history,
+    prepare_contract,
 };
 use crate::wallet::models::WalletAddress;
-
-use super::dtos::{PreparedContractDto, WalletStateAndHistoryDto};
 
 pub struct WalletApi;
 

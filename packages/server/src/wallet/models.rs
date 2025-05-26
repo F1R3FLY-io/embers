@@ -8,10 +8,10 @@ pub use wallet_address::*;
 pub struct Transfer {
     pub id: String,
     pub direction: Direction,
-    pub date: u64,
+    pub date: DateTime<Utc>,
     pub amount: u64,
     pub to_address: WalletAddress,
-    pub cost: String,
+    pub cost: u64,
 }
 
 #[derive(Debug, Clone)]
