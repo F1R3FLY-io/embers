@@ -1,15 +1,16 @@
 use crate::configuration::collect_config;
-use api::wallet::WalletApi;
 use firefly_client::FireflyClient;
 use firefly_client::{BlocksClient, ReadNodeClient, WriteNodeClient};
 use poem::listener::TcpListener;
 use poem::middleware::Cors;
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
+use routes::wallet::WalletApi;
 
-mod api;
 mod configuration;
 mod dtos;
+mod routes;
+mod wallet;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -24,13 +25,13 @@ async fn main() -> anyhow::Result<()> {
         FireflyClient::new(read_client, write_client, blocks_client)
     };
 
-    let open_api = OpenApiService::new(WalletApi, "Embers API", "0.1.0").url_prefix("/api");
+    let api = OpenApiService::new(WalletApi, "Embers API", "0.1.0").url_prefix("/api");
 
-    let ui = open_api.swagger_ui();
-    let spec = open_api.spec_endpoint();
+    let ui = api.swagger_ui();
+    let spec = api.spec_endpoint();
 
     let routes = Route::new()
-        .nest("/api", open_api)
+        .nest("/api", api)
         .nest("/swagger-ui/index.html", ui)
         .nest("/swagger-ui/openapi.json", spec)
         .data(firefly_client)

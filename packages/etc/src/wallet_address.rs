@@ -1,3 +1,5 @@
+use thiserror::{self, Error};
+
 use crate::escape_string;
 use blake2::{Blake2b, Digest, digest::consts::U32};
 use derive_more::Display;
@@ -6,10 +8,15 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Display)]
 pub struct WalletAddress(String);
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum ParseWalletAddressError {
+    #[error("Internal encoder erorr")]
     EncoderError(bs58::decode::Error),
+
+    #[error("Invalid address size")]
     InvalidRevAddressSize,
+
+    #[error("Invalid address format")]
     InvalidAddress(Vec<u8>),
 }
 

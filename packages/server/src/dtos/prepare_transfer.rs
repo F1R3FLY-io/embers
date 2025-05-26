@@ -2,7 +2,8 @@ use etc::ParseWalletAddressError;
 use poem::{error::ResponseError, http::StatusCode};
 use poem_openapi::Object;
 use thiserror::Error;
-use wallet::PrepareTransferInput;
+
+use crate::wallet::{Description, DescriptionError, PrepareTransferInput};
 
 #[derive(Debug, Object)]
 pub(crate) struct PrepareTransferInputDto {
@@ -22,6 +23,8 @@ pub enum PrepareContractRequestProblem {
     EmptySenderAddress,
     #[error("Wallet adress has wrong format")]
     WrongAddressFormat(ParseWalletAddressError),
+    #[error("Description erorr")]
+    DescriptionError(DescriptionError),
 }
 
 impl ResponseError for PrepareContractRequestProblem {
@@ -46,6 +49,12 @@ impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
             return Err(PrepareContractRequestProblem::EmptySenderAddress);
         }
 
+        let description = value
+            .description
+            .map(|d| Description::try_from(d))
+            .transpose()
+            .map_err(PrepareContractRequestProblem::DescriptionError)?;
+
         let from = value
             .from
             .try_into()
@@ -60,7 +69,7 @@ impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
             from,
             to,
             amount: value.amount,
-            description: value.description.map(Into::into),
+            description,
         })
     }
 }

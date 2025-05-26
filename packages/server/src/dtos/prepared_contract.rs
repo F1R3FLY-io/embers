@@ -1,5 +1,6 @@
 use poem_openapi::Object;
-use wallet::PreparedContract;
+
+use crate::wallet::PreparedContract;
 
 #[derive(Debug, Object)]
 pub(crate) struct PreparedContractDto {
