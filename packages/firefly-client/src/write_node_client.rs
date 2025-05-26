@@ -47,7 +47,7 @@ impl WriteNodeClient {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
-                term: contract.contract.try_into()?,
+                term: contract.contract.into(),
                 timestamp,
                 phlo_price: 1,
                 phlo_limit: 500_000,
