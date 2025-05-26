@@ -10,7 +10,7 @@ pub struct WalletAddress(String);
 
 #[derive(Debug, Error)]
 pub enum ParseWalletAddressError {
-    #[error("Internal encoder erorr")]
+    #[error("Internal encoder error")]
     EncoderError(bs58::decode::Error),
 
     #[error("Invalid address size")]
