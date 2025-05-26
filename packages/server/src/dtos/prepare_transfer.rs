@@ -23,7 +23,7 @@ pub enum PrepareContractRequestProblem {
     EmptySenderAddress,
     #[error("Wallet adress has wrong format")]
     WrongAddressFormat(ParseWalletAddressError),
-    #[error("Description erorr")]
+    #[error("Description error")]
     DescriptionError(DescriptionError),
 }
 
