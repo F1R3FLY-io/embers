@@ -2,7 +2,7 @@ use poem_openapi::Enum;
 
 use crate::wallet::models::RequestStatus;
 
-#[derive(Debug, Clone, PartialEq, Enum)]
+#[derive(Debug, Clone, Eq, PartialEq, Enum)]
 pub enum RequestStatusDto {
     Done,
     Ongoing,

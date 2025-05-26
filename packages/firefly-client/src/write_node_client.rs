@@ -82,11 +82,11 @@ impl WriteNodeClient {
             .context("failed to extract block hash")
     }
 
-    pub async fn full_deploy(&mut self, key: &SecretKey, code: String) -> anyhow::Result<String> {
+    pub async fn full_deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<String> {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
-                term: code.into(),
+                term,
                 timestamp,
                 phlo_price: 1,
                 phlo_limit: 500_000,

@@ -1,8 +1,7 @@
 use poem_openapi::Object;
 
-use crate::wallet::models::Transfer;
-
 use super::direction::DirectionDto;
+use crate::wallet::models::Transfer;
 
 #[derive(Debug, Clone, Object)]
 pub struct TransferDto {

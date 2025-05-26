@@ -12,7 +12,7 @@ pub struct TransferSendDto {
 impl From<TransferSendDto> for SignedCode {
     fn from(value: TransferSendDto) -> Self {
         Self {
-            contract: value.code.into(),
+            contract: value.code,
             sig: value.sig,
             sig_algorithm: value.sig_algorithm,
             deployer: value.deployer,

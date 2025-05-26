@@ -1,7 +1,6 @@
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 use derive_more::Display;
-
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -37,7 +36,7 @@ fn validate(rev_bytes: Vec<u8>) -> Result<(), ParseWalletAddressError> {
 impl TryFrom<String> for WalletAddress {
     type Error = ParseWalletAddressError;
 
-    fn try_from(value: String) -> Result<WalletAddress, Self::Error> {
+    fn try_from(value: String) -> Result<Self, Self::Error> {
         bs58::decode(&value)
             .into_vec()
             .map_err(ParseWalletAddressError::EncoderError)

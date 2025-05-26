@@ -2,7 +2,7 @@ mod wallet_address;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-pub(crate) use wallet_address::*;
+pub use wallet_address::*;
 
 #[derive(Debug, Clone)]
 pub struct Transfer {
@@ -61,11 +61,12 @@ pub struct Request {
 }
 
 #[derive(Debug, Clone)]
-pub struct Exchange {}
-
-#[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum RequestStatus {
     Done,
     Ongoing,
     Cancelled,
 }
+
+#[derive(Debug, Clone)]
+pub struct Exchange {}

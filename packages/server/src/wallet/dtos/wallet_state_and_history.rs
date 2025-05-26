@@ -1,14 +1,13 @@
 use poem_openapi::Object;
 
-use crate::wallet::models::WalletStateAndHistory;
-
 use super::boost::BoostDto;
 use super::exchange::ExchangeDto;
 use super::request::RequestDto;
 use super::transfer::TransferDto;
+use crate::wallet::models::WalletStateAndHistory;
 
 #[derive(Debug, Object)]
-pub(crate) struct WalletStateAndHistoryDto {
+pub struct WalletStateAndHistoryDto {
     pub address: String,
     pub balance: String,
     pub requests: Vec<RequestDto>,

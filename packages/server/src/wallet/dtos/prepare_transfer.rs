@@ -3,13 +3,11 @@ use poem::http::StatusCode;
 use poem_openapi::Object;
 use thiserror::Error;
 
-use crate::wallet::{
-    handlers::{Description, DescriptionError, PrepareTransferInput},
-    models::ParseWalletAddressError,
-};
+use crate::wallet::handlers::{Description, DescriptionError, PrepareTransferInput};
+use crate::wallet::models::ParseWalletAddressError;
 
 #[derive(Debug, Object)]
-pub(crate) struct PrepareTransferInputDto {
+pub struct PrepareTransferInputDto {
     from: String,
     to: String,
     amount: u64,
@@ -54,7 +52,7 @@ impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
 
         let description = value
             .description
-            .map(|d| Description::try_from(d))
+            .map(Description::try_from)
             .transpose()
             .map_err(PrepareContractRequestProblem::DescriptionError)?;
 
@@ -68,7 +66,7 @@ impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
             .try_into()
             .map_err(PrepareContractRequestProblem::WrongAddressFormat)?;
 
-        Ok(PrepareTransferInput {
+        Ok(Self {
             from,
             to,
             amount: value.amount,

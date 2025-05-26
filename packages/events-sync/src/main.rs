@@ -191,7 +191,7 @@ async fn main() -> anyhow::Result<()> {
                         },
                     );
                     client
-                        .full_deploy(&args.wallet_key, rho_code.into())
+                        .full_deploy(&args.wallet_key, rho_code)
                         .await
                         .context("failed to notify listeners")?;
                     println!("notified");
@@ -208,7 +208,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init => {
             let rho_code = rho_init_events_channels(&args.service_id);
             let hash = client
-                .full_deploy(&args.wallet_key, rho_code.into())
+                .full_deploy(&args.wallet_key, rho_code)
                 .await
                 .context("failed to init channels")?;
             println!("{hash}");
@@ -222,12 +222,12 @@ fn rho_save_events(
     channel_name: impl Display,
     entries: &[Entry],
 ) -> Result<String, bitcode::Error> {
-    bitcode::serialize(&entries).and_then(|data| {
+    bitcode::serialize(&entries).map(|data| {
         let value = format!(
             r#"@"{channel_name}"!("{}".hexToBytes())"#,
             hex::encode(data)
         );
-        Ok(String::from(value))
+        value
     })
 }
 
@@ -346,16 +346,16 @@ async fn subscribe_to_firefly(
 
     let rho_code = rho_subscribe_to_service(&service_id, self_id, external_hostname, grpc_port);
     client
-        .full_deploy(key, rho_code.into())
+        .full_deploy(key, rho_code)
         .await
         .context("failed to subscribe to service")?;
 
-    let key = key.clone();
+    let key = *key;
     let mut client = scopeguard::guard(client, move |mut client| {
         tokio::spawn(async move {
             let rho_code = rho_unsubscribe_from_service(&service_id, self_id);
             client
-                .full_deploy(&key, rho_code.into())
+                .full_deploy(&key, rho_code)
                 .await
                 .context("failed to unsubscribe from service")?;
             println!("unsubscribed");

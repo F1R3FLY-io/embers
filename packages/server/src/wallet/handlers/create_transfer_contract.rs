@@ -1,8 +1,7 @@
 use sailfish::TemplateSimple;
 
-use crate::wallet::models::WalletAddress;
-
 use super::Description;
+use crate::wallet::models::WalletAddress;
 
 #[derive(TemplateSimple)]
 #[template(path = "transfer_contract.rho")]
@@ -14,15 +13,15 @@ struct CreateTransferContract {
 }
 
 pub fn create_transfer_contract(
-    from: WalletAddress,
-    to: WalletAddress,
+    from: &WalletAddress,
+    to: &WalletAddress,
     amount: u64,
-    description: Description,
+    description: &Description,
 ) -> String {
     CreateTransferContract {
         wallet_address_from: from.to_string(),
         wallet_address_to: to.to_string(),
-        amount: amount,
+        amount,
         description: description.to_string(),
     }
     .render_once()

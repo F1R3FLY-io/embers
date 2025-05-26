@@ -1,6 +1,7 @@
 use std::error::Error;
 
-use firefly_client::{WriteNodeClient, signed_code::SignedCode};
+use firefly_client::WriteNodeClient;
+use firefly_client::signed_code::SignedCode;
 
 pub async fn deploy_signed_contract(
     client: &mut WriteNodeClient,

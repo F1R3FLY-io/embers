@@ -1,5 +1,4 @@
 use anyhow::Context;
-
 use serde_json::Value;
 
 #[derive(Clone)]
@@ -32,10 +31,9 @@ impl ReadNodeClient {
     }
 
     async fn get_value(&self, rholang_code: String) -> anyhow::Result<Value> {
-        let body: String = rholang_code.into();
         self.client
             .post(format!("{}/api/explore-deploy", self.url))
-            .body(body)
+            .body(rholang_code)
             .header("Content-Type", "text/plain")
             .send()
             .await?

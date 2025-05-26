@@ -5,15 +5,13 @@ use poem_openapi::OpenApi;
 use poem_openapi::payload::Json;
 
 use crate::FireFlyClients;
-use crate::wallet::dtos::PrepareTransferInputDto;
-use crate::wallet::dtos::PreparedContractDto;
-use crate::wallet::dtos::TransferSendDto;
-use crate::wallet::dtos::WalletStateAndHistoryDto;
-use crate::wallet::handlers::PrepareTransferInput;
-use crate::wallet::handlers::deploy_signed_contract;
-use crate::wallet::handlers::get_wallet_state_and_history;
-use crate::wallet::handlers::prepare_contract;
+use crate::wallet::dtos::{PrepareTransferInputDto, TransferSendDto};
+use crate::wallet::handlers::{
+    PrepareTransferInput, deploy_signed_contract, get_wallet_state_and_history, prepare_contract,
+};
 use crate::wallet::models::WalletAddress;
+
+use super::dtos::{PreparedContractDto, WalletStateAndHistoryDto};
 
 pub struct WalletApi;
 
@@ -41,6 +39,7 @@ impl WalletApi {
     }
 
     #[oai(path = "/transfer/prepare", method = "post")]
+    #[allow(clippy::unused_async)]
     async fn prepare_transfer(
         &self,
         Json(input): Json<PrepareTransferInputDto>,
@@ -59,8 +58,9 @@ impl WalletApi {
     ) -> poem::Result<()> {
         let mut client = client.to_owned();
 
-        SignedCode::try_from(body)
-            .map(|contract| deploy_signed_contract(&mut client.1, contract))?
+        let code = SignedCode::from(body);
+
+        deploy_signed_contract(&mut client.1, code)
             .await
             .map_err(Into::into)
     }

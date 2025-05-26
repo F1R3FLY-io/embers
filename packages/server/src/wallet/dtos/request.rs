@@ -1,9 +1,8 @@
 use chrono::{DateTime, Utc};
 use poem_openapi::Object;
 
-use crate::wallet::models::Request;
-
 use super::request_status::RequestStatusDto;
+use crate::wallet::models::Request;
 
 #[derive(Debug, Clone, Object)]
 pub struct RequestDto {

@@ -1,9 +1,9 @@
 use derive_more::Display;
-
 use firefly_client::models::casper::DeployDataProto;
 use thiserror::Error;
 
-use crate::wallet::{handlers::create_transfer_contract, models::WalletAddress};
+use crate::wallet::handlers::create_transfer_contract;
+use crate::wallet::models::WalletAddress;
 
 #[derive(Debug, Display, Default)]
 pub struct Description(String);
@@ -45,10 +45,10 @@ pub fn prepare_contract(value: PrepareTransferInput) -> PreparedContract {
     use prost::Message as _;
 
     let term = create_transfer_contract(
-        value.from,
-        value.to,
+        &value.from,
+        &value.to,
         value.amount,
-        value.description.unwrap_or_default(),
+        &value.description.unwrap_or_default(),
     );
 
     let timestamp = chrono::Utc::now().timestamp_millis();

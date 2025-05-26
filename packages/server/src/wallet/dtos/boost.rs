@@ -1,8 +1,7 @@
 use poem_openapi::Object;
 
-use crate::wallet::models::Boost;
-
 use super::direction::DirectionDto;
+use crate::wallet::models::Boost;
 
 #[derive(Debug, Clone, Object)]
 pub struct BoostDto {
