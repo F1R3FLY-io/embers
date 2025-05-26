@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use anyhow::{Context, anyhow};
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
@@ -40,10 +38,7 @@ impl WriteNodeClient {
         })
     }
 
-    pub async fn deploy_signed_contract(
-        &mut self,
-        contract: SignedCode,
-    ) -> std::result::Result<(), Box<dyn Error + Send + Sync>> {
+    pub async fn deploy_signed_contract(&mut self, contract: SignedCode) -> anyhow::Result<()> {
         let msg = {
             let buf = contract.contract.encode_to_vec();
             let mut msg = DeployDataProto::decode(&buf[..])?;
