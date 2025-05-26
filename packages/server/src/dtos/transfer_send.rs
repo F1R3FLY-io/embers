@@ -1,4 +1,4 @@
-use etc::SignedContract;
+use etc::SignedCode;
 use poem_openapi::Object;
 
 #[derive(Debug, Clone, Object)]
@@ -9,7 +9,7 @@ pub struct TransferSendDto {
     deployer: Vec<u8>,
 }
 
-impl From<TransferSendDto> for SignedContract {
+impl From<TransferSendDto> for SignedCode {
     fn from(value: TransferSendDto) -> Self {
         Self {
             contract: value.code.into(),

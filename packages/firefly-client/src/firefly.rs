@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use etc::{Code, SignedContract, WalletAddress};
+use etc::{Code, SignedCode, WalletAddress};
 
 use crate::{
     BlocksClient, ReadNodeClient, WriteNodeClient,
@@ -108,7 +108,7 @@ impl FireflyClient {
 
     pub async fn deploy_signed_contract(
         &mut self,
-        contract: SignedContract,
+        contract: SignedCode,
     ) -> std::result::Result<(), Box<dyn Error + Send + Sync>> {
         self.write_client.deploy_signed_contract(contract).await
     }

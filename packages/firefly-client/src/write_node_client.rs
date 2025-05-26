@@ -3,7 +3,7 @@ use std::error::Error;
 use anyhow::{Context, anyhow};
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
-use etc::{Code, SignedContract};
+use etc::{Code, SignedCode};
 use prost::Message as _;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
@@ -42,7 +42,7 @@ impl WriteNodeClient {
 
     pub async fn deploy_signed_contract(
         &mut self,
-        contract: SignedContract,
+        contract: SignedCode,
     ) -> std::result::Result<(), Box<dyn Error + Send + Sync>> {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();

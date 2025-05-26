@@ -1,4 +1,4 @@
-use etc::SignedContract;
+use etc::{SignedCode, WalletAddress};
 use firefly_client::FireflyClient;
 use poem::{http::StatusCode, web::Data};
 use poem_openapi::OpenApi;
@@ -24,7 +24,7 @@ impl WalletApi {
         wallet_address
             .try_into()
             .map_err(|_| poem::error::ParsePathError)
-            .map(|address| get_wallet_state_and_history(&client.0, address))?
+            .map(|address: WalletAddress| get_wallet_state_and_history(&client.0, address))?
             .await
             .map_err(|e| poem::Error::from_string(e.to_string(), StatusCode::INTERNAL_SERVER_ERROR))
             .map(Into::into)
@@ -52,7 +52,7 @@ impl WalletApi {
     ) -> poem::Result<()> {
         let mut client = client.to_owned();
 
-        SignedContract::try_from(body)
+        SignedCode::try_from(body)
             .map(|contract| deploy_signed_contract(&mut client, contract))?
             .await
             .map_err(Into::into)
