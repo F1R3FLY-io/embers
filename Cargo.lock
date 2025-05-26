@@ -1052,19 +1052,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "etc"
-version = "0.1.0"
-dependencies = [
- "blake2",
- "bs58",
- "derive_more 2.0.1",
- "hex",
- "html-escape",
- "serde",
- "thiserror 2.0.12",
-]
-
-[[package]]
 name = "evalexpr"
 version = "11.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1079,7 +1066,6 @@ dependencies = [
  "base64 0.22.1",
  "bitcode",
  "clap",
- "etc",
  "firefly-client",
  "futures",
  "hex",
@@ -1135,6 +1121,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "filetime"
+version = "0.2.25"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "35c0522e981e68cbfa8c3f978441a5f34b30b96e146b33cd3359176b50fe8586"
+dependencies = [
+ "cfg-if",
+ "libc",
+ "libredox",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "firefly-client"
 version = "0.1.0"
 dependencies = [
@@ -1142,15 +1140,18 @@ dependencies = [
  "async-stream",
  "base64 0.22.1",
  "blake2",
+ "bs58",
  "chrono",
- "etc",
+ "derive_more 2.0.1",
  "futures",
  "hex",
+ "html-escape",
  "prost",
  "reqwest 0.12.15",
  "secp256k1",
  "serde",
  "serde_json",
+ "thiserror 2.0.12",
  "tonic",
  "tonic-build",
 ]
@@ -1974,6 +1975,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
+name = "itoap"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9028f49264629065d057f340a86acb84867925865f73bbf8d47b4d149a7e88b8"
+
+[[package]]
 name = "java-properties"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2103,6 +2110,7 @@ checksum = "c0ff37bd590ca25063e35af745c343cb7a0271906fb7b37e4813e8f79f00268d"
 dependencies = [
  "bitflags 2.9.1",
  "libc",
+ "redox_syscall",
 ]
 
 [[package]]
@@ -3296,6 +3304,44 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
+name = "sailfish"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d4d5cd6d4f24f3ab107e949ab424738cf55b03deddce3b184c46985d7b1394ef"
+dependencies = [
+ "itoap",
+ "ryu",
+ "sailfish-macros",
+ "version_check",
+]
+
+[[package]]
+name = "sailfish-compiler"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7254ec7b3651f7f723a9073153f5dcddc1f2bf1bf8d1b23ac71c236ef6360d2b"
+dependencies = [
+ "filetime",
+ "home",
+ "memchr",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "syn 2.0.101",
+ "toml 0.8.22",
+]
+
+[[package]]
+name = "sailfish-macros"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "00812289fe1891c191cc2d9db461352fc410619e07ec2bb748faaa06412619d0"
+dependencies = [
+ "proc-macro2",
+ "sailfish-compiler",
+]
+
+[[package]]
 name = "same-file"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3521,13 +3567,14 @@ dependencies = [
  "cargo-make",
  "chrono",
  "derive_more 2.0.1",
- "etc",
  "figment",
  "firefly-client",
  "hex",
+ "html-escape",
  "poem",
  "poem-openapi",
  "prost",
+ "sailfish",
  "secp256k1",
  "serde",
  "serde_json",
@@ -3634,22 +3681,6 @@ name = "stable_deref_trait"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
-
-[[package]]
-name = "state-sync"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "base64 0.22.1",
- "clap",
- "etc",
- "firefly-client",
- "secp256k1",
- "serde",
- "serde_json",
- "tokio",
- "uuid",
-]
 
 [[package]]
 name = "strip-ansi-escapes"
@@ -4541,7 +4572,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "458f7a779bf54acc9f347480ac654f68407d3aab21269a6e3c9f922acd9e2da9"
 dependencies = [
  "getrandom 0.3.3",
- "serde",
 ]
 
 [[package]]

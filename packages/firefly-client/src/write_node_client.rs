@@ -3,7 +3,6 @@ use std::error::Error;
 use anyhow::{Context, anyhow};
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
-use etc::{Code, SignedCode};
 use prost::Message as _;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
@@ -14,6 +13,7 @@ use crate::models::casper::v1::{propose_response, rho_data_response};
 use crate::models::casper::{DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
+use crate::signed_code::SignedCode;
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -45,16 +45,8 @@ impl WriteNodeClient {
         contract: SignedCode,
     ) -> std::result::Result<(), Box<dyn Error + Send + Sync>> {
         let msg = {
-            let timestamp = chrono::Utc::now().timestamp_millis();
-            let mut msg = DeployDataProto {
-                term: contract.contract.into(),
-                timestamp,
-                phlo_price: 1,
-                phlo_limit: 500_000,
-                valid_after_block_number: 0,
-                shard_id: "root".into(),
-                ..Default::default()
-            };
+            let buf = contract.contract.encode_to_vec();
+            let mut msg = DeployDataProto::decode(&buf[..])?;
 
             msg.sig = contract.sig;
             msg.sig_algorithm = contract.sig_algorithm;
@@ -90,7 +82,7 @@ impl WriteNodeClient {
             .context("failed to extract block hash")
     }
 
-    pub async fn full_deploy(&mut self, key: &SecretKey, code: Code) -> anyhow::Result<String> {
+    pub async fn full_deploy(&mut self, key: &SecretKey, code: String) -> anyhow::Result<String> {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {

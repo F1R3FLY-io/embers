@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
-use firefly_client::models::Request;
 use poem_openapi::Object;
+
+use crate::wallet::models::Request;
 
 use super::request_status::RequestStatusDto;
 

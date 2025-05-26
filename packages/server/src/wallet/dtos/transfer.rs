@@ -1,5 +1,6 @@
-use firefly_client::models::Transfer;
 use poem_openapi::Object;
+
+use crate::wallet::models::Transfer;
 
 use super::direction::DirectionDto;
 

@@ -10,7 +10,7 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use contracts::{rho_init_events_channels, rho_subscribe_to_service, rho_unsubscribe_from_service};
-use etc::Code;
+use firefly_client::communication_service::CommunicationService;
 use futures::stream::select_all;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, future};
 use secp256k1::SecretKey;
@@ -218,13 +218,16 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn rho_save_events(channel_name: impl Display, entries: &[Entry]) -> Result<Code, bitcode::Error> {
+fn rho_save_events(
+    channel_name: impl Display,
+    entries: &[Entry],
+) -> Result<String, bitcode::Error> {
     bitcode::serialize(&entries).and_then(|data| {
         let value = format!(
             r#"@"{channel_name}"!("{}".hexToBytes())"#,
             hex::encode(data)
         );
-        Ok(Code::from(value))
+        Ok(String::from(value))
     })
 }
 
@@ -287,7 +290,7 @@ fn spawn_grpc_server(
     communication_service_api_addr: SocketAddr,
 ) -> tokio::task::JoinHandle<anyhow::Result<()>> {
     tokio::spawn(async move {
-        let service = firefly_client::CommunicationService::new(move |msg: NotifyMsg| {
+        let service = CommunicationService::new(move |msg: NotifyMsg| {
             println!("got grpc notification: {msg:?}");
             let events = events.clone();
             async move {

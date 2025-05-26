@@ -10,7 +10,6 @@ async-stream      = { version = "0.3" }
 base64            = { version = "0.22" }
 bitcode           = { version = "0.6", features = ["serde"] }
 clap              = { version = "4.5", features = ["derive"] }
-etc               = { path = "../etc" }
 firefly-client    = { path = "../firefly-client" }
 futures           = { version = "0.3" }
 hex               = { version = "0.4" }

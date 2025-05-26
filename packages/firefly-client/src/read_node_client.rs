@@ -1,5 +1,5 @@
 use anyhow::Context;
-use etc::Code;
+
 use serde_json::Value;
 
 #[derive(Clone)]
@@ -16,7 +16,7 @@ impl ReadNodeClient {
         }
     }
 
-    pub async fn get_data<T>(&self, rholang_code: Code) -> anyhow::Result<T>
+    pub async fn get_data<T>(&self, rholang_code: String) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -31,7 +31,7 @@ impl ReadNodeClient {
             .context("failed to deserialize response data into target type")
     }
 
-    async fn get_value(&self, rholang_code: Code) -> anyhow::Result<Value> {
+    async fn get_value(&self, rholang_code: String) -> anyhow::Result<Value> {
         let body: String = rholang_code.into();
         self.client
             .post(format!("{}/api/explore-deploy", self.url))

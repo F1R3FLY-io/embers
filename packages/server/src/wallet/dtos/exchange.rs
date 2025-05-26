@@ -1,5 +1,6 @@
-use firefly_client::models::Exchange;
 use poem_openapi::Object;
+
+use crate::wallet::models::Exchange;
 
 #[derive(Debug, Clone, Object)]
 pub struct ExchangeDto {}

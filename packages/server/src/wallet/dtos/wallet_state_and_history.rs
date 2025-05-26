@@ -1,7 +1,11 @@
-use firefly_client::models::WalletStateAndHistory;
 use poem_openapi::Object;
 
-use super::{boost::BoostDto, exchange::ExchangeDto, request::RequestDto, transfer::TransferDto};
+use crate::wallet::models::WalletStateAndHistory;
+
+use super::boost::BoostDto;
+use super::exchange::ExchangeDto;
+use super::request::RequestDto;
+use super::transfer::TransferDto;
 
 #[derive(Debug, Object)]
 pub(crate) struct WalletStateAndHistoryDto {

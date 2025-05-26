@@ -1,4 +1,4 @@
-use etc::SignedCode;
+use firefly_client::signed_code::SignedCode;
 use poem_openapi::Object;
 
 #[derive(Debug, Clone, Object)]

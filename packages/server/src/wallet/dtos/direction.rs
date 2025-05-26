@@ -1,5 +1,6 @@
-use firefly_client::models::Direction;
 use poem_openapi::Enum;
+
+use crate::wallet::models::Direction;
 
 #[derive(Debug, Clone, Enum)]
 pub enum DirectionDto {

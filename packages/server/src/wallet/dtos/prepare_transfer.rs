@@ -1,9 +1,12 @@
-use etc::ParseWalletAddressError;
-use poem::{error::ResponseError, http::StatusCode};
+use poem::error::ResponseError;
+use poem::http::StatusCode;
 use poem_openapi::Object;
 use thiserror::Error;
 
-use crate::wallet::{Description, DescriptionError, PrepareTransferInput};
+use crate::wallet::{
+    handlers::{Description, DescriptionError, PrepareTransferInput},
+    models::ParseWalletAddressError,
+};
 
 #[derive(Debug, Object)]
 pub(crate) struct PrepareTransferInputDto {

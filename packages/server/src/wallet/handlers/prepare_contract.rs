@@ -1,10 +1,9 @@
 use derive_more::Display;
+
+use firefly_client::models::casper::DeployDataProto;
 use thiserror::Error;
 
-use etc::{WalletAddress, escape_string};
-use firefly_client::models::casper::DeployDataProto;
-
-use crate::wallet::create_transfer_contract;
+use crate::wallet::{handlers::create_transfer_contract, models::WalletAddress};
 
 #[derive(Debug, Display, Default)]
 pub struct Description(String);
@@ -23,7 +22,7 @@ impl TryFrom<String> for Description {
             return Result::Err(DescriptionError::TooLong);
         }
 
-        Ok(Self(escape_string(&value).to_string()))
+        Ok(Self(html_escape::encode_safe(&value).to_string()))
     }
 
     type Error = DescriptionError;
@@ -45,7 +44,7 @@ pub struct PreparedContract {
 pub fn prepare_contract(value: PrepareTransferInput) -> PreparedContract {
     use prost::Message as _;
 
-    let code = create_transfer_contract(
+    let term = create_transfer_contract(
         value.from,
         value.to,
         value.amount,
@@ -54,7 +53,7 @@ pub fn prepare_contract(value: PrepareTransferInput) -> PreparedContract {
 
     let timestamp = chrono::Utc::now().timestamp_millis();
     let contract = DeployDataProto {
-        term: code,
+        term,
         timestamp,
         phlo_price: 1,
         phlo_limit: 500_000,

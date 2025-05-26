@@ -1,5 +1,6 @@
-use firefly_client::models::Boost;
 use poem_openapi::Object;
+
+use crate::wallet::models::Boost;
 
 use super::direction::DirectionDto;
 

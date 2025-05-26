@@ -1,5 +1,6 @@
-use firefly_client::models::RequestStatus;
 use poem_openapi::Enum;
+
+use crate::wallet::models::RequestStatus;
 
 #[derive(Debug, Clone, PartialEq, Enum)]
 pub enum RequestStatusDto {
