@@ -2,6 +2,7 @@ use firefly_client::signed_code::SignedCode;
 use poem::http::StatusCode;
 use poem::web::Data;
 use poem_openapi::OpenApi;
+use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
 use super::dtos::{PreparedContractDto, WalletStateAndHistoryDto};
@@ -22,11 +23,11 @@ impl WalletApi {
     #[oai(path = "/state/:address", method = "get")]
     async fn wallet_state_and_history(
         &self,
-        wallet_address: String,
+        Path(address): Path<String>,
         Data(client): Data<&FireFlyClients>,
     ) -> poem::Result<Json<WalletStateAndHistoryDto>> {
         let wallet_address =
-            WalletAddress::try_from(wallet_address).map_err(|_| poem::error::ParsePathError)?;
+            WalletAddress::try_from(address).map_err(|_| poem::error::ParsePathError)?;
 
         let wallet_state_and_history =
             get_wallet_state_and_history(&client.0, &client.2, wallet_address)
