@@ -40,13 +40,12 @@ impl WriteNodeClient {
 
     pub async fn deploy_signed_contract(&mut self, contract: SignedCode) -> anyhow::Result<()> {
         let msg = {
-            let buf = contract.contract.encode_to_vec();
-            let mut msg = DeployDataProto::decode(&buf[..])?;
+            let mut msg = DeployDataProto::decode(contract.contract.as_slice())?;
 
             msg.sig = contract.sig;
             msg.sig_algorithm = contract.sig_algorithm;
-
             msg.deployer = contract.deployer;
+
             msg
         };
 
