@@ -8,7 +8,7 @@ pub struct Config {
     pub deploy_service_url: String,
     pub propose_service_url: String,
     pub read_node_url: String,
-    pub port: String,
+    pub port: u32,
 }
 
 pub fn collect_config() -> anyhow::Result<Config> {
