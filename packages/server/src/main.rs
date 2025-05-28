@@ -7,6 +7,7 @@ use wallet::api::WalletApi;
 
 use crate::configuration::collect_config;
 
+mod common;
 mod configuration;
 mod wallet;
 

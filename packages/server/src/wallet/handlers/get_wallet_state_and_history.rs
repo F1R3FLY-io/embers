@@ -54,8 +54,7 @@ pub async fn get_wallet_state_and_history(
                 Direction::Incoming
             };
 
-            #[allow(clippy::cast_possible_wrap)]
-            chrono::DateTime::from_timestamp_millis(deploy.timestamp as i64).map(|date| Transfer {
+            chrono::DateTime::from_timestamp_millis(deploy.timestamp).map(|date| Transfer {
                 id: deploy.sig,
                 direction,
                 date,
@@ -69,7 +68,6 @@ pub async fn get_wallet_state_and_history(
     Ok(WalletStateAndHistory {
         balance,
         transfers,
-        address,
         boosts: vec![],
         exchanges: vec![],
         requests: vec![],

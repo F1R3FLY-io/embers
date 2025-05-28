@@ -1,4 +1,4 @@
-FROM rust:1.86-slim-bookworm AS builder
+FROM rust:1.87-slim-bookworm AS builder
 
 WORKDIR /app
 RUN apt-get update && \
@@ -6,7 +6,6 @@ RUN apt-get update && \
     apt clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY packages/etc etc
 COPY packages/firefly-client firefly-client
 COPY packages/events-sync events-sync
 

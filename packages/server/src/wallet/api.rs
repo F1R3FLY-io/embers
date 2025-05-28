@@ -1,5 +1,4 @@
-use firefly_client::signed_code::SignedCode;
-use poem::http::StatusCode;
+use firefly_client::models::SignedCode;
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
@@ -30,15 +29,9 @@ impl WalletApi {
             WalletAddress::try_from(address).map_err(|_| poem::error::ParsePathError)?;
 
         let wallet_state_and_history =
-            get_wallet_state_and_history(&client.0, &client.2, wallet_address)
-                .await
-                .map_err(|e| {
-                    poem::Error::from_string(e.to_string(), StatusCode::INTERNAL_SERVER_ERROR)
-                })?;
+            get_wallet_state_and_history(&client.0, &client.2, wallet_address).await?;
 
-        Ok(Json(WalletStateAndHistoryDto::from(
-            wallet_state_and_history,
-        )))
+        Ok(Json(wallet_state_and_history.into()))
     }
 
     #[oai(path = "/transfer/prepare", method = "post")]
@@ -50,7 +43,7 @@ impl WalletApi {
         let value = PrepareTransferInput::try_from(input)?;
         let contract = prepare_contract(value);
 
-        Ok(Json(PreparedContractDto::from(contract)))
+        Ok(Json(contract.into()))
     }
 
     #[oai(path = "/transfer/send", method = "post")]

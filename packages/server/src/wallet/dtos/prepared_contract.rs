@@ -2,7 +2,7 @@ use poem_openapi::Object;
 
 use crate::wallet::handlers::PreparedContract;
 
-#[derive(Debug, Object)]
+#[derive(Debug, Clone, Object)]
 pub struct PreparedContractDto {
     contract: Vec<u8>,
 }

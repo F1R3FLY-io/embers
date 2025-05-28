@@ -38,7 +38,7 @@ pub struct BlockInfo {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Deploy {
-    pub timestamp: u64,
+    pub timestamp: i64,
     pub cost: u64,
     pub term: String,
     pub sig: String,
@@ -52,4 +52,12 @@ pub struct Deploy {
 pub struct Block {
     pub block_info: BlockInfo,
     pub deploys: Vec<Deploy>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SignedCode {
+    pub contract: Vec<u8>,
+    pub sig: Vec<u8>,
+    pub sig_algorithm: String,
+    pub deployer: Vec<u8>,
 }
