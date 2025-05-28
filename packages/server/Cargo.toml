@@ -39,7 +39,3 @@ priority = -1
 [lints.clippy.nursery]
 level    = "warn"
 priority = -1
-
-[dev-dependencies]
-cargo-make = "0.37.24"
-taplo-cli  = "0.10.0"
