@@ -5,13 +5,13 @@ use prost::Message as _;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
 use crate::helpers::FromExpr;
+use crate::models::SignedCode;
 use crate::models::casper::v1::deploy_service_client::DeployServiceClient;
 use crate::models::casper::v1::propose_service_client::ProposeServiceClient;
-use crate::models::casper::v1::{propose_response, rho_data_response};
+use crate::models::casper::v1::{deploy_response, propose_response, rho_data_response};
 use crate::models::casper::{DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
-use crate::signed_code::SignedCode;
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -49,7 +49,20 @@ impl WriteNodeClient {
             msg
         };
 
-        self.deploy_client.do_deploy(msg).await?;
+        let resp = self
+            .deploy_client
+            .do_deploy(msg)
+            .await?
+            .into_inner()
+            .message
+            .context("missing do_deploy responce")?;
+
+        match resp {
+            deploy_response::Message::Result(_) => (),
+            deploy_response::Message::Error(err) => {
+                return Err(anyhow!("do_deploy error: {err:?}"));
+            }
+        }
 
         Ok(())
     }
@@ -105,11 +118,20 @@ impl WriteNodeClient {
             msg
         };
 
-        self.deploy_client
+        let resp = self
+            .deploy_client
             .do_deploy(msg)
-            .await
-            .context("do_deploy grpc error")?
-            .into_inner();
+            .await?
+            .into_inner()
+            .message
+            .context("missing do_deploy responce")?;
+
+        match resp {
+            deploy_response::Message::Result(_) => (),
+            deploy_response::Message::Error(err) => {
+                return Err(anyhow!("do_deploy error: {err:?}"));
+            }
+        }
 
         self.propose().await.context("propose error")
     }

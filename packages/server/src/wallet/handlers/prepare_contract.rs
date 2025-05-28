@@ -1,11 +1,12 @@
-use derive_more::Display;
+use derive_more::{AsRef, Display, Into};
 use firefly_client::models::casper::DeployDataProto;
+use prost::Message as _;
 use thiserror::Error;
 
 use crate::wallet::handlers::create_transfer_contract;
-use crate::wallet::models::WalletAddress;
+use crate::wallet::models::{Amount, WalletAddress};
 
-#[derive(Debug, Display, Default)]
+#[derive(Debug, Display, Default, Into, AsRef)]
 pub struct Description(String);
 
 const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
@@ -17,22 +18,22 @@ pub enum DescriptionError {
 }
 
 impl TryFrom<String> for Description {
+    type Error = DescriptionError;
+
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.chars().count() > MAX_DESCRIPTION_CHARS_COUNT {
-            return Result::Err(DescriptionError::TooLong);
+            return Result::Err(Self::Error::TooLong);
         }
 
-        Ok(Self(html_escape::encode_safe(&value).to_string()))
+        Ok(Self(html_escape::encode_safe(&value).into_owned()))
     }
-
-    type Error = DescriptionError;
 }
 
 #[derive(Debug)]
 pub struct PrepareTransferInput {
     pub from: WalletAddress,
     pub to: WalletAddress,
-    pub amount: u64,
+    pub amount: Amount,
     pub description: Option<Description>,
 }
 
@@ -42,8 +43,6 @@ pub struct PreparedContract {
 }
 
 pub fn prepare_contract(value: PrepareTransferInput) -> PreparedContract {
-    use prost::Message as _;
-
     let term = create_transfer_contract(
         &value.from,
         &value.to,

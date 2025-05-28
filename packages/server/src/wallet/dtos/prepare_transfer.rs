@@ -3,14 +3,15 @@ use poem::http::StatusCode;
 use poem_openapi::Object;
 use thiserror::Error;
 
+use crate::common::dtos::Stringified;
 use crate::wallet::handlers::{Description, DescriptionError, PrepareTransferInput};
-use crate::wallet::models::ParseWalletAddressError;
+use crate::wallet::models::{Amount, ParseWalletAddressError};
 
-#[derive(Debug, Object)]
+#[derive(Debug, Clone, Object)]
 pub struct PrepareTransferInputDto {
     from: String,
     to: String,
-    amount: u64,
+    amount: Stringified<u64>,
     description: Option<String>,
 }
 
@@ -18,14 +19,12 @@ pub struct PrepareTransferInputDto {
 pub enum PrepareContractRequestProblem {
     #[error("Amount field can't be empty")]
     EmptyAmount,
-    #[error("Receiver address field can't be empty")]
-    EmptyReceiverAddress,
-    #[error("Serder address field can't be empty")]
-    EmptySenderAddress,
-    #[error("Wallet adress has wrong format")]
-    WrongAddressFormat(ParseWalletAddressError),
-    #[error("Description error")]
-    DescriptionError(DescriptionError),
+    #[error("Receiver wallet adress has wrong format: {0}")]
+    WrongReceiverAddressFormat(ParseWalletAddressError),
+    #[error("Sender wallet adress has wrong format: {0}")]
+    WrongSenderAddressFormat(ParseWalletAddressError),
+    #[error("Description format error: {0}")]
+    DescriptionError(#[from] DescriptionError),
 }
 
 impl ResponseError for PrepareContractRequestProblem {
@@ -38,38 +37,23 @@ impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
     type Error = PrepareContractRequestProblem;
 
     fn try_from(value: PrepareTransferInputDto) -> Result<Self, Self::Error> {
-        if value.amount == 0 {
-            return Err(PrepareContractRequestProblem::EmptyAmount);
-        }
-
-        if value.to.is_empty() {
-            return Err(PrepareContractRequestProblem::EmptyReceiverAddress);
-        }
-
-        if value.from.is_empty() {
-            return Err(PrepareContractRequestProblem::EmptySenderAddress);
-        }
-
-        let description = value
-            .description
-            .map(Description::try_from)
-            .transpose()
-            .map_err(PrepareContractRequestProblem::DescriptionError)?;
+        let to = value
+            .to
+            .try_into()
+            .map_err(Self::Error::WrongReceiverAddressFormat)?;
 
         let from = value
             .from
             .try_into()
-            .map_err(PrepareContractRequestProblem::WrongAddressFormat)?;
+            .map_err(Self::Error::WrongSenderAddressFormat)?;
 
-        let to = value
-            .to
-            .try_into()
-            .map_err(PrepareContractRequestProblem::WrongAddressFormat)?;
+        let amount = Amount::try_from(value.amount.0).map_err(|_| Self::Error::EmptyAmount)?;
+        let description = value.description.map(Description::try_from).transpose()?;
 
         Ok(Self {
             from,
             to,
-            amount: value.amount,
+            amount,
             description,
         })
     }

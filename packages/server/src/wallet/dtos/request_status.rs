@@ -3,6 +3,7 @@ use poem_openapi::Enum;
 use crate::wallet::models::RequestStatus;
 
 #[derive(Debug, Clone, Eq, PartialEq, Enum)]
+#[oai(rename_all = "lowercase")]
 pub enum RequestStatusDto {
     Done,
     Ongoing,

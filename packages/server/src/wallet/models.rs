@@ -1,8 +1,12 @@
 mod wallet_address;
 
+use std::num::NonZero;
+
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 pub use wallet_address::*;
+
+pub type Amount = NonZero<u64>;
 
 #[derive(Debug, Clone)]
 pub struct Transfer {
@@ -20,12 +24,9 @@ pub enum Direction {
     Outgoing,
 }
 
-type Balance = u64;
-
 #[derive(Debug, Clone)]
 pub struct WalletStateAndHistory {
-    pub address: WalletAddress,
-    pub balance: Balance,
+    pub balance: u64,
     pub requests: Vec<Request>,
     pub exchanges: Vec<Exchange>,
     pub boosts: Vec<Boost>,
@@ -43,6 +44,7 @@ pub struct Boost {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "UPPERCASE")]
 pub enum Operation {
     Transfer {
         wallet_address_from: WalletAddress,
