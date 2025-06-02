@@ -1,15 +1,26 @@
 use firefly_client::models::Deploy;
 use firefly_client::{BlocksClient, ReadNodeClient};
+use sailfish::TemplateSimple;
 
-use super::create_check_balance_contract;
 use crate::wallet::models::{Direction, Operation, Transfer, WalletAddress, WalletStateAndHistory};
+
+#[derive(TemplateSimple)]
+#[template(path = "check_balance.rho")]
+struct CheckBalance<'a> {
+    wallet_address: &'a str,
+}
 
 pub async fn get_wallet_state_and_history(
     read_client: &ReadNodeClient,
     block_client: &BlocksClient,
     address: WalletAddress,
 ) -> anyhow::Result<WalletStateAndHistory> {
-    let code = create_check_balance_contract(&address);
+    let code = CheckBalance {
+        wallet_address: address.as_ref(),
+    }
+    .render_once()
+    .unwrap();
+
     let balance = read_client.get_data(code).await?;
     let transfers = block_client
         .get_deploys()

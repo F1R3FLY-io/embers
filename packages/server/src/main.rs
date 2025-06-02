@@ -11,20 +11,14 @@ mod common;
 mod configuration;
 mod wallet;
 
-pub(crate) type FireFlyClients = (ReadNodeClient, WriteNodeClient, BlocksClient);
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = collect_config().expect("Can't read bootstrap configuration");
 
-    let firefly_clients = {
-        let read_client = ReadNodeClient::new(config.read_node_url.clone());
-        let write_client =
-            WriteNodeClient::new(config.deploy_service_url, config.propose_service_url).await?;
-        let blocks_client = BlocksClient::new(config.read_node_url);
-
-        (read_client, write_client, blocks_client)
-    };
+    let read_client = ReadNodeClient::new(config.read_node_url.clone());
+    let write_client =
+        WriteNodeClient::new(config.deploy_service_url, config.propose_service_url).await?;
+    let blocks_client = BlocksClient::new(config.read_node_url);
 
     let api = OpenApiService::new(WalletApi, "Embers API", "0.1.0").url_prefix("/api");
 
@@ -35,7 +29,9 @@ async fn main() -> anyhow::Result<()> {
         .nest("/api", api)
         .nest("/swagger-ui/index.html", ui)
         .nest("/swagger-ui/openapi.json", spec)
-        .data(firefly_clients)
+        .data(read_client)
+        .data(write_client)
+        .data(blocks_client)
         .with(Cors::new().allow_origin_regex("*"));
 
     let port = config.port;

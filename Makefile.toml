@@ -4,6 +4,12 @@ command       = "cargo"
 install_crate = "clippy"
 toolchain     = "nightly"
 
+[tasks.audit]
+args          = ["audit"]
+command       = "cargo"
+install_crate = "cargo-audit"
+workspace     = false
+
 [tasks.format]
 args          = ["fmt", "--all"]
 command       = "cargo"
@@ -13,3 +19,10 @@ workspace     = false
 
 [tasks.fmt]
 alias = "format"
+
+[tasks.format-check]
+args          = ["fmt", "--all", "--check"]
+command       = "cargo"
+install_crate = "rustfmt"
+toolchain     = "nightly"
+workspace     = false

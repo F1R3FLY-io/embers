@@ -4,8 +4,8 @@ use poem_openapi::Object;
 use thiserror::Error;
 
 use crate::common::dtos::Stringified;
-use crate::wallet::handlers::{Description, DescriptionError, PrepareTransferInput};
-use crate::wallet::models::{Amount, ParseWalletAddressError};
+use crate::wallet::handlers::PrepareTransferInput;
+use crate::wallet::models::{Amount, Description, DescriptionError, ParseWalletAddressError};
 
 #[derive(Debug, Clone, Object)]
 pub struct PrepareTransferInputDto {

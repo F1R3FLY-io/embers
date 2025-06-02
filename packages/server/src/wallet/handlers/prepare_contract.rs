@@ -1,32 +1,16 @@
-use derive_more::{AsRef, Display, Into};
 use firefly_client::models::casper::DeployDataProto;
 use prost::Message as _;
-use thiserror::Error;
+use sailfish::TemplateSimple;
 
-use crate::wallet::handlers::create_transfer_contract;
-use crate::wallet::models::{Amount, WalletAddress};
+use crate::wallet::models::{Amount, Description, WalletAddress};
 
-#[derive(Debug, Display, Default, Into, AsRef)]
-pub struct Description(String);
-
-const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
-
-#[derive(Debug, Error)]
-pub enum DescriptionError {
-    #[error("Maximum chars length")]
-    TooLong,
-}
-
-impl TryFrom<String> for Description {
-    type Error = DescriptionError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        if value.chars().count() > MAX_DESCRIPTION_CHARS_COUNT {
-            return Result::Err(Self::Error::TooLong);
-        }
-
-        Ok(Self(html_escape::encode_safe(&value).into_owned()))
-    }
+#[derive(TemplateSimple)]
+#[template(path = "transfer_contract.rho")]
+struct TransferContract<'a> {
+    wallet_address_from: &'a str,
+    wallet_address_to: &'a str,
+    amount: u64,
+    description: &'a str,
 }
 
 #[derive(Debug)]
@@ -42,13 +26,15 @@ pub struct PreparedContract {
     pub contract: Vec<u8>,
 }
 
-pub fn prepare_contract(value: PrepareTransferInput) -> PreparedContract {
-    let term = create_transfer_contract(
-        &value.from,
-        &value.to,
-        value.amount,
-        &value.description.unwrap_or_default(),
-    );
+pub fn prepare_transfer_contract(value: PrepareTransferInput) -> PreparedContract {
+    let term = TransferContract {
+        wallet_address_from: value.from.as_ref(),
+        wallet_address_to: value.to.as_ref(),
+        amount: value.amount.get(),
+        description: value.description.unwrap_or_default().as_ref(),
+    }
+    .render_once()
+    .unwrap();
 
     let timestamp = chrono::Utc::now().timestamp_millis();
     let contract = DeployDataProto {
