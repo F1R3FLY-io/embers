@@ -38,15 +38,15 @@ in {
     }|
 
     contract updateTransferHistory(@user, @from, @to, @amount, @description) = {
-        for(@user_transaction_history <- @{ *history | user }) {
+        for(@user_transaction_history <- @{ history | *user }) {
             match user_transaction_history {
-                Nil => @{ *history | user }!([{
+                Nil => @{ history | *user }!([{
                     "from": from,
                     "to": to,
                     "amount": amount,
                     "description": description,
                 }])
-                value => @{ *history | user }!(value ++ [{
+                value => @{ history | *user }!(value ++ [{
                     "from": from,
                     "to": to,
                     "amount": amount,
@@ -72,18 +72,17 @@ in {
         }
     }|
 
-    contract @"getUserHistory"(@address, @publicKey, ret) = {
-        match address == deriveRevAddressFromPublicKey(publicKey){
-            true => {
-for(@user_transaction_history <- @{ *history | address }) {
-                match user_transaction_history {
-                    Nil => ret!([])
-                    value => ret!(value)
+    contract @"getUserHistory"(publicKey, ret) = {
+        new RevAddress(`rho:rev:address`), revAddrCh in {
+            RevAddress!("fromPublicKey", *publicKey, *revAddrCh)|
+            for (address <- revAddrCh) {
+                for(@user_transaction_history <- @{ history | *address }) {
+                    match user_transaction_history {
+                        Nil => ret!([])
+                        value => ret!(value)
+                    }
                 }
             }
-            }
-            false => ret!([])
         }
-
     }
 }
