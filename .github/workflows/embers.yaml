@@ -6,14 +6,16 @@ concurrency:
 
 on:
   push:
-    branches: main
+    branches: [main]
     paths-ignore:
       - "docker/**"
       - "docs/**"
+      - "*.md"
   pull_request:
     paths-ignore:
       - "docker/**"
       - "docs/**"
+      - "*.md"
 
 jobs:
   build:
@@ -27,17 +29,34 @@ jobs:
         with:
           toolchain: stable, nightly
           components: rustfmt, clippy
+          cache: true
 
-      - name: Install cargo-make
-        run: cargo install cargo-make
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Run audit
+      - name: Cache cargo tools
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/cargo-make
+            ~/.cargo/bin/cargo-audit
+          key: cargo-tools-${{ runner.os }}
+
+      - name: Install cargo tools
+        run: |
+          if ! command -v cargo-make &> /dev/null; then
+            cargo install cargo-make
+          fi
+
+      - name: Build
         run: cargo build --all-targets
 
-      - name: Run audit
+      - name: Run security audit
         run: cargo make audit
 
-      - name: Run format
+      - name: Check formatting
         run: cargo make format-check
 
       - name: Run clippy
