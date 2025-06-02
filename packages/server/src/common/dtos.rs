@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
@@ -88,5 +89,11 @@ impl ParseFromJSON for Stringified<u64> {
 impl ToJSON for Stringified<u64> {
     fn to_json(&self) -> Option<serde_json::Value> {
         self.0.to_string().to_json()
+    }
+}
+
+impl From<NonZero<u64>> for Stringified<u64> {
+    fn from(value: NonZero<u64>) -> Self {
+        Self(value.get())
     }
 }

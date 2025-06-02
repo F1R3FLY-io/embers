@@ -1,0 +1,44 @@
+name: Embers
+run-name: Embers ${{ github.event_name == 'push' && 'main' || format('MR {0}', github.event.pull_request.title) }}
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: main
+    paths-ignore:
+      - "docker/**"
+      - "docs/**"
+  pull_request:
+    paths-ignore:
+      - "docker/**"
+      - "docs/**"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable, nightly
+          components: rustfmt, clippy
+
+      - name: Install cargo-make
+        run: cargo install cargo-make
+
+      - name: Run audit
+        run: cargo build --all-targets
+
+      - name: Run audit
+        run: cargo make audit
+
+      - name: Run format
+        run: cargo make format-check
+
+      - name: Run clippy
+        run: cargo make clippy

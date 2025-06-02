@@ -1,10 +1,13 @@
+mod description;
 mod wallet_address;
 
 use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-pub use wallet_address::*;
+
+pub use self::description::*;
+pub use self::wallet_address::*;
 
 pub type Amount = NonZero<u64>;
 
@@ -13,7 +16,7 @@ pub struct Transfer {
     pub id: String,
     pub direction: Direction,
     pub date: DateTime<Utc>,
-    pub amount: u64,
+    pub amount: Amount,
     pub to_address: WalletAddress,
     pub cost: u64,
 }
@@ -39,7 +42,7 @@ pub struct Boost {
     pub username: String,
     pub direction: Direction,
     pub date: DateTime<Utc>,
-    pub amount: u64,
+    pub amount: Amount,
     pub post: String,
 }
 
@@ -49,7 +52,7 @@ pub enum Operation {
     Transfer {
         wallet_address_from: WalletAddress,
         wallet_address_to: WalletAddress,
-        amount: u64,
+        amount: Amount,
         description: String,
     },
 }
@@ -58,7 +61,7 @@ pub enum Operation {
 pub struct Request {
     pub id: String,
     pub date: DateTime<Utc>,
-    pub amount: u64,
+    pub amount: Amount,
     pub status: RequestStatus,
 }
 

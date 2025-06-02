@@ -17,7 +17,6 @@ poem               = { version = "3.1", features = ["anyhow"] }
 poem-openapi       = { version = "5.1", features = ["chrono", "swagger-ui"] }
 prost              = { version = "0.13" }
 sailfish           = { version = "0.9" }
-secp256k1          = { version = "0.31", features = ["serde"] }
 serde              = { version = "1.0" }
 serde_json         = { version = "1.0" }
 structural-convert = { version = "0.13" }
