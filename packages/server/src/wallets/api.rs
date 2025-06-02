@@ -13,6 +13,12 @@ use crate::wallets::handlers::{
     prepare_transfer_contract,
 };
 use crate::wallets::models::{PrepareTransferInput, WalletAddress};
+use super::dtos::{PreparedContractDto, WalletStateAndHistoryDto};
+use crate::FireFlyClients;
+use crate::wallet::contracts::{PrepareTransferInput, prepare_contract};
+use crate::wallet::dtos::{PrepareTransferInputDto, TransferSendDto};
+use crate::wallet::handlers::{deploy_signed_contract, get_wallet_state_and_history};
+use crate::wallet::models::WalletAddress;
 
 pub struct WalletsApi;
 
@@ -28,10 +34,11 @@ impl WalletsApi {
         let wallet_address =
             WalletAddress::try_from(address).map_err(|_| poem::error::ParsePathError)?;
 
-        let wallet_state_and_history =
-            get_wallet_state_and_history(read_client, block_client, wallet_address).await?;
+        let wallet_state_and_history = get_wallet_state_and_history(&client.0, wallet_address)
+            .await
+            .map(Into::into)?;
 
-        Ok(Json(wallet_state_and_history.into()))
+        Ok(Json(wallet_state_and_history))
     }
 
     #[allow(clippy::unused_async)]
@@ -40,10 +47,12 @@ impl WalletsApi {
         &self,
         Json(input): Json<PrepareTransferInputDto>,
     ) -> poem::Result<Json<PreparedContractDto>> {
-        let value = PrepareTransferInput::try_from(input)?;
-        let contract = prepare_transfer_contract(value);
+        let id_generator = uuid::Uuid::now_v7;
+        let input = PrepareTransferInput::try_from(input)?;
 
-        Ok(Json(contract.into()))
+        let result = prepare_contract(id_generator, input);
+
+        Ok(Json(result.into()))
     }
 
     #[oai(path = "/transfer/send", method = "post")]
@@ -52,11 +61,11 @@ impl WalletsApi {
         Json(body): Json<SignedContractDto>,
         Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
+        let (_, mut write_node_client, _) = client.to_owned();
 
         let code = SignedCode::from(body);
 
-        deploy_signed_transfer(&mut client, code)
+        deploy_signed_contract(&mut write_node_client, code)
             .await
             .map_err(Into::into)
     }

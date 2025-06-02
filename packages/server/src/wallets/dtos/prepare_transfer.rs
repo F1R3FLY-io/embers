@@ -1,7 +1,6 @@
 use poem::error::ResponseError;
 use poem::http::StatusCode;
 use poem_openapi::Object;
-use thiserror::Error;
 
 use crate::common::dtos::Stringified;
 use crate::wallets::models::{

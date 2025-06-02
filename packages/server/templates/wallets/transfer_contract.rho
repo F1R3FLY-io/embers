@@ -1,35 +1,82 @@
-//FIREFLY_OPERATION;{"type": "TRANSFER", "wallet_address_from": {{ wallet_address_from }}, "wallet_address_to": {{ wallet_address_to }}, "amount": {{ amount }}, "description": {{ description }}}}
-new rl(`rho:registry:lookup`), RevVaultCh in {
-    rl!(`rho:rchain:revVault`, *RevVaultCh) |
-    for (@(_, RevVault) <- RevVaultCh) {
-        new vaultCh, vaultTo, revVaultkeyCh,
-        deployerId(`rho:rchain:deployerId`),
-        deployId(`rho:rchain:deployId`)
-        in {
-            match ({{ wallet_address_from }}, {{ wallet_address_to }}, {{ amount }}) {
-                (revAddrFrom, revAddrTo, amount) => {
-                    @RevVault!("findOrCreate", revAddrFrom, *vaultCh) |
-                    @RevVault!("findOrCreate", revAddrTo, *vaultTo) |
-                    @RevVault!("deployerAuthKey", *deployerId, *revVaultkeyCh) |
-                    for (@vault <- vaultCh; key <- revVaultkeyCh; _ <- vaultTo) {
-                        match vault {
-                            (true, vault) => {
-                                new resultCh in {
-                                    @vault!("transfer", revAddrTo, amount, *key, *resultCh) |
-                                    for (@result <- resultCh) {
-                                        match result {
-                                            (true , _  ) => deployId!((true, "OK"))
-                                            (false, err) => deployId!((false, err))
+new doTransfer,
+    updateTransferHistory,
+    history
+in {
+    contract doTransfer(@from, @to, @amount, ret) = {
+        new rl(`rho:registry:lookup`),
+            RevVaultCh in {
+            rl!(`rho:rchain:revVault`, *RevVaultCh) |
+            for (@(_, RevVault) <- RevVaultCh) {
+                new vaultCh,
+                    vaultTo,
+                    revVaultKeyCh,
+                    deployerId(`rho:rchain:deployerId`) in {
+                        @RevVault!("findOrCreate", from, *vaultCh) |
+                        @RevVault!("findOrCreate", to, *vaultTo) |
+                        @RevVault!("deployerAuthKey", *deployerId, *revVaultKeyCh) |
+                        for (@vault <- vaultCh; key <- revVaultKeyCh; _ <- vaultTo) {
+                            match vault {
+                                (true, vault) => {
+                                    new resultCh in {
+                                        @vault!("transfer", to, amount, *key, *resultCh) |
+                                        for (@result <- resultCh) {
+                                            match result {
+                                                (true , _  ) => ret!((true, "OK"))
+                                                (false, err) => ret!((false, err))
+                                            }
                                         }
                                     }
                                 }
-                            }
-                            err => {
-                                deployId!((false, "REV vault cannot be found or created"))
+                                err => {
+                                    ret!((false, "REV vault cannot be found or created"))
+                                }
                             }
                         }
-                    }
                 }
+            }
+        }
+    }|
+
+    contract updateTransferHistory(@user, @from, @to, @amount, @description) = {
+        for(@user_transaction_history <- @{ *history | user }) {
+            match user_transaction_history {
+                Nil => @{ *history | user }!([{
+                    "from": from,
+                    "to": to,
+                    "amount": amount,
+                    "description": description,
+                }])
+                value => @{ *history | user }!(value ++ [{
+                    "from": from,
+                    "to": to,
+                    "amount": amount,
+                    "description": description,
+                }])
+            }
+        }
+    }|
+
+    contract @"sendTokens"(@from, @to, @amount, @description) = {
+        new return in {
+            doTransfer!(from, to, amount, *return)|
+            for (@v <- return) {
+                match v {
+                    (true, _) =>{
+                        updateTransferHistory!(from, from, to, amount, description) |
+                        updateTransferHistory!(to,   from, to, amount, description)
+                    }
+                    (false, err) => return!((false, err))
+                }
+
+            }
+        }
+    }|
+
+    contract @"getUserHistory"(address, ret) = {
+        for(@user_transaction_history <- @{ *history | *address }) {
+            match user_transaction_history {
+                Nil => ret!([])
+                value => ret!(user_transaction_history)
             }
         }
     }

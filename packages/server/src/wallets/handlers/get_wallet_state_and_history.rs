@@ -4,11 +4,15 @@ use firefly_client::{BlocksClient, ReadNodeClient};
 
 use crate::common::rendering::RhoValue;
 use crate::wallets::models::{
-    Direction,
-    Operation,
-    Transfer,
-    WalletAddress,
-    WalletStateAndHistory,
+    Direction, Operation, Transfer, WalletAddress, WalletStateAndHistory,
+};
+use chrono::{DateTime, Utc};
+use firefly_client::ReadNodeClient;
+
+use crate::wallet::{
+    contracts::{create_check_balance_contract, get_user_history_contract},
+    dtos::{ChainOperationRecord, OperationRecord},
+    models::{Direction, Transfer, WalletAddress, WalletStateAndHistory},
 };
 
 #[derive(Template)]
@@ -20,78 +24,45 @@ struct CheckBalance {
 #[tracing::instrument(level = "info", skip_all, err(Debug))]
 #[tracing::instrument(level = "trace", skip(read_client, block_client), ret(Debug))]
 pub async fn get_wallet_state_and_history(
-    read_client: &ReadNodeClient,
-    block_client: &BlocksClient,
+    client: &ReadNodeClient,
     address: WalletAddress,
 ) -> anyhow::Result<WalletStateAndHistory> {
-    let code = CheckBalance {
-        wallet_address: String::from(address.clone()).into(),
-    }
-    .render()
-    .unwrap();
+    let contract = create_check_balance_contract(&address);
+    let balance = client.get_data("/expr/0/ExprInt/data", contract).await?;
 
-    let balance = read_client.get_data(code).await?;
-    let transfers = block_client
-        .get_deploys()
+    let contract = get_user_history_contract(&address);
+    let transfers = client
+        .get_data::<Vec<ChainOperationRecord>>("/expr", contract)
         .await?
         .into_iter()
-        .filter(|deploy| !deploy.errored)
-        .filter_map(|deploy| {
-            deploy
-                .term
-                .lines()
-                .next()
-                .and_then(|line| line.strip_prefix("//FIREFLY_OPERATION;"))
-                .map(ToOwned::to_owned)
-                .map(|meta| (deploy, meta))
-        })
-        .filter_map(|(deploy, meta)| {
-            serde_json::from_str(&meta)
-                .map(|operation| (deploy, operation))
-                .ok()
-        })
-        .filter(|(_, operation): &(Deploy, Operation)| {
-            matches!(
-                operation,
-                Operation::Transfer {
-                    wallet_address_from,
-                    wallet_address_to,
-                    ..
-                } if wallet_address_from == &address || wallet_address_to == &address
-            )
-        })
-        .filter_map(|(deploy, operation)| {
-            let Operation::Transfer {
-                wallet_address_from,
-                wallet_address_to,
-                amount,
-                ..
-            } = operation;
-
-            let direction = if address == wallet_address_from {
+        .flat_map(OperationRecord::try_from)
+        .filter_map(|operation| {
+            let direction = if address == operation.to {
                 Direction::Outgoing
             } else {
                 Direction::Incoming
             };
 
-            let date = chrono::DateTime::from_timestamp_millis(deploy.timestamp)?;
-
-            Some(Transfer {
-                id: deploy.sig,
-                direction,
-                date,
-                amount,
-                to_address: wallet_address_to,
-                cost: deploy.cost,
+            operation.id.get_timestamp().map(|date| {
+                let timestamp = i64::try_from(date.to_unix().0).ok()?;
+                DateTime::<Utc>::from_timestamp_millis(timestamp).map(|date| {
+                    Transfer {
+                        id: operation.id,
+                        direction,
+                        amount: operation.amount,
+                        date,
+                        to_address: operation.to,
+                        cost: 0, // Assuming cost is not provided in the operation
+                    }
+                })
             })
         })
+        .flatten()
         .collect();
 
     Ok(WalletStateAndHistory {
         balance,
         transfers,
-        boosts: vec![],
-        exchanges: vec![],
-        requests: vec![],
+        ..Default::default()
     })
 }

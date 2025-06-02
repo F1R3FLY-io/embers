@@ -8,12 +8,16 @@ use serde::{Deserialize, Serialize};
 
 pub use self::description::*;
 pub use self::wallet_address::*;
+use uuid::Uuid;
+pub use wallet_address::*;
 
 pub type Amount = NonZero<u64>;
 
-#[derive(Debug, Clone)]
+pub type Id = Uuid;
+
+#[derive(Debug, Clone, Deserialize)]
 pub struct Transfer {
-    pub id: String,
+    pub id: Id,
     pub direction: Direction,
     pub date: DateTime<Utc>,
     pub amount: Amount,
@@ -21,13 +25,13 @@ pub struct Transfer {
     pub cost: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Deserialize)]
 pub enum Direction {
     Incoming,
     Outgoing,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct WalletStateAndHistory {
     pub balance: u64,
     pub requests: Vec<Request>,
@@ -36,7 +40,7 @@ pub struct WalletStateAndHistory {
     pub transfers: Vec<Transfer>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Boost {
     pub id: String,
     pub username: String,
@@ -57,7 +61,7 @@ pub enum Operation {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Request {
     pub id: String,
     pub date: DateTime<Utc>,
@@ -65,6 +69,7 @@ pub struct Request {
     pub status: RequestStatus,
 }
 
+#[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RequestStatus {
@@ -73,7 +78,7 @@ pub enum RequestStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Exchange {}
 
 #[derive(Debug, Clone)]

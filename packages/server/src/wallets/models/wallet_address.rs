@@ -40,3 +40,9 @@ impl TryFrom<String> for WalletAddress {
         Ok(Self(value))
     }
 }
+
+impl<'a> From<&'a WalletAddress> for &'a str {
+    fn from(value: &'a WalletAddress) -> Self {
+        value.0.as_str()
+    }
+}

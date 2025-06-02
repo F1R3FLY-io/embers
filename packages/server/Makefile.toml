@@ -9,3 +9,4 @@ env.EMBERS__PORT                   = 8080
 env.EMBERS__PROPOSE_SERVICE_URL    = "http://localhost:40402"
 env.EMBERS__READ_NODE_URL          = "http://localhost:40413"
 env.EMBERS__SERVICE_KEY            = "232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE"
+env.RUST_BACKTRACE                 = "full"
