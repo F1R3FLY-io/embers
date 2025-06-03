@@ -1,12 +1,12 @@
 use derive_more::{AsRef, Into};
 use thiserror::Error;
 
-#[derive(Debug, Default, Into, AsRef)]
+#[derive(Debug, Clone, Default, Into, AsRef)]
 pub struct Description(String);
 
 const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum DescriptionError {
     #[error("Maximum description length reached")]
     TooLong,
@@ -17,7 +17,7 @@ impl TryFrom<String> for Description {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.chars().count() > MAX_DESCRIPTION_CHARS_COUNT {
-            return Result::Err(Self::Error::TooLong);
+            return Err(Self::Error::TooLong);
         }
 
         Ok(Self(html_escape::encode_safe(&value).into_owned()))

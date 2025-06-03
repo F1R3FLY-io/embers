@@ -21,7 +21,7 @@ pub struct Transfer {
     pub cost: u64,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Direction {
     Incoming,
     Outgoing,
@@ -65,7 +65,7 @@ pub struct Request {
     pub status: RequestStatus,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 #[allow(dead_code)]
 pub enum RequestStatus {
     Done,

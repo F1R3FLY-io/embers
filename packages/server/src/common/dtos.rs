@@ -3,6 +3,7 @@ use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
+use poem_openapi::Tags;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 
@@ -96,4 +97,10 @@ impl From<NonZero<u64>> for Stringified<u64> {
     fn from(value: NonZero<u64>) -> Self {
         Self(value.get())
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Tags)]
+pub enum ApiTags {
+    Wallets,
+    AIAgents,
 }

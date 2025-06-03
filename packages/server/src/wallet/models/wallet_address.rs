@@ -7,7 +7,7 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Into, AsRef)]
 pub struct WalletAddress(String);
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum ParseWalletAddressError {
     #[error("Internal encoder error: {0}")]
     EncoderError(bs58::decode::Error),

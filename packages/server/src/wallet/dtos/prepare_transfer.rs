@@ -15,7 +15,7 @@ pub struct PrepareTransferInputDto {
     description: Option<String>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum PrepareContractRequestProblem {
     #[error("Amount field can't be empty")]
     EmptyAmount,

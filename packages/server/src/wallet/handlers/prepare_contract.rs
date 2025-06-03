@@ -13,7 +13,7 @@ struct TransferContract<'a> {
     description: &'a str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PrepareTransferInput {
     pub from: WalletAddress,
     pub to: WalletAddress,
@@ -21,11 +21,13 @@ pub struct PrepareTransferInput {
     pub description: Option<Description>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PreparedContract {
     pub contract: Vec<u8>,
 }
 
+#[tracing::instrument(level = "info", skip_all)]
+#[tracing::instrument(level = "trace", ret(Debug))]
 pub fn prepare_transfer_contract(value: PrepareTransferInput) -> PreparedContract {
     let term = TransferContract {
         wallet_address_from: value.from.as_ref(),
