@@ -8,7 +8,7 @@ pub use self::prepare_transfer::*;
 use crate::common::dtos::Stringified;
 use crate::wallet::{handlers, models};
 
-#[derive(Debug, Clone, Enum, StructuralConvert)]
+#[derive(Debug, Clone, Eq, PartialEq, Enum, StructuralConvert)]
 #[oai(rename_all = "lowercase")]
 #[convert(from(models::Direction))]
 pub enum DirectionDto {

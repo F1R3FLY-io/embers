@@ -10,7 +10,7 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use contracts::{rho_init_events_channels, rho_subscribe_to_service, rho_unsubscribe_from_service};
-use firefly_client::communication_service::CommunicationService;
+use firefly_client::CommunicationService;
 use futures::stream::select_all;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, future};
 use secp256k1::SecretKey;

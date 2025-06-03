@@ -10,6 +10,8 @@ struct CheckBalance<'a> {
     wallet_address: &'a str,
 }
 
+#[tracing::instrument(level = "info", skip_all, err(Debug))]
+#[tracing::instrument(level = "trace", skip(read_client, block_client), ret(Debug))]
 pub async fn get_wallet_state_and_history(
     read_client: &ReadNodeClient,
     block_client: &BlocksClient,
@@ -36,7 +38,7 @@ pub async fn get_wallet_state_and_history(
                 .map(ToOwned::to_owned)
                 .map(|meta| (deploy, meta))
         })
-        .filter_map(|(deploy, meta): (Deploy, String)| {
+        .filter_map(|(deploy, meta)| {
             serde_json::from_str(&meta)
                 .map(|operation| (deploy, operation))
                 .ok()
@@ -51,7 +53,7 @@ pub async fn get_wallet_state_and_history(
                 } if wallet_address_from == &address || wallet_address_to == &address
             )
         })
-        .filter_map(|(deploy, operation): (Deploy, Operation)| {
+        .filter_map(|(deploy, operation)| {
             let Operation::Transfer {
                 wallet_address_from,
                 wallet_address_to,
@@ -65,7 +67,9 @@ pub async fn get_wallet_state_and_history(
                 Direction::Incoming
             };
 
-            chrono::DateTime::from_timestamp_millis(deploy.timestamp).map(|date| Transfer {
+            let date = chrono::DateTime::from_timestamp_millis(deploy.timestamp)?;
+
+            Some(Transfer {
                 id: deploy.sig,
                 direction,
                 date,

@@ -5,6 +5,7 @@ use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
+use crate::common::dtos::ApiTags;
 use crate::wallet::dtos::{
     PrepareTransferInputDto,
     PreparedContractDto,
@@ -19,10 +20,10 @@ use crate::wallet::handlers::{
 };
 use crate::wallet::models::WalletAddress;
 
-pub struct WalletApi;
+pub struct WalletsApi;
 
-#[OpenApi(prefix_path = "/wallet")]
-impl WalletApi {
+#[OpenApi(prefix_path = "/wallet", tag = ApiTags::Wallets)]
+impl WalletsApi {
     #[oai(path = "/state/:address", method = "get")]
     async fn wallet_state_and_history(
         &self,

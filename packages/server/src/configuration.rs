@@ -3,8 +3,9 @@ use figment::Figment;
 use figment::providers::Env;
 use serde::Deserialize;
 
-#[derive(Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Config {
+    pub log_level: String,
     pub deploy_service_url: String,
     pub propose_service_url: String,
     pub read_node_url: String,
