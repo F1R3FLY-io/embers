@@ -6,13 +6,14 @@ use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
 
 use crate::ai_agents::api::AIAgents;
+use crate::ai_agents::handlers::init_agents_env;
 use crate::configuration::collect_config;
-use crate::wallet::api::WalletsApi;
+use crate::wallets::api::WalletsApi;
 
 mod ai_agents;
 mod common;
 mod configuration;
-mod wallet;
+mod wallets;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -31,9 +32,13 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let read_client = ReadNodeClient::new(config.read_node_url.clone());
-    let write_client =
+    let mut write_client =
         WriteNodeClient::new(config.deploy_service_url, config.propose_service_url).await?;
     let blocks_client = BlocksClient::new(config.read_node_url);
+
+    init_agents_env(&mut write_client, &config.service_key)
+        .await
+        .context("failed to init agents env")?;
 
     let api = OpenApiService::new((WalletsApi, AIAgents), "Embers API", "0.1.0").url_prefix("/api");
 

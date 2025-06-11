@@ -1,4 +1,4 @@
-//FIREFLY_OPERATION;{"type": "TRANSFER", "wallet_address_from": "<%= wallet_address_from %>", "wallet_address_to": "<%= wallet_address_to %>", "amount": <%= amount %>, "description": "<%= description %>"}
+//FIREFLY_OPERATION;{"type": "TRANSFER", "wallet_address_from": {{ wallet_address_from }}, "wallet_address_to": {{ wallet_address_to }}, "amount": {{ amount }}, "description": {{ description }}}}
 new rl(`rho:registry:lookup`), RevVaultCh in {
     rl!(`rho:rchain:revVault`, *RevVaultCh) |
     for (@(_, RevVault) <- RevVaultCh) {
@@ -6,7 +6,7 @@ new rl(`rho:registry:lookup`), RevVaultCh in {
         deployerId(`rho:rchain:deployerId`),
         deployId(`rho:rchain:deployId`)
         in {
-            match ("<%= wallet_address_from %>", "<%= wallet_address_to %>", <%= amount %>) {
+            match ({{ wallet_address_from }}, {{ wallet_address_to }}, {{ amount }}) {
                 (revAddrFrom, revAddrTo, amount) => {
                     @RevVault!("findOrCreate", revAddrFrom, *vaultCh) |
                     @RevVault!("findOrCreate", revAddrTo, *vaultTo) |
@@ -18,7 +18,7 @@ new rl(`rho:registry:lookup`), RevVaultCh in {
                                     @vault!("transfer", revAddrTo, amount, *key, *resultCh) |
                                     for (@result <- resultCh) {
                                         match result {
-                                            (true , _  ) => deployId!((true, "<%= description %>"))
+                                            (true , _  ) => deployId!((true, "OK"))
                                             (false, err) => deployId!((false, err))
                                         }
                                     }

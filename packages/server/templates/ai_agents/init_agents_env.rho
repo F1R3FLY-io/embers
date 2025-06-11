@@ -1,0 +1,40 @@
+new debug(`rho:io:stdout`), rl(`rho:registry:lookup`), TreeHashMapCh, mapCh in {
+    rl!(`rho:lang:treeHashMap`, *TreeHashMapCh)|
+    for(TreeHashMap <- TreeHashMapCh) {
+        TreeHashMap!("init", 2, *mapCh)|
+        for(@map <- mapCh) {
+            contract @"createAiAgent"(@id, @version, @name, @shard, @filesystem) = {
+                new mapResult in {
+                    TreeHashMap!("get", map, id, *mapResult)|
+                    for(@versions <- mapResult) {
+                        match versions {
+                            Nil => TreeHashMap!("set", map, id, {version: {
+                                "name": name,
+                                "shard": shard,
+                                "filesystem": filesystem,
+                            }}, *mapResult)
+                            versions => TreeHashMap!("set", map, id, versions.set(version, {
+                                "name": name,
+                                "shard": shard,
+                                "filesystem": filesystem,
+                            }), *mapResult)
+                        }|
+                        for(_ <- mapResult) {Nil}
+                    }
+                }
+            }|
+
+            contract @"listAiAgents"(@id, ret) = {
+                new mapResult in {
+                    TreeHashMap!("get", map, id, *mapResult)|
+                    for(@versions <- mapResult) {
+                        match versions {
+                            Nil => ret!({})
+                            versions => ret!(versions)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

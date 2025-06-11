@@ -3,9 +3,12 @@ use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
-use poem_openapi::Tags;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
+use poem_openapi::{Object, Tags};
+use structural_convert::StructuralConvert;
+
+use crate::common;
 
 /// This type transforms values into [`String`] for serialization/deserialization
 /// and keeps original format in `OpenApi` model.
@@ -103,4 +106,19 @@ impl From<NonZero<u64>> for Stringified<u64> {
 pub enum ApiTags {
     Wallets,
     AIAgents,
+}
+
+#[derive(Debug, Clone, Object, StructuralConvert)]
+#[convert(from(common::models::PreparedContract))]
+pub struct PreparedContractDto {
+    pub contract: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Object, StructuralConvert)]
+#[convert(into(firefly_client::models::SignedCode))]
+pub struct SignedContractDto {
+    pub contract: Vec<u8>,
+    pub sig: Vec<u8>,
+    pub sig_algorithm: String,
+    pub deployer: Vec<u8>,
 }
