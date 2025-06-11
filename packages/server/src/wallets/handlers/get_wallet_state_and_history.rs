@@ -1,13 +1,20 @@
+use askama::Template;
 use firefly_client::models::Deploy;
 use firefly_client::{BlocksClient, ReadNodeClient};
-use sailfish::TemplateSimple;
 
-use crate::wallet::models::{Direction, Operation, Transfer, WalletAddress, WalletStateAndHistory};
+use crate::common::rendering::RhoValue;
+use crate::wallets::models::{
+    Direction,
+    Operation,
+    Transfer,
+    WalletAddress,
+    WalletStateAndHistory,
+};
 
-#[derive(TemplateSimple)]
-#[template(path = "check_balance.rho")]
-struct CheckBalance<'a> {
-    wallet_address: &'a str,
+#[derive(Template)]
+#[template(path = "wallets/check_balance.rho", escape = "none")]
+struct CheckBalance {
+    wallet_address: RhoValue<String>,
 }
 
 #[tracing::instrument(level = "info", skip_all, err(Debug))]
@@ -18,9 +25,9 @@ pub async fn get_wallet_state_and_history(
     address: WalletAddress,
 ) -> anyhow::Result<WalletStateAndHistory> {
     let code = CheckBalance {
-        wallet_address: address.as_ref(),
+        wallet_address: String::from(address.clone()).into(),
     }
-    .render_once()
+    .render()
     .unwrap();
 
     let balance = read_client.get_data(code).await?;

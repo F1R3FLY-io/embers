@@ -20,6 +20,6 @@ impl TryFrom<String> for Description {
             return Err(Self::Error::TooLong);
         }
 
-        Ok(Self(html_escape::encode_safe(&value).into_owned()))
+        Ok(Self(value))
     }
 }

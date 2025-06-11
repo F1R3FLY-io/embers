@@ -1,8 +1,10 @@
+use firefly_client::WriteNodeClient;
+use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
-use crate::ai_agents::models::{
+use crate::ai_agents::dtos::{
     Agent,
     Agents,
     CreateAgentReq,
@@ -14,7 +16,8 @@ use crate::ai_agents::models::{
     TestAgentReq,
     TestAgentResp,
 };
-use crate::common::dtos::ApiTags;
+use crate::ai_agents::handlers::{deploy_signed_create_agent, prepare_create_agent_contract};
+use crate::common::dtos::{ApiTags, SignedContractDto};
 
 pub struct AIAgents;
 
@@ -26,12 +29,25 @@ impl AIAgents {
         todo!()
     }
 
-    #[oai(path = "/create", method = "post")]
-    async fn create(
+    #[oai(path = "/create/prepare", method = "post")]
+    async fn prepare_create(
         &self,
         Json(input): Json<CreateAgentReq>,
     ) -> poem::Result<Json<CreateAgentResp>> {
-        todo!()
+        let contract = prepare_create_agent_contract(input.into());
+        Ok(Json(contract.into()))
+    }
+
+    #[oai(path = "/create/send", method = "post")]
+    async fn create(
+        &self,
+        Data(client): Data<&WriteNodeClient>,
+        Json(body): Json<SignedContractDto>,
+    ) -> poem::Result<()> {
+        let mut client = client.to_owned();
+        deploy_signed_create_agent(&mut client, body.into())
+            .await
+            .map_err(Into::into)
     }
 
     #[oai(path = "/test", method = "post")]

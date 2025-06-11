@@ -5,20 +5,14 @@ use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
-use crate::common::dtos::ApiTags;
-use crate::wallet::dtos::{
-    PrepareTransferInputDto,
-    PreparedContractDto,
-    TransferSendDto,
-    WalletStateAndHistoryDto,
-};
-use crate::wallet::handlers::{
-    PrepareTransferInput,
-    deploy_signed_contract,
+use crate::common::dtos::{ApiTags, PreparedContractDto, SignedContractDto};
+use crate::wallets::dtos::{PrepareTransferInputDto, WalletStateAndHistoryDto};
+use crate::wallets::handlers::{
+    deploy_signed_transfer,
     get_wallet_state_and_history,
     prepare_transfer_contract,
 };
-use crate::wallet::models::WalletAddress;
+use crate::wallets::models::{PrepareTransferInput, WalletAddress};
 
 pub struct WalletsApi;
 
@@ -40,8 +34,8 @@ impl WalletsApi {
         Ok(Json(wallet_state_and_history.into()))
     }
 
-    #[oai(path = "/transfer/prepare", method = "post")]
     #[allow(clippy::unused_async)]
+    #[oai(path = "/transfer/prepare", method = "post")]
     async fn prepare_transfer(
         &self,
         Json(input): Json<PrepareTransferInputDto>,
@@ -55,14 +49,14 @@ impl WalletsApi {
     #[oai(path = "/transfer/send", method = "post")]
     async fn transfer(
         &self,
-        Json(body): Json<TransferSendDto>,
+        Json(body): Json<SignedContractDto>,
         Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<()> {
         let mut client = client.to_owned();
 
         let code = SignedCode::from(body);
 
-        deploy_signed_contract(&mut client, code)
+        deploy_signed_transfer(&mut client, code)
             .await
             .map_err(Into::into)
     }

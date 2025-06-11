@@ -6,7 +6,7 @@ use structural_convert::StructuralConvert;
 
 pub use self::prepare_transfer::*;
 use crate::common::dtos::Stringified;
-use crate::wallet::{handlers, models};
+use crate::wallets::models;
 
 #[derive(Debug, Clone, Eq, PartialEq, Enum, StructuralConvert)]
 #[oai(rename_all = "lowercase")]
@@ -68,19 +68,4 @@ pub struct WalletStateAndHistoryDto {
     pub exchanges: Vec<ExchangeDto>,
     pub boosts: Vec<BoostDto>,
     pub transfers: Vec<TransferDto>,
-}
-
-#[derive(Debug, Clone, Object, StructuralConvert)]
-#[convert(from(handlers::PreparedContract))]
-pub struct PreparedContractDto {
-    pub contract: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Object, StructuralConvert)]
-#[convert(into(firefly_client::models::SignedCode))]
-pub struct TransferSendDto {
-    pub contract: Vec<u8>,
-    pub sig: Vec<u8>,
-    pub sig_algorithm: String,
-    pub deployer: Vec<u8>,
 }

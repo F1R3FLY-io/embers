@@ -65,8 +65,8 @@ pub struct Request {
     pub status: RequestStatus,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
 #[allow(dead_code)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RequestStatus {
     Done,
     Ongoing,
@@ -75,3 +75,11 @@ pub enum RequestStatus {
 
 #[derive(Debug, Clone)]
 pub struct Exchange {}
+
+#[derive(Debug, Clone)]
+pub struct PrepareTransferInput {
+    pub from: WalletAddress,
+    pub to: WalletAddress,
+    pub amount: Amount,
+    pub description: Option<Description>,
+}
