@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 pub mod servicemodelapi {
@@ -60,4 +62,31 @@ pub struct SignedCode {
     pub sig: Vec<u8>,
     pub sig_algorithm: String,
     pub deployer: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub enum ReadNodeExpr {
+    ExprList { data: Vec<ReadNodeExpr> },
+    ExprTuple { data: Vec<ReadNodeExpr> },
+    ExprInt { data: serde_json::Number },
+    ExprMap { data: HashMap<String, ReadNodeExpr> },
+    ExprString { data: String },
+}
+
+impl From<ReadNodeExpr> for serde_json::Value {
+    fn from(value: ReadNodeExpr) -> Self {
+        match value {
+            ReadNodeExpr::ExprList { data } => {
+                Self::Array(data.into_iter().map(Into::into).collect())
+            }
+            ReadNodeExpr::ExprTuple { data } => {
+                Self::Array(data.into_iter().map(Into::into).collect())
+            }
+            ReadNodeExpr::ExprInt { data } => Self::Number(data),
+            ReadNodeExpr::ExprMap { data } => {
+                Self::Object(data.into_iter().map(|(k, v)| (k, v.into())).collect())
+            }
+            ReadNodeExpr::ExprString { data } => Self::String(data),
+        }
+    }
 }

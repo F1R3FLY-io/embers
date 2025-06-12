@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::models::PreparedContract;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Agents {
     pub agents: Vec<AgentHeader>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AgentHeader {
     pub id: String,
     pub version: String,

@@ -5,7 +5,7 @@ use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
-use crate::common::dtos::{ApiTags, PreparedContractDto, SignedContractDto};
+use crate::common::dtos::{ApiTags, ParseFromString, PreparedContractDto, SignedContractDto};
 use crate::wallets::dtos::{PrepareTransferInputDto, WalletStateAndHistoryDto};
 use crate::wallets::handlers::{
     deploy_signed_transfer,
@@ -21,15 +21,12 @@ impl WalletsApi {
     #[oai(path = "/state/:address", method = "get")]
     async fn wallet_state_and_history(
         &self,
-        Path(address): Path<String>,
+        Path(address): Path<ParseFromString<WalletAddress>>,
         Data(read_client): Data<&ReadNodeClient>,
         Data(block_client): Data<&BlocksClient>,
     ) -> poem::Result<Json<WalletStateAndHistoryDto>> {
-        let wallet_address =
-            WalletAddress::try_from(address).map_err(|_| poem::error::ParsePathError)?;
-
         let wallet_state_and_history =
-            get_wallet_state_and_history(read_client, block_client, wallet_address).await?;
+            get_wallet_state_and_history(read_client, block_client, address.0).await?;
 
         Ok(Json(wallet_state_and_history.into()))
     }

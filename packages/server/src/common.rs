@@ -4,6 +4,7 @@ use firefly_client::models::SignedCode;
 pub mod dtos;
 pub mod models;
 pub mod rendering;
+pub mod tracing;
 
 pub async fn deploy_signed_contract(
     client: &mut WriteNodeClient,

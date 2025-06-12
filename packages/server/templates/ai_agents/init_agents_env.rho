@@ -1,38 +1,76 @@
-new debug(`rho:io:stdout`), rl(`rho:registry:lookup`), TreeHashMapCh, mapCh in {
+new rl(`rho:registry:lookup`), TreeHashMapCh in {
     rl!(`rho:lang:treeHashMap`, *TreeHashMapCh)|
     for(TreeHashMap <- TreeHashMapCh) {
-        TreeHashMap!("init", 2, *mapCh)|
-        for(@map <- mapCh) {
-            contract @"createAiAgent"(@id, @version, @name, @shard, @filesystem) = {
-                new mapResult in {
-                    TreeHashMap!("get", map, id, *mapResult)|
-                    for(@versions <- mapResult) {
-                        match versions {
-                            Nil => TreeHashMap!("set", map, id, {version: {
-                                "name": name,
-                                "shard": shard,
-                                "filesystem": filesystem,
-                            }}, *mapResult)
-                            versions => TreeHashMap!("set", map, id, versions.set(version, {
-                                "name": name,
-                                "shard": shard,
-                                "filesystem": filesystem,
-                            }), *mapResult)
-                        }|
-                        for(_ <- mapResult) {Nil}
-                    }
-                }
-            }|
+        TreeHashMap!("init", 3, *TreeHashMapCh)|
+        for(map <- TreeHashMapCh) {
+            TreeHashMapCh!(*TreeHashMap, *map)
+        }
+    }|
 
-            contract @"listAiAgents"(@id, ret) = {
-                new mapResult in {
-                    TreeHashMap!("get", map, id, *mapResult)|
-                    for(@versions <- mapResult) {
-                        match versions {
-                            Nil => ret!({})
-                            versions => ret!(versions)
-                        }
-                    }
+    contract @"createAiAgent"(@id, @version, @name, @shard, @filesystem) = {
+        new deployerId(`rho:rchain:deployerId`), revAddress(`rho:rev:address`), retCh in {
+            revAddress!("fromDeployerId", *deployerId, *retCh)|
+
+            for(@address <- retCh; TreeHashMap, map <<- TreeHashMapCh) {
+                TreeHashMap!("get", *map, address, *retCh)|
+
+                for(@agents <- retCh) {
+                    match agents {
+                        Nil => TreeHashMap!("set", *map, address,
+                                {
+                                    id: {
+                                        version: {
+                                            "name": name,
+                                            "shard": shard,
+                                            "filesystem": filesystem,
+                                        },
+                                        "latest": {
+                                            "version": version,
+                                            "name": name,
+                                            "shard": shard,
+                                            "filesystem": filesystem,
+                                        }
+                                    }
+                                }, *retCh)
+
+                        agents => TreeHashMap!("set", *map, address,
+                                agents.set(id,
+                                    agents.getOrElse(id, {}).union(
+                                        {
+                                            version: {
+                                                "name": name,
+                                                "shard": shard,
+                                                "filesystem": filesystem,
+                                            },
+                                            "latest": {
+                                                "version": version,
+                                                "name": name,
+                                                "shard": shard,
+                                                "filesystem": filesystem,
+                                            }
+                                        }
+                                    )
+                                ), *retCh)
+                    }|
+                    for(_ <- retCh) {Nil}
+                }
+            }
+        }
+    }|
+
+    contract @"listAiAgents"(@address, ret) = {
+        new foldAgents, retCh in {
+            rl!(`rho:lang:listOps`, *retCh)|
+
+            for(@(_, listOps) <- retCh; TreeHashMap, map <<- TreeHashMapCh) {
+                TreeHashMap!("get", *map, address, *retCh)|
+
+                for(@agents <- retCh) {
+                    contract foldAgents(@(id, versions), @acc, ret) = {
+                        ret!(acc ++ [versions.get("latest").delete("filesystem").set("id", id)])
+                    }|
+
+                    @listOps!("fold", agents.toList(), [], *foldAgents, *ret)
                 }
             }
         }

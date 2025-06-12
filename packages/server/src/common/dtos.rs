@@ -4,7 +4,14 @@ use std::num::NonZero;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
-use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
+use poem_openapi::types::{
+    ParseError,
+    ParseFromJSON,
+    ParseFromParameter,
+    ParseResult,
+    ToJSON,
+    Type,
+};
 use poem_openapi::{Object, Tags};
 use structural_convert::StructuralConvert;
 
@@ -99,6 +106,51 @@ impl ToJSON for Stringified<u64> {
 impl From<NonZero<u64>> for Stringified<u64> {
     fn from(value: NonZero<u64>) -> Self {
         Self(value.get())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ParseFromString<T>(pub T);
+
+impl<T> Type for ParseFromString<T>
+where
+    T: Send + Sync,
+{
+    const IS_REQUIRED: bool = String::IS_REQUIRED;
+
+    type RawValueType = Self;
+    type RawElementValueType = Self;
+
+    fn name() -> Cow<'static, str> {
+        String::name()
+    }
+
+    fn schema_ref() -> MetaSchemaRef {
+        String::schema_ref()
+    }
+
+    fn register(registry: &mut Registry) {
+        String::register(registry);
+    }
+
+    fn as_raw_value(&self) -> Option<&Self::RawValueType> {
+        Some(self)
+    }
+
+    fn raw_element_iter<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
+        Box::new(self.as_raw_value().into_iter())
+    }
+}
+
+impl<T> ParseFromParameter for ParseFromString<T>
+where
+    T: TryFrom<String> + Send + Sync,
+    T::Error: std::fmt::Display,
+{
+    fn parse_from_parameter(value: &str) -> ParseResult<Self> {
+        T::try_from(value.to_owned()).map(Self).map_err(Into::into)
     }
 }
 
