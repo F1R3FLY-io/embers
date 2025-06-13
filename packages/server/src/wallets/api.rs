@@ -40,7 +40,6 @@ impl WalletsApi {
         Json(input): Json<PrepareTransferInputDto>,
     ) -> poem::Result<Json<PreparedContract>> {
         let input = PrepareTransferInput::try_from(input).map_err(anyhow::Error::from)?;
-
         let result = prepare_transfer_contract(input);
 
         poem::Result::Ok(Json(result))

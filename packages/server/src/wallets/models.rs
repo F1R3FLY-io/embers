@@ -1,3 +1,4 @@
+use askama::Template;
 use std::num::NonZero;
 
 use blake2::digest::consts::U32;
@@ -151,3 +152,7 @@ impl<'a> From<&'a WalletAddress> for &'a str {
         value.0.as_str()
     }
 }
+
+#[derive(Template)]
+#[template(path = "wallet/init.rho", escape = "none")]
+pub struct InitWalletEnv;

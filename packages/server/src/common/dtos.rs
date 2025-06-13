@@ -8,7 +8,7 @@ use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
 use poem_openapi::{Object, Tags};
 use structural_convert::StructuralConvert;
 
-use crate::common;
+use super::models::PreparedContract;
 
 /// This type transforms values into [`String`] for serialization/deserialization
 /// and keeps original format in `OpenApi` model.
@@ -109,7 +109,7 @@ pub enum ApiTags {
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
-#[convert(from(common::models::PreparedContract))]
+#[convert(from(PreparedContract))]
 pub struct PreparedContractDto {
     pub contract: Vec<u8>,
 }

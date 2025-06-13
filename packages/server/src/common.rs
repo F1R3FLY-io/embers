@@ -3,9 +3,12 @@ use firefly_client::models::SignedCode;
 
 use crate::wallets::models::Id;
 
+pub mod bootstrap_contracts;
 pub mod dtos;
 pub mod models;
 pub mod rendering;
+
+pub use bootstrap_contracts::*;
 
 pub async fn deploy_signed_contract(
     client: &mut WriteNodeClient,

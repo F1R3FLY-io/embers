@@ -1,12 +1,15 @@
+use ai_agents::models::InitAgentsEnv;
 use anyhow::Context;
+use askama::Template;
+use common::bootstrap_contracts;
 use firefly_client::{BlocksClient, ReadNodeClient, WriteNodeClient};
 use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
+use wallets::models::InitWalletEnv;
 
 use crate::ai_agents::api::AIAgents;
-use crate::ai_agents::handlers::init_agents_env;
 use crate::configuration::collect_config;
 use crate::wallets::api::WalletsApi;
 
@@ -36,7 +39,15 @@ async fn main() -> anyhow::Result<()> {
         WriteNodeClient::new(config.deploy_service_url, config.propose_service_url).await?;
     let blocks_client = BlocksClient::new(config.read_node_url);
 
-    init_agents_env(&mut write_client, &config.service_key)
+    let contracts = vec![
+        InitAgentsEnv
+            .render()
+            .expect("Can't render InitAgentsEnv bootstrap code"),
+        InitWalletEnv
+            .render()
+            .expect("Can't render InitWalletEnv bootstrap code"),
+    ];
+    bootstrap_contracts(&mut write_client, &config.service_key, contracts)
         .await
         .context("failed to init agents env")?;
 

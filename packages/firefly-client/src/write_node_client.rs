@@ -89,7 +89,7 @@ impl WriteNodeClient {
             .context("failed to extract block hash")
     }
 
-    pub async fn full_deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<String> {
+    pub async fn deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<&mut Self> {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
@@ -127,13 +127,9 @@ impl WriteNodeClient {
             .context("missing do_deploy responce")?;
 
         match resp {
-            deploy_response::Message::Result(_) => (),
-            deploy_response::Message::Error(err) => {
-                return Err(anyhow!("do_deploy error: {err:?}"));
-            }
+            deploy_response::Message::Result(_) => Ok(self),
+            deploy_response::Message::Error(err) => Err(anyhow!("do_deploy error: {err:?}")),
         }
-
-        self.propose().await.context("propose error")
     }
 
     pub async fn get_channel_value<T>(&mut self, hash: String, channel: String) -> anyhow::Result<T>

@@ -8,7 +8,7 @@ use crate::common::{deploy_signed_contract, generate_id};
 use crate::wallets::models::{Id, PrepareTransferInput};
 
 #[derive(Template)]
-#[template(path = "wallet/transfer_contract.rho", escape = "none")]
+#[template(path = "wallet/send_tokens.rho", escape = "none")]
 struct TransferContract {
     id: RhoValue<Id>,
     wallet_address_from: RhoValue<String>,
