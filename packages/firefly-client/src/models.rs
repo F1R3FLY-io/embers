@@ -65,16 +65,13 @@ pub struct SignedCode {
 }
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Unit {}
-
-#[derive(Debug, Clone, Deserialize)]
 pub enum ReadNodeExpr {
     ExprTuple { data: Vec<ReadNodeExpr> },
     ExprList { data: Vec<ReadNodeExpr> },
     ExprSet { data: Vec<ReadNodeExpr> },
     ExprMap { data: HashMap<String, ReadNodeExpr> },
 
-    ExprNil(Unit),
+    ExprNil {},
     ExprBool { data: bool },
     ExprInt { data: serde_json::Number },
     ExprString { data: String },
@@ -96,7 +93,7 @@ impl From<ReadNodeExpr> for serde_json::Value {
             ReadNodeExpr::ExprMap { data } => {
                 Self::Object(data.into_iter().map(|(k, v)| (k, v.into())).collect())
             }
-            ReadNodeExpr::ExprNil(Unit {}) => Self::Null,
+            ReadNodeExpr::ExprNil {} => Self::Null,
             ReadNodeExpr::ExprBool { data } => Self::Bool(data),
             ReadNodeExpr::ExprInt { data } => Self::Number(data),
             ReadNodeExpr::ExprString { data } => Self::String(data),
