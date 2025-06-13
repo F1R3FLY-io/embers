@@ -6,13 +6,13 @@ use crate::common::deploy_signed_contract;
 use crate::common::models::PreparedContract;
 use crate::common::rendering::{PrepareForSigning, RhoValue};
 use crate::common::tracing::record_trace;
-use crate::wallets::models::PrepareTransferInput;
+use crate::wallets::models::{PrepareTransferInput, WalletAddress};
 
 #[derive(Template)]
 #[template(path = "wallets/transfer_contract.rho", escape = "none")]
 struct TransferContract {
-    wallet_address_from: RhoValue<String>,
-    wallet_address_to: RhoValue<String>,
+    wallet_address_from: RhoValue<WalletAddress>,
+    wallet_address_to: RhoValue<WalletAddress>,
     amount: RhoValue<u64>,
     description: RhoValue<Option<String>>,
 }
@@ -22,8 +22,8 @@ pub fn prepare_transfer_contract(request: PrepareTransferInput) -> PreparedContr
     record_trace!(request);
 
     TransferContract {
-        wallet_address_from: String::from(request.from).into(),
-        wallet_address_to: String::from(request.to).into(),
+        wallet_address_from: request.from.into(),
+        wallet_address_to: request.to.into(),
         amount: request.amount.get().into(),
         description: request.description.map(Into::into).into(),
     }

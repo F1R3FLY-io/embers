@@ -15,7 +15,7 @@ use crate::wallets::models::{
 #[derive(Template)]
 #[template(path = "wallets/check_balance.rho", escape = "none")]
 struct CheckBalance {
-    wallet_address: RhoValue<String>,
+    wallet_address: RhoValue<WalletAddress>,
 }
 
 #[tracing::instrument(
@@ -33,7 +33,7 @@ pub async fn get_wallet_state_and_history(
     record_trace!(address);
 
     let code = CheckBalance {
-        wallet_address: String::from(address.clone()).into(),
+        wallet_address: address.clone().into(),
     }
     .render()
     .unwrap();
