@@ -12,7 +12,7 @@ use crate::wallets::models::{
     WalletStateAndHistory,
 };
 
-#[derive(Template)]
+#[derive(Debug, Clone, Template)]
 #[template(path = "wallets/check_balance.rho", escape = "none")]
 struct CheckBalance {
     wallet_address: RhoValue<WalletAddress>,

@@ -10,6 +10,7 @@ use serde_json::json;
 
 use crate::common::models::PreparedContract;
 
+#[derive(Debug, Clone)]
 pub enum RhoValue<T> {
     Nil(PhantomData<T>),
     Bool(bool),

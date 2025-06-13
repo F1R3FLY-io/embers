@@ -8,7 +8,7 @@ use crate::common::deploy_signed_contract;
 use crate::common::rendering::{PrepareForSigning, RhoValue};
 use crate::common::tracing::record_trace;
 
-#[derive(Template)]
+#[derive(Debug, Clone, Template)]
 #[template(path = "ai_agents/save_agent.rho", escape = "none")]
 struct SaveAgent {
     id: RhoValue<String>,

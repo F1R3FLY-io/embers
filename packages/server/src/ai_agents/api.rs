@@ -28,6 +28,7 @@ use crate::ai_agents::handlers::{
 use crate::common::dtos::{ApiTags, MaybeNotFound, ParseFromString, SignedContractDto};
 use crate::wallets::models::WalletAddress;
 
+#[derive(Debug, Clone)]
 pub struct AIAgents;
 
 #[allow(unused_variables, clippy::unused_async)]

@@ -2,7 +2,7 @@ use askama::Template;
 use firefly_client::WriteNodeClient;
 use secp256k1::SecretKey;
 
-#[derive(Template)]
+#[derive(Debug, Clone, Template)]
 #[template(path = "ai_agents/init_agents_env.rho", escape = "none")]
 struct InitAgentsEnv;
 

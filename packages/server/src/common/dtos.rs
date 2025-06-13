@@ -110,7 +110,7 @@ impl From<NonZero<u64>> for Stringified<u64> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, From)]
 pub struct ParseFromString<T>(pub T);
 
 impl<T> Type for ParseFromString<T>
@@ -174,7 +174,7 @@ impl From<anyhow::Error> for InternalError {
     }
 }
 
-#[derive(ApiResponse)]
+#[derive(Debug, Clone, ApiResponse)]
 pub enum MaybeNotFound<T>
 where
     T: Type + ToJSON + Send + Sync,

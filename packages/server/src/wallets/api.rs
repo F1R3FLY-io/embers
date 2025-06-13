@@ -14,6 +14,7 @@ use crate::wallets::handlers::{
 };
 use crate::wallets::models::{PrepareTransferInput, WalletAddress};
 
+#[derive(Debug, Clone)]
 pub struct WalletsApi;
 
 #[allow(clippy::unused_async)]

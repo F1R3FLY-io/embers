@@ -6,7 +6,7 @@ use crate::common::rendering::RhoValue;
 use crate::common::tracing::record_trace;
 use crate::wallets::models::WalletAddress;
 
-#[derive(Template)]
+#[derive(Debug, Clone, Template)]
 #[template(path = "ai_agents/list_agents.rho", escape = "none")]
 struct ListAgents {
     address: RhoValue<WalletAddress>,

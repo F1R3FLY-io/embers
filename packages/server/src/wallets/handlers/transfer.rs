@@ -8,7 +8,7 @@ use crate::common::rendering::{PrepareForSigning, RhoValue};
 use crate::common::tracing::record_trace;
 use crate::wallets::models::{PrepareTransferInput, WalletAddress};
 
-#[derive(Template)]
+#[derive(Debug, Clone, Template)]
 #[template(path = "wallets/transfer_contract.rho", escape = "none")]
 struct TransferContract {
     wallet_address_from: RhoValue<WalletAddress>,
