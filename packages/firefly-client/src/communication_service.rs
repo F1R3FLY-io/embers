@@ -7,7 +7,8 @@ use serde::Deserialize;
 use crate::models::casper::UpdateNotification;
 use crate::models::casper::v1::UpdateNotificationResponse;
 use crate::models::casper::v1::external_communication_service_server::{
-    ExternalCommunicationService, ExternalCommunicationServiceServer,
+    ExternalCommunicationService,
+    ExternalCommunicationServiceServer,
 };
 
 pub struct CommunicationService<T, F> {

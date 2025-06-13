@@ -5,7 +5,11 @@ use thiserror::Error;
 
 use crate::common::dtos::Stringified;
 use crate::wallets::models::{
-    Amount, Description, DescriptionError, ParseWalletAddressError, PrepareTransferInput,
+    Amount,
+    Description,
+    DescriptionError,
+    ParseWalletAddressError,
+    PrepareTransferInput,
 };
 
 #[derive(Debug, Clone, Object)]

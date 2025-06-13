@@ -1,6 +1,6 @@
-use askama::Template;
 use std::num::NonZero;
 
+use askama::Template;
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 use chrono::{DateTime, Utc};

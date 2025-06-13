@@ -1,9 +1,9 @@
+use chrono::{DateTime, Utc};
 use firefly_client::ReadNodeClient;
 
 use crate::wallets::contracts::{create_check_balance_contract, get_user_history_contract};
 use crate::wallets::dtos::{ChainOperationRecord, OperationRecord};
 use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
-use chrono::{DateTime, Utc};
 
 pub async fn get_wallet_state_and_history(
     client: &ReadNodeClient,

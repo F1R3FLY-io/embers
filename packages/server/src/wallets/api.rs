@@ -5,13 +5,12 @@ use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
+use super::handlers::{deploy_signed_transfer, prepare_transfer_contract};
 use crate::common::dtos::{ApiTags, SignedContractDto};
 use crate::common::models::PreparedContract;
 use crate::wallets::dtos::{PrepareTransferInputDto, WalletStateAndHistoryDto};
 use crate::wallets::handlers::get_wallet_state_and_history;
 use crate::wallets::models::{PrepareTransferInput, WalletAddress};
-
-use super::handlers::{deploy_signed_transfer, prepare_transfer_contract};
 
 pub struct WalletsApi;
 

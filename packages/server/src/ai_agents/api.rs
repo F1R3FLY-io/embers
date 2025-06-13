@@ -5,8 +5,16 @@ use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
 use crate::ai_agents::dtos::{
-    Agent, Agents, CreateAgentReq, CreateAgentResp, DeployAgentReq, DeployAgentResp, SaveAgentReq,
-    SaveAgentResp, TestAgentReq, TestAgentResp,
+    Agent,
+    Agents,
+    CreateAgentReq,
+    CreateAgentResp,
+    DeployAgentReq,
+    DeployAgentResp,
+    SaveAgentReq,
+    SaveAgentResp,
+    TestAgentReq,
+    TestAgentResp,
 };
 use crate::ai_agents::handlers::{deploy_signed_create_agent, prepare_create_agent_contract};
 use crate::common::dtos::{ApiTags, SignedContractDto};
