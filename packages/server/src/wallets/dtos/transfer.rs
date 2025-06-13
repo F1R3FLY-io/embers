@@ -1,9 +1,9 @@
 use chrono::{DateTime, Utc};
 use poem_openapi::Object;
 
-use super::direction::DirectionDto;
-use crate::common::dtos::Stringified;
-use crate::wallet::models::Transfer;
+use crate::{common::dtos::Stringified, wallets::models::Transfer};
+
+use super::DirectionDto;
 
 #[derive(Debug, Clone, Object)]
 pub struct TransferDto {

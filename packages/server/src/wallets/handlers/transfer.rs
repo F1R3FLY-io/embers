@@ -2,14 +2,15 @@ use askama::Template;
 use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
 
-use crate::common::deploy_signed_contract;
 use crate::common::models::PreparedContract;
 use crate::common::rendering::{PrepareForSigning, RhoValue};
-use crate::wallets::models::PrepareTransferInput;
+use crate::common::{deploy_signed_contract, generate_id};
+use crate::wallets::models::{Id, PrepareTransferInput};
 
 #[derive(Template)]
-#[template(path = "wallets/transfer_contract.rho", escape = "none")]
+#[template(path = "wallet/transfer_contract.rho", escape = "none")]
 struct TransferContract {
+    id: RhoValue<Id>,
     wallet_address_from: RhoValue<String>,
     wallet_address_to: RhoValue<String>,
     amount: RhoValue<u64>,
@@ -20,6 +21,7 @@ struct TransferContract {
 #[tracing::instrument(level = "trace", ret(Debug))]
 pub fn prepare_transfer_contract(value: PrepareTransferInput) -> PreparedContract {
     TransferContract {
+        id: generate_id().into(),
         wallet_address_from: String::from(value.from).into(),
         wallet_address_to: String::from(value.to).into(),
         amount: value.amount.get().into(),

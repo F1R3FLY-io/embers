@@ -1,4 +1,6 @@
+mod chain_operation_record;
 mod prepare_transfer;
+mod transfer;
 
 use chrono::{DateTime, Utc};
 use poem_openapi::{Enum, Object};
@@ -7,6 +9,7 @@ use structural_convert::StructuralConvert;
 pub use self::prepare_transfer::*;
 use crate::common::dtos::Stringified;
 use crate::wallets::models;
+pub use chain_operation_record::*;
 
 #[derive(Debug, Clone, Eq, PartialEq, Enum, StructuralConvert)]
 #[oai(rename_all = "lowercase")]

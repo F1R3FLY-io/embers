@@ -1,3 +1,0 @@
-new return in {
-    @"getUserHistory"!("<%= address %>", *return)
-}

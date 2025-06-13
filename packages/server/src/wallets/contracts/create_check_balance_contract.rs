@@ -1,10 +1,9 @@
-use sailfish::TemplateSimple;
-use tokio::fs::File;
+use askama::Template;
 
-use crate::wallet::models::WalletAddress;
+use crate::wallets::models::WalletAddress;
 
-#[derive(TemplateSimple)]
-#[template(path = "check_balance.rho")]
+#[derive(Template)]
+#[template(path = "wallet/check_balance.rho", escape = "none")]
 struct CheckBalance<'a> {
     wallet_address: &'a str,
 }
@@ -13,6 +12,6 @@ pub fn create_check_balance_contract(address: &WalletAddress) -> String {
     CheckBalance {
         wallet_address: address.as_ref(),
     }
-    .render_once()
+    .render()
     .unwrap()
 }

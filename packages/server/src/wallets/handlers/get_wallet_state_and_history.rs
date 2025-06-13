@@ -1,28 +1,10 @@
-use askama::Template;
-use firefly_client::models::Deploy;
-use firefly_client::{BlocksClient, ReadNodeClient};
-
-use crate::common::rendering::RhoValue;
-use crate::wallets::models::{
-    Direction, Operation, Transfer, WalletAddress, WalletStateAndHistory,
-};
-use chrono::{DateTime, Utc};
 use firefly_client::ReadNodeClient;
 
-use crate::wallet::{
-    contracts::{create_check_balance_contract, get_user_history_contract},
-    dtos::{ChainOperationRecord, OperationRecord},
-    models::{Direction, Transfer, WalletAddress, WalletStateAndHistory},
-};
+use crate::wallets::contracts::{create_check_balance_contract, get_user_history_contract};
+use crate::wallets::dtos::{ChainOperationRecord, OperationRecord};
+use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
+use chrono::{DateTime, Utc};
 
-#[derive(Template)]
-#[template(path = "wallets/check_balance.rho", escape = "none")]
-struct CheckBalance {
-    wallet_address: RhoValue<String>,
-}
-
-#[tracing::instrument(level = "info", skip_all, err(Debug))]
-#[tracing::instrument(level = "trace", skip(read_client, block_client), ret(Debug))]
 pub async fn get_wallet_state_and_history(
     client: &ReadNodeClient,
     address: WalletAddress,

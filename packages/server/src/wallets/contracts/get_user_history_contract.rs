@@ -1,9 +1,9 @@
-use sailfish::TemplateSimple;
+use askama::Template;
 
-use crate::wallet::models::WalletAddress;
+use crate::wallets::models::WalletAddress;
 
-#[derive(TemplateSimple)]
-#[template(path = "get_user_history.rho")]
+#[derive(Template)]
+#[template(path = "wallet/get_user_history.rho", escape = "none")]
 struct GetUserHistory<'a> {
     address: &'a str,
 }
@@ -12,6 +12,6 @@ pub fn get_user_history_contract(address: &WalletAddress) -> String {
     GetUserHistory {
         address: address.into(),
     }
-    .render_once()
+    .render()
     .unwrap()
 }
