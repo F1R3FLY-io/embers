@@ -18,10 +18,12 @@ use crate::ai_agents::dtos::{
 };
 use crate::ai_agents::handlers::{
     deploy_signed_create_agent,
+    get_agent,
+    list_agent_versions,
     list_agents,
     prepare_create_agent_contract,
 };
-use crate::common::dtos::{ApiTags, ParseFromString, SignedContractDto};
+use crate::common::dtos::{ApiTags, MaybeNotFound, ParseFromString, SignedContractDto};
 use crate::wallets::models::WalletAddress;
 
 pub struct AIAgents;
@@ -44,8 +46,9 @@ impl AIAgents {
         &self,
         Path(address): Path<ParseFromString<WalletAddress>>,
         Path(id): Path<String>,
-    ) -> poem::Result<Json<Agents>> {
-        todo!()
+        Data(read_client): Data<&ReadNodeClient>,
+    ) -> MaybeNotFound<Agents> {
+        list_agent_versions(address.0, id, read_client).await.into()
     }
 
     #[oai(path = "/:address/:id/:version", method = "get")]
@@ -54,8 +57,9 @@ impl AIAgents {
         Path(address): Path<ParseFromString<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
-    ) -> poem::Result<Json<Agent>> {
-        todo!()
+        Data(read_client): Data<&ReadNodeClient>,
+    ) -> MaybeNotFound<Agent> {
+        get_agent(address.0, id, version, read_client).await.into()
     }
 
     #[oai(path = "/create/prepare", method = "post")]

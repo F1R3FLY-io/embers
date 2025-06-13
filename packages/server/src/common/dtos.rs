@@ -3,6 +3,7 @@ use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
+use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
     ParseError,
@@ -12,7 +13,7 @@ use poem_openapi::types::{
     ToJSON,
     Type,
 };
-use poem_openapi::{Object, Tags};
+use poem_openapi::{ApiResponse, Object, Tags};
 use structural_convert::StructuralConvert;
 
 use crate::common;
@@ -158,6 +159,53 @@ where
 pub enum ApiTags {
     Wallets,
     AIAgents,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct InternalError {
+    description: String,
+}
+
+impl From<anyhow::Error> for InternalError {
+    fn from(err: anyhow::Error) -> Self {
+        Self {
+            description: format!("{err:?}"),
+        }
+    }
+}
+
+#[derive(ApiResponse)]
+pub enum MaybeNotFound<T>
+where
+    T: Type + ToJSON + Send + Sync,
+{
+    #[oai(status = 200)]
+    Ok(Json<T>),
+    #[oai(status = 404)]
+    NotFound,
+    #[oai(status = 500)]
+    InternalError(Json<InternalError>),
+}
+
+impl<T, K> From<Option<T>> for MaybeNotFound<K>
+where
+    K: Type + ToJSON + Send + Sync + From<T>,
+{
+    fn from(value: Option<T>) -> Self {
+        value.map_or_else(|| Self::NotFound, |value| Self::Ok(Json(value.into())))
+    }
+}
+
+impl<T, K> From<anyhow::Result<Option<T>>> for MaybeNotFound<K>
+where
+    K: Type + ToJSON + Send + Sync + From<T>,
+{
+    fn from(value: anyhow::Result<Option<T>>) -> Self {
+        match value {
+            Ok(opt) => opt.into(),
+            Err(err) => Self::InternalError(Json(err.into())),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]

@@ -43,7 +43,7 @@ pub struct File {
     pub content: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Agent {
     pub id: String,
     pub version: String,
