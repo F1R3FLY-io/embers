@@ -84,7 +84,11 @@ async fn main() -> anyhow::Result<()> {
                 let sql = run_pg_dump(&db_url)?;
 
                 let rho_code = rho_sql_dump_template(channel_name, sql);
-                let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
+                let hash = client
+                    .deploy(&args.wallet_key, rho_code)
+                    .await?
+                    .propose()
+                    .await?;
                 println!("dump hash: {hash}");
 
                 let rho_code = rho_save_hash_template(
@@ -94,7 +98,11 @@ async fn main() -> anyhow::Result<()> {
                         channel_name,
                     },
                 );
-                let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
+                let hash = client
+                    .deploy(&args.wallet_key, rho_code)
+                    .await?
+                    .propose()
+                    .await?;
                 println!("save hash: {hash}");
             }
         }
@@ -116,7 +124,11 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Init => {
             let rho_code = rho_save_hash_contract(&args.service_id);
-            let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
+            let hash = client
+                .deploy(&args.wallet_key, rho_code)
+                .await?
+                .propose()
+                .await?;
             println!("{hash}");
         }
     }

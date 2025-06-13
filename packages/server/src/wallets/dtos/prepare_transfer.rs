@@ -14,10 +14,10 @@ use crate::wallets::models::{
 
 #[derive(Debug, Clone, Object)]
 pub struct PrepareTransferInputDto {
-    from: String,
-    to: String,
-    amount: Stringified<u64>,
-    description: Option<String>,
+    pub from: String,
+    pub to: String,
+    pub amount: Stringified<u64>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -45,14 +45,15 @@ impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
         let to = value
             .to
             .try_into()
-            .map_err(Self::Error::WrongReceiverAddressFormat)?;
+            .map_err(PrepareContractRequestProblem::WrongReceiverAddressFormat)?;
 
         let from = value
             .from
             .try_into()
-            .map_err(Self::Error::WrongSenderAddressFormat)?;
+            .map_err(PrepareContractRequestProblem::WrongSenderAddressFormat)?;
 
-        let amount = Amount::try_from(value.amount.0).map_err(|_| Self::Error::EmptyAmount)?;
+        let amount = Amount::try_from(value.amount.0)
+            .map_err(|_| PrepareContractRequestProblem::EmptyAmount)?;
         let description = value.description.map(Description::try_from).transpose()?;
 
         Ok(Self {

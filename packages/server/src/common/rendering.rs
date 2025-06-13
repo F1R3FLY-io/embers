@@ -86,9 +86,11 @@ where
     T: askama::Template,
 {
     fn prepare_for_signing(self) -> PreparedContract {
+        let term = self.render().unwrap();
+
         let timestamp = chrono::Utc::now().timestamp_millis();
         let contract = DeployDataProto {
-            term: self.render().unwrap(),
+            term,
             timestamp,
             phlo_price: 1,
             phlo_limit: 500_000,

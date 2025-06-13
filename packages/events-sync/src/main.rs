@@ -178,9 +178,11 @@ async fn main() -> anyhow::Result<()> {
                     println!("events: {}", events.len());
                     let rho_code = rho_save_events(channel_name, &events)?;
                     let hash = client
-                        .full_deploy(&args.wallet_key, rho_code)
+                        .deploy(&args.wallet_key, rho_code)
                         .await
-                        .context("failed save events")?;
+                        .context("failed save events")?
+                        .propose()
+                        .await?;
                     println!("events deployed");
 
                     let rho_code = rho_notify_listeners(
@@ -191,9 +193,11 @@ async fn main() -> anyhow::Result<()> {
                         },
                     );
                     client
-                        .full_deploy(&args.wallet_key, rho_code)
+                        .deploy(&args.wallet_key, rho_code)
                         .await
-                        .context("failed to notify listeners")?;
+                        .context("failed to notify listeners")?
+                        .propose()
+                        .await?;
                     println!("notified");
                 }
 
@@ -208,9 +212,11 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init => {
             let rho_code = rho_init_events_channels(&args.service_id);
             let hash = client
-                .full_deploy(&args.wallet_key, rho_code)
+                .deploy(&args.wallet_key, rho_code)
                 .await
-                .context("failed to init channels")?;
+                .context("failed to init channels")?
+                .propose()
+                .await?;
             println!("{hash}");
         }
     }
@@ -346,18 +352,22 @@ async fn subscribe_to_firefly(
 
     let rho_code = rho_subscribe_to_service(&service_id, self_id, external_hostname, grpc_port);
     client
-        .full_deploy(key, rho_code)
+        .deploy(key, rho_code)
         .await
-        .context("failed to subscribe to service")?;
+        .context("failed to subscribe to service")?
+        .propose()
+        .await?;
 
     let key = *key;
     let mut client = scopeguard::guard(client, move |mut client| {
         tokio::spawn(async move {
             let rho_code = rho_unsubscribe_from_service(&service_id, self_id);
             client
-                .full_deploy(&key, rho_code)
+                .deploy(&key, rho_code)
                 .await
-                .context("failed to unsubscribe from service")?;
+                .context("failed to unsubscribe from service")?
+                .propose()
+                .await?;
             println!("unsubscribed");
             anyhow::Ok(())
         });

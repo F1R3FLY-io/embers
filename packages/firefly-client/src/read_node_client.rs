@@ -15,14 +15,14 @@ impl ReadNodeClient {
         }
     }
 
-    pub async fn get_data<T>(&self, rholang_code: String) -> anyhow::Result<T>
+    pub async fn get_data<T>(&self, path: &str, rholang_code: String) -> anyhow::Result<T>
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut response_json = self.get_value(rholang_code).await?;
+        let mut response_json = self.send_contract(rholang_code).await?;
 
         let data_value = response_json
-            .pointer_mut("/expr/0/ExprInt/data")
+            .pointer_mut(path)
             .map(Value::take)
             .context("failed to extract data from response structure")?;
 
@@ -30,9 +30,10 @@ impl ReadNodeClient {
             .context("failed to deserialize response data into target type")
     }
 
-    async fn get_value(&self, rholang_code: String) -> anyhow::Result<Value> {
+    async fn send_contract(&self, rholang_code: String) -> anyhow::Result<Value> {
+        let url = format!("{}/api/explore-deploy", self.url);
         self.client
-            .post(format!("{}/api/explore-deploy", self.url))
+            .post(url)
             .body(rholang_code)
             .header("Content-Type", "text/plain")
             .send()
