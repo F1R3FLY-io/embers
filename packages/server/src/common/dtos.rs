@@ -151,7 +151,7 @@ where
     T::Error: std::fmt::Display,
 {
     fn parse_from_parameter(value: &str) -> ParseResult<Self> {
-        T::try_from(value.to_owned()).map(Self).map_err(Into::into)
+        value.to_owned().try_into().map(Self).map_err(Into::into)
     }
 }
 
