@@ -16,6 +16,7 @@ use crate::wallets::models::{PrepareTransferInput, WalletAddress};
 
 pub struct WalletsApi;
 
+#[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/wallet", tag = ApiTags::Wallets)]
 impl WalletsApi {
     #[oai(path = "/state/:address", method = "get")]
@@ -31,7 +32,6 @@ impl WalletsApi {
         Ok(Json(wallet_state_and_history.into()))
     }
 
-    #[allow(clippy::unused_async)]
     #[oai(path = "/transfer/prepare", method = "post")]
     async fn prepare_transfer(
         &self,

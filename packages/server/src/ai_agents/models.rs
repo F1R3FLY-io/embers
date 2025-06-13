@@ -64,6 +64,7 @@ pub type SaveAgentReq = CreateAgentReq;
 #[derive(Debug, Clone)]
 pub struct SaveAgentResp {
     pub version: String,
+    pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone)]

@@ -141,5 +141,42 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
 
             getValueOr!(address, *valueCh, *nilCh)
         }
+    }|
+
+    contract @"saveAiAgent"(@id, @version, @name, @shard, @filesystem) = {
+        new valueCh, nilCh, retCh in {
+            for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                match agents.get(id) {
+                    Nil => nilCh!()
+                    versions => treeHashMap!("set", *map, address,
+                                    agents.set(id,
+                                        versions.union(
+                                            {
+                                                version: {
+                                                    "name": name,
+                                                    "shard": shard,
+                                                    "filesystem": filesystem,
+                                                },
+                                                "latest": {
+                                                    "version": version,
+                                                    "name": name,
+                                                    "shard": shard,
+                                                    "filesystem": filesystem,
+                                                }
+                                            }
+                                        )
+                                    ), *retCh)
+                }|
+
+                for(_ <- retCh) {Nil}
+            }|
+
+            for(<- nilCh) {
+                // abort?
+                Nil
+            }|
+
+            getValueOr!(address, *valueCh, *nilCh)
+        }
     }
 }

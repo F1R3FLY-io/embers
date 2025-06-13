@@ -73,6 +73,7 @@ pub type SaveAgentReq = CreateAgentReq;
 #[convert(from(models::SaveAgentResp))]
 pub struct SaveAgentResp {
     pub version: String,
+    pub contract: PreparedContractDto,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
