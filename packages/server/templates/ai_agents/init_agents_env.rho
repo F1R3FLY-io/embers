@@ -1,40 +1,181 @@
-new debug(`rho:io:stdout`), rl(`rho:registry:lookup`), TreeHashMapCh, mapCh in {
-    rl!(`rho:lang:treeHashMap`, *TreeHashMapCh)|
-    for(TreeHashMap <- TreeHashMapCh) {
-        TreeHashMap!("init", 2, *mapCh)|
-        for(@map <- mapCh) {
-            contract @"createAiAgent"(@id, @version, @name, @shard, @filesystem) = {
-                new mapResult in {
-                    TreeHashMap!("get", map, id, *mapResult)|
-                    for(@versions <- mapResult) {
-                        match versions {
-                            Nil => TreeHashMap!("set", map, id, {version: {
-                                "name": name,
-                                "shard": shard,
-                                "filesystem": filesystem,
-                            }}, *mapResult)
-                            versions => TreeHashMap!("set", map, id, versions.set(version, {
-                                "name": name,
-                                "shard": shard,
-                                "filesystem": filesystem,
-                            }), *mapResult)
-                        }|
-                        for(_ <- mapResult) {Nil}
+new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
+    rl!(`rho:lang:treeHashMap`, *treeHashMapCh)|
+    for(treeHashMap <- treeHashMapCh) {
+        treeHashMap!("init", 3, *treeHashMapCh)|
+        for(map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, *map)
+        }
+    }|
+
+    contract getValueOr(@address, valueCh, nilCh) = {
+        new retCh in {
+            for(treeHashMap, map <<- treeHashMapCh) {
+                treeHashMap!("get", *map, address, *retCh)|
+
+                for(@value <- retCh) {
+                    match value {
+                        Nil => nilCh!()
+                        value => valueCh!(value)
+                    }
+                }
+            }
+        }
+    }|
+
+    contract @"createAiAgent"(@id, @version, @name, @shard, @filesystem) = {
+        new deployerId(`rho:rchain:deployerId`), revAddress(`rho:rev:address`), retCh, valueCh, nilCh in {
+            revAddress!("fromDeployerId", *deployerId, *retCh)|
+
+            for(@address <- retCh) {
+                for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                    treeHashMap!("set", *map, address,
+                        agents.set(id,
+                            agents.getOrElse(id, {}).union(
+                                {
+                                    version: {
+                                        "name": name,
+                                        "shard": shard,
+                                        "filesystem": filesystem,
+                                    },
+                                    "latest": {
+                                        "version": version,
+                                        "name": name,
+                                        "shard": shard,
+                                        "filesystem": filesystem,
+                                    }
+                                }
+                            )
+                        ), *retCh)
+                }|
+
+                for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
+                    treeHashMap!("set", *map, address,
+                        {
+                            id: {
+                                version: {
+                                    "name": name,
+                                    "shard": shard,
+                                    "filesystem": filesystem,
+                                },
+                                "latest": {
+                                    "version": version,
+                                    "name": name,
+                                    "shard": shard,
+                                    "filesystem": filesystem,
+                                }
+                            }
+                        }, *retCh)
+                }|
+
+                getValueOr!(address, *valueCh, *nilCh)|
+                for(_ <- retCh) {Nil}
+            }
+        }
+    }|
+
+    contract @"listAiAgents"(@address, ret) = {
+        new valueCh, nilCh in {
+            for(@agents <- valueCh) {
+                new retCh, toAgentHeader in {
+                    rl!(`rho:lang:listOps`, *retCh)|
+
+                    contract toAgentHeader(@(id, versions), ret) = {
+                        ret!(versions.get("latest").delete("filesystem").set("id", id))
+                    }|
+
+                    for(@(_, listOps) <- retCh) {
+                        @listOps!("map", agents.toList(), *toAgentHeader, *ret)
                     }
                 }
             }|
 
-            contract @"listAiAgents"(@id, ret) = {
-                new mapResult in {
-                    TreeHashMap!("get", map, id, *mapResult)|
-                    for(@versions <- mapResult) {
-                        match versions {
-                            Nil => ret!({})
-                            versions => ret!(versions)
+            for(<- nilCh) {
+                ret!([])
+            }|
+
+            getValueOr!(address, *valueCh, *nilCh)
+        }
+    }|
+
+    contract @"listAiAgentVersions"(@address, @id, ret) = {
+        new valueCh, nilCh in {
+            for(@agents <- valueCh) {
+                match agents.get(id) {
+                    Nil => nilCh!()
+                    versions => {
+                        new retCh, toAgentHeader in {
+                            rl!(`rho:lang:listOps`, *retCh)|
+
+                            contract toAgentHeader(@(version, agent), ret) = {
+                                ret!(agent.delete("filesystem").union({"id": id, "version": version}))
+                            }|
+
+                            for(@(_, listOps) <- retCh) {
+                                @listOps!("map", versions.delete("latest").toList(), *toAgentHeader, *ret)
+                            }
                         }
                     }
                 }
-            }
+            }|
+
+            for(<- nilCh) {
+                ret!(Nil)
+            }|
+
+            getValueOr!(address, *valueCh, *nilCh)
+        }
+    }|
+
+    contract @"getAiAgent"(@address, @id, @version, ret) = {
+        new valueCh, nilCh in {
+            for(@agents <- valueCh) {
+                match agents.getOrElse(id, {}).get(version) {
+                    Nil => nilCh!()
+                    agent => ret!(agent.union({"id": id, "version": version}))
+                }
+            }|
+
+            for(<- nilCh) {
+                ret!(Nil)
+            }|
+
+            getValueOr!(address, *valueCh, *nilCh)
+        }
+    }|
+
+    contract @"saveAiAgent"(@id, @version, @name, @shard, @filesystem) = {
+        new valueCh, nilCh, retCh in {
+            for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                match agents.get(id) {
+                    Nil => nilCh!()
+                    versions => treeHashMap!("set", *map, address,
+                                    agents.set(id,
+                                        versions.union(
+                                            {
+                                                version: {
+                                                    "name": name,
+                                                    "shard": shard,
+                                                    "filesystem": filesystem,
+                                                },
+                                                "latest": {
+                                                    "version": version,
+                                                    "name": name,
+                                                    "shard": shard,
+                                                    "filesystem": filesystem,
+                                                }
+                                            }
+                                        )
+                                    ), *retCh)
+                }|
+
+                for(_ <- retCh) {Nil}
+            }|
+
+            for(<- nilCh) {
+                Nil
+            }|
+
+            getValueOr!(address, *valueCh, *nilCh)
         }
     }
 }

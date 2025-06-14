@@ -3,6 +3,7 @@ use firefly_client::models::Deploy;
 use firefly_client::{BlocksClient, ReadNodeClient};
 
 use crate::common::rendering::RhoValue;
+use crate::common::tracing::record_trace;
 use crate::wallets::models::{
     Direction,
     Operation,
@@ -11,21 +12,28 @@ use crate::wallets::models::{
     WalletStateAndHistory,
 };
 
-#[derive(Template)]
+#[derive(Debug, Clone, Template)]
 #[template(path = "wallets/check_balance.rho", escape = "none")]
 struct CheckBalance {
-    wallet_address: RhoValue<String>,
+    wallet_address: RhoValue<WalletAddress>,
 }
 
-#[tracing::instrument(level = "info", skip_all, err(Debug))]
-#[tracing::instrument(level = "trace", skip(read_client, block_client), ret(Debug))]
+#[tracing::instrument(
+    level = "info",
+    skip_all,
+    fields(address),
+    err(Debug),
+    ret(Debug, level = "trace")
+)]
 pub async fn get_wallet_state_and_history(
     read_client: &ReadNodeClient,
     block_client: &BlocksClient,
     address: WalletAddress,
 ) -> anyhow::Result<WalletStateAndHistory> {
+    record_trace!(address);
+
     let code = CheckBalance {
-        wallet_address: String::from(address.clone()).into(),
+        wallet_address: address.clone().into(),
     }
     .render()
     .unwrap();

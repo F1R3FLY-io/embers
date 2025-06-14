@@ -3,9 +3,17 @@ use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
+use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
-use poem_openapi::types::{ParseError, ParseFromJSON, ParseResult, ToJSON, Type};
-use poem_openapi::{Object, Tags};
+use poem_openapi::types::{
+    ParseError,
+    ParseFromJSON,
+    ParseFromParameter,
+    ParseResult,
+    ToJSON,
+    Type,
+};
+use poem_openapi::{ApiResponse, Object, Tags};
 use structural_convert::StructuralConvert;
 
 use crate::common;
@@ -102,10 +110,102 @@ impl From<NonZero<u64>> for Stringified<u64> {
     }
 }
 
+#[derive(Debug, Clone, From)]
+pub struct ParseFromString<T>(pub T);
+
+impl<T> Type for ParseFromString<T>
+where
+    T: Send + Sync,
+{
+    const IS_REQUIRED: bool = String::IS_REQUIRED;
+
+    type RawValueType = Self;
+    type RawElementValueType = Self;
+
+    fn name() -> Cow<'static, str> {
+        String::name()
+    }
+
+    fn schema_ref() -> MetaSchemaRef {
+        String::schema_ref()
+    }
+
+    fn register(registry: &mut Registry) {
+        String::register(registry);
+    }
+
+    fn as_raw_value(&self) -> Option<&Self::RawValueType> {
+        Some(self)
+    }
+
+    fn raw_element_iter<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
+        Box::new(self.as_raw_value().into_iter())
+    }
+}
+
+impl<T> ParseFromParameter for ParseFromString<T>
+where
+    T: TryFrom<String> + Send + Sync,
+    T::Error: std::fmt::Display,
+{
+    fn parse_from_parameter(value: &str) -> ParseResult<Self> {
+        value.to_owned().try_into().map(Self).map_err(Into::into)
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Tags)]
 pub enum ApiTags {
     Wallets,
     AIAgents,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct InternalError {
+    description: String,
+}
+
+impl From<anyhow::Error> for InternalError {
+    fn from(err: anyhow::Error) -> Self {
+        Self {
+            description: format!("{err:?}"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, ApiResponse)]
+pub enum MaybeNotFound<T>
+where
+    T: Type + ToJSON + Send + Sync,
+{
+    #[oai(status = 200)]
+    Ok(Json<T>),
+    #[oai(status = 404)]
+    NotFound,
+    #[oai(status = 500)]
+    InternalError(Json<InternalError>),
+}
+
+impl<T, K> From<Option<T>> for MaybeNotFound<K>
+where
+    K: Type + ToJSON + Send + Sync + From<T>,
+{
+    fn from(value: Option<T>) -> Self {
+        value.map_or_else(|| Self::NotFound, |value| Self::Ok(Json(value.into())))
+    }
+}
+
+impl<T, K> From<anyhow::Result<Option<T>>> for MaybeNotFound<K>
+where
+    K: Type + ToJSON + Send + Sync + From<T>,
+{
+    fn from(value: anyhow::Result<Option<T>>) -> Self {
+        match value {
+            Ok(opt) => opt.into(),
+            Err(err) => Self::InternalError(Json(err.into())),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]

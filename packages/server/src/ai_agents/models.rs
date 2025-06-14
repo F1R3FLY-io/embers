@@ -4,12 +4,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::common::models::PreparedContract;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Agents {
     pub agents: Vec<AgentHeader>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct AgentHeader {
     pub id: String,
     pub version: String,
@@ -43,7 +43,7 @@ pub struct File {
     pub content: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Agent {
     pub id: String,
     pub version: String,
@@ -64,6 +64,7 @@ pub type SaveAgentReq = CreateAgentReq;
 #[derive(Debug, Clone)]
 pub struct SaveAgentResp {
     pub version: String,
+    pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone)]

@@ -1,6 +1,8 @@
 use anyhow::Context;
 use serde_json::Value;
 
+use crate::models::ReadNodeExpr;
+
 #[derive(Clone)]
 pub struct ReadNodeClient {
     url: String,
@@ -22,11 +24,14 @@ impl ReadNodeClient {
         let mut response_json = self.get_value(rholang_code).await?;
 
         let data_value = response_json
-            .pointer_mut("/expr/0/ExprInt/data")
+            .pointer_mut("/expr/0")
             .map(Value::take)
             .context("failed to extract data from response structure")?;
 
-        serde_json::from_value(data_value)
+        let intermediate: ReadNodeExpr = serde_json::from_value(data_value)
+            .context("failed to deserialize response data into intermediate type")?;
+
+        serde_json::from_value(intermediate.into())
             .context("failed to deserialize response data into target type")
     }
 

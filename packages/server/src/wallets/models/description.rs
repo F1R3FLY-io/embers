@@ -1,7 +1,7 @@
 use derive_more::{AsRef, Into};
 use thiserror::Error;
 
-#[derive(Debug, Clone, Default, Into, AsRef)]
+#[derive(Debug, Clone, Into, AsRef)]
 pub struct Description(String);
 
 const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
