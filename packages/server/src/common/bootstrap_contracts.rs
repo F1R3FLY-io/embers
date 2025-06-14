@@ -8,8 +8,8 @@ pub async fn bootstrap_contracts(
     key: &SecretKey,
     contracts: Vec<String>,
 ) -> anyhow::Result<String> {
-    for contract in contracts {
-        client.deploy(key, contract).await?;
-    }
+    let contract = contracts.join("\n|\n");
+
+    client.deploy(key, contract).await?;
     client.propose().await
 }

@@ -7,6 +7,7 @@ use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
+use tracing::trace;
 use wallets::models::InitWalletEnv;
 
 use crate::ai_agents::api::AIAgents;
@@ -47,9 +48,9 @@ async fn main() -> anyhow::Result<()> {
             .render()
             .expect("Can't render InitWalletEnv bootstrap code"),
     ];
-    bootstrap_contracts(&mut write_client, &config.service_key, contracts)
+    let _ = bootstrap_contracts(&mut write_client, &config.service_key, contracts)
         .await
-        .context("failed to init agents env")?;
+        .inspect(|result| trace!(result));
 
     let api = OpenApiService::new((WalletsApi, AIAgents), "Embers API", "0.1.0").url_prefix("/api");
 

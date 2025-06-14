@@ -14,21 +14,28 @@ in {
                         @RevVault!("findOrCreate", wallet_address_from, *vaultCh) |
                         @RevVault!("findOrCreate", wallet_address_to, *vaultTo) |
                         @RevVault!("deployerAuthKey", *deployerId, *revVaultKeyCh) |
-                        for (@vault <- vaultCh; key <- revVaultKeyCh; _ <- vaultTo) {
+                        for (@vault <- vaultCh; @key <- revVaultKeyCh; @vaultToResult <- vaultTo) {
                             match vault {
-                                (true, vault) => {
-                                    new resultCh in {
-                                        @vault!("transfer", wallet_address_to, amount, *key, *resultCh) |
-                                        for (@result <- resultCh) {
-                                            match result {
-                                                (true , _  ) => ret!((true, "OK"))
-                                                (false, err) => ret!((false, err))
+                                (true, vaultFrom) => {
+                                    match vaultToResult {
+                                        (true, _) => {
+                                            new resultCh in {
+                                                @vaultFrom!("transfer", wallet_address_to, amount, key, *resultCh) |
+                                                for (@result <- resultCh) {
+                                                    match result {
+                                                        (true , _  ) => ret!((true, "OK"))
+                                                        (false, err) => ret!((false, err))
+                                                    }
+                                                }
                                             }
+                                        }
+                                        (false, err) => {
+                                            ret!((false, "Destination REV vault cannot be found or created"))
                                         }
                                     }
                                 }
-                                err => {
-                                    ret!((false, "REV vault cannot be found or created"))
+                                (false, err) => {
+                                    ret!((false, "Source REV vault cannot be found or created"))
                                 }
                             }
                         }
@@ -38,21 +45,21 @@ in {
     }|
 
     contract updateTransferHistory(@id, @user, @wallet_address_from, @wallet_address_to, @amount, @description) = {
-        for(@user_transaction_history <- @{ *history | user }) {
-            match user_transaction_history {
+        for(@transaction_history <- @{ *history | user }) {
+            match transaction_history {
                 Nil => @{ *history | user }!([{
                     "id": id,
                     "from": wallet_address_from,
                     "to": wallet_address_to,
                     "amount": amount,
-                    "description": description,
+                    "description": description
                 }])
                 value => @{ *history | user }!(value ++ [{
                     "id": id,
                     "from": wallet_address_from,
                     "to": wallet_address_to,
                     "amount": amount,
-                    "description": description,
+                    "description": description
                 }])
             }
         }
@@ -63,9 +70,9 @@ in {
             doTransfer!(wallet_address_from, wallet_address_to, amount, *return)|
             for (@v <- return) {
                 match v {
-                    (true, _) =>{
-                        updateTransferHistory!(id, wallet_address_from, wallet_address_to, amount, description) |
-                        updateTransferHistory!(id, wallet_address_to, wallet_address_from, amount, description)
+                    (true, _) => {
+                        updateTransferHistory!(id, wallet_address_from, wallet_address_from, wallet_address_to, amount, description) |
+                        updateTransferHistory!(id, wallet_address_to, wallet_address_from, wallet_address_to, amount, description)
                     }
                     (false, err) => return!((false, err))
                 }
@@ -73,11 +80,33 @@ in {
         }
     }|
 
-    contract @"getUserHistory"(@wallet_address, ret) = {
-        for(@user_transaction_history <- @{ *history | wallet_address }) {
-            match user_transaction_history {
+    contract @"getTransactionsHistory"(@wallet_address, ret) = {
+        for(@transactions <- @{ *history | wallet_address }) {
+            match transactions {
                 Nil => ret!([])
-                value => ret!(user_transaction_history)
+                value => ret!(value)
+            }
+        }
+    }|
+
+    contract @"getBalance"(@wallet_address, ret) = {
+        new rl(`rho:registry:lookup`), RevVaultCh, vaultCh in {
+            rl!(`rho:rchain:revVault`, *RevVaultCh) |
+            for (@(_, RevVault) <- RevVaultCh) {
+                @RevVault!("findOrCreate", wallet_address, *vaultCh) |
+                for (@maybeVault <- vaultCh) {
+                    match maybeVault {
+                        (true, vault) => {
+                            new balanceCh in {
+                                @vault!("balance", *balanceCh) |
+                                for (@balance <- balanceCh) {
+                                    ret!(balance)
+                                }
+                            }
+                        }
+                        (false, err) => ret!((false, err))
+                    }
+                }
             }
         }
     }
