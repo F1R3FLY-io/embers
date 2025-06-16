@@ -70,7 +70,7 @@ impl AIAgents {
         &self,
         Json(input): Json<CreateAgentReq>,
     ) -> poem::Result<Json<CreateAgentResp>> {
-        let contract = prepare_create_agent_contract(input.into());
+        let contract = prepare_create_agent_contract(input.into())?;
         Ok(Json(contract.into()))
     }
 
@@ -97,7 +97,7 @@ impl AIAgents {
         Path(id): Path<String>,
         Json(input): Json<SaveAgentReq>,
     ) -> poem::Result<Json<SaveAgentResp>> {
-        let contract = prepare_save_agent_contract(id, input.into());
+        let contract = prepare_save_agent_contract(id, input.into())?;
         Ok(Json(contract.into()))
     }
 

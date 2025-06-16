@@ -1,44 +1,50 @@
-use askama::Template;
-use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
+use firefly_client::{WriteNodeClient, template};
 use uuid::Uuid;
 
 use crate::ai_agents::models::{CreateAgentReq, CreateAgentResp, Directory};
-use crate::common::deploy_signed_contract;
-use crate::common::rendering::{PrepareForSigning, RhoValue};
 use crate::common::tracing::record_trace;
+use crate::common::{deploy_signed_contract, prepare_for_signing};
 
-#[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents/create_agent.rho", escape = "none")]
-struct CreateAgent {
-    id: RhoValue<String>,
-    version: RhoValue<String>,
-    name: RhoValue<String>,
-    shard: RhoValue<Option<String>>,
-    filesystem: RhoValue<Option<Directory>>,
+template! {
+    #[template(path = "ai_agents/create_agent.rho")]
+    #[derive(Debug, Clone)]
+    struct CreateAgent {
+        id: String,
+        version: String,
+        name: String,
+        shard: Option<String>,
+        filesystem: Option<Directory>,
+    }
 }
 
-#[tracing::instrument(level = "info", skip_all, fields(request), ret(Debug, level = "trace"))]
-pub fn prepare_create_agent_contract(request: CreateAgentReq) -> CreateAgentResp {
+#[tracing::instrument(
+    level = "info",
+    skip_all,
+    fields(request),
+    err(Debug),
+    ret(Debug, level = "trace")
+)]
+pub fn prepare_create_agent_contract(request: CreateAgentReq) -> anyhow::Result<CreateAgentResp> {
     record_trace!(request);
 
     let id = Uuid::new_v4();
     let version = Uuid::now_v7();
 
     let contract = CreateAgent {
-        id: id.to_string().into(),
-        version: version.to_string().into(),
-        name: request.name.into(),
-        shard: request.shard.into(),
-        filesystem: request.filesystem.into(),
+        id: id.to_string(),
+        version: version.to_string(),
+        name: request.name,
+        shard: request.shard,
+        filesystem: request.filesystem,
     }
-    .prepare_for_signing();
+    .render()?;
 
-    CreateAgentResp {
+    Ok(CreateAgentResp {
         id: id.into(),
         version: version.into(),
-        contract,
-    }
+        contract: prepare_for_signing(contract),
+    })
 }
 
 #[tracing::instrument(

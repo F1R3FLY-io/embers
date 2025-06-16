@@ -18,7 +18,7 @@ use structural_convert::StructuralConvert;
 
 use crate::common;
 
-/// This type transforms values into [`String`] for serialization/deserialization
+/// Transforms T to [`String`] before serialization/deserialization
 /// and keeps original format in `OpenApi` model.
 #[derive(Debug, Clone, From)]
 pub struct Stringified<T>(pub T);
@@ -110,6 +110,7 @@ impl From<NonZero<u64>> for Stringified<u64> {
     }
 }
 
+/// Parses [`String`] path parameter into T using [`TryFrom::try_from`].
 #[derive(Debug, Clone, From)]
 pub struct ParseFromString<T>(pub T);
 

@@ -1,42 +1,51 @@
-use askama::Template;
-use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
+use firefly_client::{WriteNodeClient, template};
 use uuid::Uuid;
 
 use crate::ai_agents::models::{Directory, SaveAgentReq, SaveAgentResp};
-use crate::common::deploy_signed_contract;
-use crate::common::rendering::{PrepareForSigning, RhoValue};
 use crate::common::tracing::record_trace;
+use crate::common::{deploy_signed_contract, prepare_for_signing};
 
-#[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents/save_agent.rho", escape = "none")]
-struct SaveAgent {
-    id: RhoValue<String>,
-    version: RhoValue<String>,
-    name: RhoValue<String>,
-    shard: RhoValue<Option<String>>,
-    filesystem: RhoValue<Option<Directory>>,
+template! {
+    #[template(path = "ai_agents/save_agent.rho")]
+    #[derive(Debug, Clone)]
+    struct SaveAgent {
+        id: String,
+        version: String,
+        name: String,
+        shard: Option<String>,
+        filesystem: Option<Directory>,
+    }
 }
 
-#[tracing::instrument(level = "info", skip_all, fields(request), ret(Debug, level = "trace"))]
-pub fn prepare_save_agent_contract(id: String, request: SaveAgentReq) -> SaveAgentResp {
+#[tracing::instrument(
+    level = "info",
+    skip_all,
+    fields(request),
+    err(Debug),
+    ret(Debug, level = "trace")
+)]
+pub fn prepare_save_agent_contract(
+    id: String,
+    request: SaveAgentReq,
+) -> anyhow::Result<SaveAgentResp> {
     record_trace!(request);
 
     let version = Uuid::now_v7();
 
     let contract = SaveAgent {
-        id: id.into(),
-        version: version.to_string().into(),
-        name: request.name.into(),
-        shard: request.shard.into(),
-        filesystem: request.filesystem.into(),
+        id,
+        version: version.to_string(),
+        name: request.name,
+        shard: request.shard,
+        filesystem: request.filesystem,
     }
-    .prepare_for_signing();
+    .render()?;
 
-    SaveAgentResp {
+    Ok(SaveAgentResp {
         version: version.into(),
-        contract,
-    }
+        contract: prepare_for_signing(contract),
+    })
 }
 
 #[tracing::instrument(

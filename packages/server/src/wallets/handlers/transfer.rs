@@ -1,34 +1,46 @@
-use askama::Template;
-use firefly_client::WriteNodeClient;
-use firefly_client::models::SignedCode;
+use std::num::NonZero;
 
-use crate::common::deploy_signed_contract;
+use firefly_client::models::SignedCode;
+use firefly_client::{WriteNodeClient, template};
+
 use crate::common::models::PreparedContract;
-use crate::common::rendering::{PrepareForSigning, RhoValue};
 use crate::common::tracing::record_trace;
+use crate::common::{deploy_signed_contract, prepare_for_signing};
 use crate::wallets::models::{PrepareTransferInput, WalletAddress};
 
-#[derive(Debug, Clone, Template)]
-#[template(path = "wallets/transfer_contract.rho", escape = "none")]
-struct TransferContract {
-    wallet_address_from: RhoValue<WalletAddress>,
-    wallet_address_to: RhoValue<WalletAddress>,
-    amount: RhoValue<u64>,
-    #[allow(dead_code)]
-    description: RhoValue<Option<String>>,
+template! {
+    #[template(path = "wallets/transfer_contract.rho")]
+    #[derive(Debug, Clone)]
+    struct TransferContract {
+        wallet_address_from: WalletAddress,
+        wallet_address_to: WalletAddress,
+        amount: NonZero<u64>,
+        #[allow(dead_code)]
+        description: Option<String>,
+    }
 }
 
-#[tracing::instrument(level = "info", skip_all, fields(request), ret(Debug, level = "trace"))]
-pub fn prepare_transfer_contract(request: PrepareTransferInput) -> PreparedContract {
+#[tracing::instrument(
+    level = "info",
+    skip_all,
+    fields(request),
+    err(Debug),
+    ret(Debug, level = "trace")
+)]
+pub fn prepare_transfer_contract(
+    request: PrepareTransferInput,
+) -> anyhow::Result<PreparedContract> {
     record_trace!(request);
 
-    TransferContract {
-        wallet_address_from: request.from.into(),
-        wallet_address_to: request.to.into(),
-        amount: request.amount.get().into(),
-        description: request.description.map(Into::into).into(),
+    let contract = TransferContract {
+        wallet_address_from: request.from,
+        wallet_address_to: request.to,
+        amount: request.amount,
+        description: request.description.map(Into::into),
     }
-    .prepare_for_signing()
+    .render()?;
+
+    Ok(prepare_for_signing(contract))
 }
 
 #[tracing::instrument(

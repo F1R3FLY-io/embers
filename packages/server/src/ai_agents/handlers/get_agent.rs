@@ -1,23 +1,24 @@
-use askama::Template;
-use firefly_client::ReadNodeClient;
+use firefly_client::{ReadNodeClient, template};
 
 use crate::ai_agents::models::Agent;
-use crate::common::rendering::RhoValue;
 use crate::common::tracing::record_trace;
 use crate::wallets::models::WalletAddress;
 
-#[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents/get_agent.rho", escape = "none")]
-struct GetAgent {
-    address: RhoValue<WalletAddress>,
-    id: RhoValue<String>,
-    version: RhoValue<String>,
+template! {
+    #[template(path = "ai_agents/get_agent.rho")]
+    #[derive(Debug, Clone)]
+    struct GetAgent {
+        address: WalletAddress,
+        id: String,
+        version: String,
+    }
 }
 
 #[tracing::instrument(
     level = "info",
     skip_all,
     fields(address, id, version),
+    err(Debug),
     ret(Debug, level = "trace")
 )]
 pub async fn get_agent(
@@ -29,12 +30,11 @@ pub async fn get_agent(
     record_trace!(address, id, version);
 
     let code = GetAgent {
-        address: address.into(),
-        id: id.into(),
-        version: version.into(),
+        address,
+        id,
+        version,
     }
-    .render()
-    .unwrap();
+    .render()?;
 
     client.get_data(code).await
 }
