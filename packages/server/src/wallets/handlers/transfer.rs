@@ -14,6 +14,7 @@ struct TransferContract {
     wallet_address_from: RhoValue<WalletAddress>,
     wallet_address_to: RhoValue<WalletAddress>,
     amount: RhoValue<u64>,
+    #[allow(dead_code)]
     description: RhoValue<Option<String>>,
 }
 
