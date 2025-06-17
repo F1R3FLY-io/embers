@@ -2438,7 +2438,6 @@ dependencies = [
  "derive_more",
  "figment",
  "firefly-client",
- "itertools",
  "poem",
  "poem-openapi",
  "prost",

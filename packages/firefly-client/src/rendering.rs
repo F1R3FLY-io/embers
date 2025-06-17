@@ -472,20 +472,19 @@ macro_rules! template {
                 #[derive($crate::rendering::_dependencies::askama::Template)]
                 #[template(path = $path, escape = "none")]
                 struct Template {
-                    $($field: u64),*
+                    $($field: $crate::rendering::RhoValue),*
                 }
 
-                let $crate::rendering::RhoValue::Map(values) =
-                    $crate::rendering::_dependencies::serde::Serialize::serialize(&self, $crate::rendering::Serializer)?
-                else {
-                    unreachable!();
-                };
-
                 let template = Template {
-                    $($field: 0),*
+                    $(
+                        $field: $crate::rendering::_dependencies::serde::Serialize::serialize(
+                            &self.$field,
+                            $crate::rendering::Serializer
+                        )?
+                    ),*
                 };
 
-                $crate::rendering::_dependencies::askama::Template::render_with_values(&template, &values)
+                $crate::rendering::_dependencies::askama::Template::render(&template)
                     .map_err($crate::rendering::_dependencies::serde::ser::Error::custom)
             }
         }
