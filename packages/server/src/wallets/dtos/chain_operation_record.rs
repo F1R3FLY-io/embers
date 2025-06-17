@@ -6,21 +6,21 @@ use thiserror::Error;
 use crate::wallets::models::{Id, WalletAddress};
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct ChainOperationRecord {
+pub struct BlockChainTransactionRecord {
     id: Id,
     from: String,
     to: String,
     amount: u64,
-    description: String,
+    description: Option<String>,
 }
 
-#[allow(dead_code)]
+#[derive(Debug)]
 pub struct OperationRecord {
     pub id: Id,
     pub from: WalletAddress,
     pub to: WalletAddress,
     pub amount: NonZero<u64>,
-    pub description: String,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -33,10 +33,10 @@ pub enum TransformError {
     Amount,
 }
 
-impl TryFrom<ChainOperationRecord> for OperationRecord {
+impl TryFrom<BlockChainTransactionRecord> for OperationRecord {
     type Error = TransformError;
 
-    fn try_from(record: ChainOperationRecord) -> Result<Self, Self::Error> {
+    fn try_from(record: BlockChainTransactionRecord) -> Result<Self, Self::Error> {
         let from = WalletAddress::try_from(record.from).map_err(|_| TransformError::FromAddress)?;
         let to = WalletAddress::try_from(record.to).map_err(|_| TransformError::ToAddress)?;
 

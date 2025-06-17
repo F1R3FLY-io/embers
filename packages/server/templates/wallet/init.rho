@@ -1,7 +1,33 @@
 new doTransfer,
     updateTransferHistory,
-    history
+    treeHashMapCh,
+    getValueOr,
+    rl(`rho:registry:lookup`)
 in {
+    rl!(`rho:lang:treeHashMap`, *treeHashMapCh)|
+
+    for(treeHashMap <- treeHashMapCh) {
+        treeHashMap!("init", 3, *treeHashMapCh)|
+        for(map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, *map)
+        }
+    }|
+
+    contract getValueOr(@address, valueCh, nilCh) = {
+        new retCh in {
+            for(treeHashMap, map <<- treeHashMapCh) {
+                treeHashMap!("get", *map, address, *retCh)|
+
+                for(@value <- retCh) {
+                    match value {
+                        Nil => nilCh!()
+                        value => valueCh!(value)
+                    }
+                }
+            }
+        }
+    }|
+
     contract doTransfer(@wallet_address_from, @wallet_address_to, @amount, ret) = {
         new rl(`rho:registry:lookup`),
             RevVaultCh in {
@@ -16,11 +42,11 @@ in {
                         @RevVault!("deployerAuthKey", *deployerId, *revVaultKeyCh) |
                         for (@vault <- vaultCh; @key <- revVaultKeyCh; @vaultToResult <- vaultTo) {
                             match vault {
-                                (true, vaultFrom) => {
+                                (true, vault) => {
                                     match vaultToResult {
                                         (true, _) => {
                                             new resultCh in {
-                                                @vaultFrom!("transfer", wallet_address_to, amount, key, *resultCh) |
+                                                @vault!("transfer", wallet_address_to, amount, key, *resultCh) |
                                                 for (@result <- resultCh) {
                                                     match result {
                                                         (true , _  ) => ret!((true, "OK"))
@@ -39,52 +65,66 @@ in {
                                 }
                             }
                         }
+                    }
                 }
             }
-        }
     }|
 
-    contract updateTransferHistory(@id, @user, @wallet_address_from, @wallet_address_to, @amount, @description) = {
-        for(@transaction_history <- @{ *history | user }) {
-            match transaction_history {
-                Nil => @{ *history | user }!([{
-                    "id": id,
-                    "from": wallet_address_from,
-                    "to": wallet_address_to,
-                    "amount": amount,
-                    "description": description
-                }])
-                value => @{ *history | user }!(value ++ [{
-                    "id": id,
-                    "from": wallet_address_from,
-                    "to": wallet_address_to,
-                    "amount": amount,
-                    "description": description
-                }])
+    contract updateTransferHistory(@id, @wallet_owner, @wallet_address_from, @wallet_address_to, @amount, @description) = {
+        new valueCh, nilCh, retCh in {
+            getValueOr!(wallet_owner, *valueCh, *nilCh)|
+
+            for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
+                treeHashMap!("set", *map, wallet_owner,
+                    [{
+                        "id": id,
+                        "from": wallet_address_from,
+                        "to": wallet_address_to,
+                        "amount": amount,
+                        "description": description }],
+                    *retCh)
+            }|
+
+            for(@transactionsHistory <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                treeHashMap!("set", *map, wallet_owner,
+                    transactionsHistory ++ [{
+                            "id": id,
+                            "from": wallet_address_from,
+                            "to": wallet_address_to,
+                            "amount": amount,
+                            "description": description }],
+                    *retCh)
             }
         }
     }|
 
     contract @"sendTokens"(@id, @wallet_address_from, @wallet_address_to, @amount, @description) = {
-        new return in {
-            doTransfer!(wallet_address_from, wallet_address_to, amount, *return)|
-            for (@v <- return) {
-                match v {
+        new print(`rho:io:stdout`),next in {
+            doTransfer!(wallet_address_from, wallet_address_to, amount, *next) |
+            for (@transaction_status <- next) {
+                match transaction_status {
                     (true, _) => {
                         updateTransferHistory!(id, wallet_address_from, wallet_address_from, wallet_address_to, amount, description) |
                         updateTransferHistory!(id, wallet_address_to, wallet_address_from, wallet_address_to, amount, description)
                     }
-                    (false, err) => return!((false, err))
+                    (false, err) => {
+                        print!("Transfer failed: " ++ err)
+                    }
                 }
             }
         }
     }|
 
     contract @"getTransactionsHistory"(@wallet_address, ret) = {
-        for(@transactions <- @{ *history | wallet_address }) {
-            match transactions {
-                Nil => ret!([])
-                value => ret!(value)
+        new valueCh, nilCh in {
+            getValueOr!(wallet_address, *valueCh, *nilCh)|
+
+            for(<- nilCh) {
+                ret!([])
+            }|
+
+            for(@transactionsHistory <- valueCh) {
+                ret!(transactionsHistory)
             }
         }
     }|

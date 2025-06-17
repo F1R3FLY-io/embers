@@ -48,9 +48,7 @@ async fn main() -> anyhow::Result<()> {
             .render()
             .expect("Can't render InitWalletEnv bootstrap code"),
     ];
-    let _ = bootstrap_contracts(&mut write_client, &config.service_key, contracts)
-        .await
-        .inspect(|result| trace!(result));
+    let _ = bootstrap_contracts(&mut write_client, &config.service_key, contracts).await;
 
     let api = OpenApiService::new((WalletsApi, AIAgents), "Embers API", "0.1.0").url_prefix("/api");
 

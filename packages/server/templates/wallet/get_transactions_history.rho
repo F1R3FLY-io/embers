@@ -1,0 +1,3 @@
+new ret in {
+    @"getTransactionsHistory"!({{ wallet_address }}, *ret)
+}
