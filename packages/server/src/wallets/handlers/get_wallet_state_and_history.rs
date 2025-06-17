@@ -23,9 +23,9 @@ pub async fn get_wallet_state_and_history(
         .flat_map(OperationRecord::try_from)
         .filter_map(|operation| {
             let direction = if address == operation.to {
-                Direction::Outgoing
-            } else {
                 Direction::Incoming
+            } else {
+                Direction::Outgoing
             };
 
             operation.id.get_timestamp().map(|date| {
