@@ -144,38 +144,42 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
     }|
 
     contract @"saveAiAgent"(@id, @version, @name, @shard, @filesystem) = {
-        new valueCh, nilCh, retCh in {
-            for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
-                match agents.get(id) {
-                    Nil => nilCh!()
-                    versions => treeHashMap!("set", *map, address,
-                                    agents.set(id,
-                                        versions.union(
-                                            {
-                                                version: {
-                                                    "name": name,
-                                                    "shard": shard,
-                                                    "filesystem": filesystem,
-                                                },
-                                                "latest": {
-                                                    "version": version,
-                                                    "name": name,
-                                                    "shard": shard,
-                                                    "filesystem": filesystem,
+        new deployerId(`rho:rchain:deployerId`), revAddress(`rho:rev:address`), valueCh, nilCh, retCh in {
+            revAddress!("fromDeployerId", *deployerId, *retCh)|
+
+            for(@address <- retCh) {
+                for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                    match agents.get(id) {
+                        Nil => nilCh!()
+                        versions => treeHashMap!("set", *map, address,
+                                        agents.set(id,
+                                            versions.union(
+                                                {
+                                                    version: {
+                                                        "name": name,
+                                                        "shard": shard,
+                                                        "filesystem": filesystem,
+                                                    },
+                                                    "latest": {
+                                                        "version": version,
+                                                        "name": name,
+                                                        "shard": shard,
+                                                        "filesystem": filesystem,
+                                                    }
                                                 }
-                                            }
-                                        )
-                                    ), *retCh)
+                                            )
+                                        ), *retCh)
+                    }|
+
+                    for(_ <- retCh) {Nil}
                 }|
 
-                for(_ <- retCh) {Nil}
-            }|
+                for(<- nilCh) {
+                    Nil
+                }|
 
-            for(<- nilCh) {
-                Nil
-            }|
-
-            getValueOr!(address, *valueCh, *nilCh)
+                getValueOr!(address, *valueCh, *nilCh)
+            }
         }
     }
 }
