@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use firefly_client::ReadNodeClient;
 
 use crate::wallets::contracts::{create_check_balance_contract, get_user_history_contract};
-use crate::wallets::dtos::{BlockChainTransactionRecord, OperationRecord};
+use crate::wallets::dtos::{BlockChainTransactionRecord, Transaction};
 use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
 
 #[tracing::instrument(level = "trace", skip_all, ret(Debug), err(Debug))]
@@ -20,7 +20,7 @@ pub async fn get_wallet_state_and_history(
 
     let transfers: Vec<_> = get_data
         .into_iter()
-        .flat_map(OperationRecord::try_from)
+        .flat_map(Transaction::try_from)
         .filter_map(|operation| {
             let direction = if address == operation.to {
                 Direction::Incoming

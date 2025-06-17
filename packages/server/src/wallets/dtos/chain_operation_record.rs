@@ -15,7 +15,8 @@ pub struct BlockChainTransactionRecord {
 }
 
 #[derive(Debug)]
-pub struct OperationRecord {
+#[allow(dead_code)]
+pub struct Transaction {
     pub id: Id,
     pub from: WalletAddress,
     pub to: WalletAddress,
@@ -33,7 +34,7 @@ pub enum TransformError {
     Amount,
 }
 
-impl TryFrom<BlockChainTransactionRecord> for OperationRecord {
+impl TryFrom<BlockChainTransactionRecord> for Transaction {
     type Error = TransformError;
 
     fn try_from(record: BlockChainTransactionRecord) -> Result<Self, Self::Error> {

@@ -88,6 +88,8 @@ where
     fn prepare_for_signing(self) -> PreparedContract {
         let term = self.render().unwrap();
 
+        println!("{:#}", &term);
+
         let timestamp = chrono::Utc::now().timestamp_millis();
         let contract = DeployDataProto {
             term,

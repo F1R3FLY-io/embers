@@ -31,7 +31,7 @@ pub fn prepare_transfer_contract(value: PrepareTransferInput) -> PreparedContrac
 }
 
 #[tracing::instrument(level = "info", skip_all, err(Debug))]
-#[tracing::instrument(level = "trace", skip(client), ret(Debug))]
+#[tracing::instrument(level = "trace", skip_all, ret(Debug), err(Debug))]
 pub async fn deploy_signed_transfer(
     client: &mut WriteNodeClient,
     contract: SignedCode,
