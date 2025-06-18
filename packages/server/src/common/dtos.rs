@@ -209,17 +209,21 @@ where
     }
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
+#[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
 #[convert(from(common::models::PreparedContract))]
 pub struct PreparedContractDto {
+    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
     pub contract: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
+#[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
 #[convert(into(firefly_client::models::SignedCode))]
 pub struct SignedContractDto {
+    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
     pub contract: Vec<u8>,
+    #[debug("{:?}", hex::encode(sig))]
     pub sig: Vec<u8>,
     pub sig_algorithm: String,
+    #[debug("{:?}", hex::encode(deployer))]
     pub deployer: Vec<u8>,
 }
