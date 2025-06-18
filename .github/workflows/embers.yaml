@@ -49,14 +49,17 @@ jobs:
         if: steps.cache-cargo-tools.outputs.cache-hit != 'true'
         run: cargo install cargo-make
 
-      - name: Build
-        run: cargo build --all-targets
+      - name: Check formatting
+        run: cargo make format-check
 
       - name: Run security audit
         run: cargo make audit
 
-      - name: Check formatting
-        run: cargo make format-check
+      - name: Build
+        run: cargo build --all-targets
 
       - name: Run clippy
         run: cargo make clippy
+
+      - name: Run tests
+        run: cargo make test

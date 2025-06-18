@@ -18,7 +18,7 @@ use structural_convert::StructuralConvert;
 
 use crate::common;
 
-/// This type transforms values into [`String`] for serialization/deserialization
+/// Transforms T to [`String`] before serialization/deserialization
 /// and keeps original format in `OpenApi` model.
 #[derive(Debug, Clone, From)]
 pub struct Stringified<T>(pub T);
@@ -110,6 +110,7 @@ impl From<NonZero<u64>> for Stringified<u64> {
     }
 }
 
+/// Parses [`String`] path parameter into T using [`TryFrom::try_from`].
 #[derive(Debug, Clone, From)]
 pub struct ParseFromString<T>(pub T);
 
@@ -208,17 +209,21 @@ where
     }
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
+#[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
 #[convert(from(common::models::PreparedContract))]
 pub struct PreparedContractDto {
+    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
     pub contract: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
+#[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
 #[convert(into(firefly_client::models::SignedCode))]
 pub struct SignedContractDto {
+    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
     pub contract: Vec<u8>,
+    #[debug("{:?}", hex::encode(sig))]
     pub sig: Vec<u8>,
     pub sig_algorithm: String,
+    #[debug("{:?}", hex::encode(deployer))]
     pub deployer: Vec<u8>,
 }

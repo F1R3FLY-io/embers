@@ -1,22 +1,23 @@
-use askama::Template;
-use firefly_client::ReadNodeClient;
+use firefly_client::{ReadNodeClient, template};
 
 use crate::ai_agents::models::{AgentHeader, Agents};
-use crate::common::rendering::RhoValue;
 use crate::common::tracing::record_trace;
 use crate::wallets::models::WalletAddress;
 
-#[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents/list_agent_versions.rho", escape = "none")]
-struct ListAgentVersions {
-    address: RhoValue<WalletAddress>,
-    id: RhoValue<String>,
+template! {
+    #[template(path = "ai_agents/list_agent_versions.rho")]
+    #[derive(Debug, Clone)]
+    struct ListAgentVersions {
+        address: WalletAddress,
+        id: String,
+    }
 }
 
 #[tracing::instrument(
     level = "info",
     skip_all,
     fields(address, id),
+    err(Debug),
     ret(Debug, level = "trace")
 )]
 pub async fn list_agent_versions(
@@ -26,12 +27,7 @@ pub async fn list_agent_versions(
 ) -> anyhow::Result<Option<Agents>> {
     record_trace!(address, id);
 
-    let code = ListAgentVersions {
-        address: address.into(),
-        id: id.into(),
-    }
-    .render()
-    .unwrap();
+    let code = ListAgentVersions { address, id }.render()?;
 
     let agents: Option<Vec<AgentHeader>> = client.get_data(code).await?;
     Ok(agents.map(|mut agents| {

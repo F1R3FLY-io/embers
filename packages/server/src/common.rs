@@ -1,9 +1,12 @@
 use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
+use firefly_client::models::casper::DeployDataProto;
+use prost::Message;
+
+use crate::common::models::PreparedContract;
 
 pub mod dtos;
 pub mod models;
-pub mod rendering;
 pub mod tracing;
 
 pub async fn deploy_signed_contract(
@@ -12,4 +15,20 @@ pub async fn deploy_signed_contract(
 ) -> anyhow::Result<()> {
     client.deploy_signed_contract(contract).await?;
     client.propose().await.map(|_| ())
+}
+
+pub fn prepare_for_signing(code: String) -> PreparedContract {
+    let timestamp = chrono::Utc::now().timestamp_millis();
+    let contract = DeployDataProto {
+        term: code,
+        timestamp,
+        phlo_price: 1,
+        phlo_limit: 500_000,
+        valid_after_block_number: 0,
+        shard_id: "root".into(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+
+    PreparedContract { contract }
 }

@@ -6,8 +6,8 @@ use secp256k1::SecretKey;
 #[template(path = "ai_agents/init_agents_env.rho", escape = "none")]
 struct InitAgentsEnv;
 
-#[tracing::instrument(level = "info", skip_all, ret(Debug, level = "trace"))]
+#[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
 pub async fn init_agents_env(client: &mut WriteNodeClient, key: &SecretKey) -> anyhow::Result<()> {
-    let contract = InitAgentsEnv.render().unwrap();
+    let contract = InitAgentsEnv.render()?;
     client.full_deploy(key, contract).await.map(|_| ())
 }
