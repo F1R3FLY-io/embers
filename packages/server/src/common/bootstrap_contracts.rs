@@ -2,7 +2,7 @@ use firefly_client::WriteNodeClient;
 use secp256k1::SecretKey;
 
 #[tracing::instrument(level = "info", skip_all)]
-#[tracing::instrument(level = "trace", skip(client, key), ret(Debug))]
+#[tracing::instrument(level = "trace", skip_all, ret(Debug))]
 pub async fn bootstrap_contracts(
     client: &mut WriteNodeClient,
     key: &SecretKey,
