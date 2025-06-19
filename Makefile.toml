@@ -26,3 +26,10 @@ command       = "cargo"
 install_crate = "rustfmt"
 toolchain     = "nightly"
 workspace     = false
+
+[tasks.run]
+script = '''
+cd packages/${1}
+cargo make run
+'''
+workspace = false

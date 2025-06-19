@@ -6,33 +6,31 @@ use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
 use super::handlers::{deploy_signed_transfer, prepare_transfer_contract};
-use crate::common::dtos::{ApiTags, SignedContractDto};
+use crate::common::dtos::{ApiTags, ParseFromString, SignedContractDto};
 use crate::common::models::PreparedContract;
 use crate::wallets::dtos::{PrepareTransferInputDto, WalletStateAndHistoryDto};
 use crate::wallets::handlers::get_wallet_state_and_history;
 use crate::wallets::models::{PrepareTransferInput, WalletAddress};
 
+#[derive(Debug, Clone)]
 pub struct WalletsApi;
 
+#[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/wallet", tag = ApiTags::Wallets)]
 impl WalletsApi {
     #[oai(path = "/state/:address", method = "get")]
     async fn wallet_state_and_history(
         &self,
-        Path(address): Path<String>,
+        Path(wallet_address): Path<ParseFromString<WalletAddress>>,
         Data(read_client): Data<&ReadNodeClient>,
     ) -> poem::Result<Json<WalletStateAndHistoryDto>> {
-        let wallet_address =
-            WalletAddress::try_from(address).map_err(|_| poem::error::ParsePathError)?;
-
-        let wallet_state_and_history = get_wallet_state_and_history(read_client, wallet_address)
+        let wallet_state_and_history = get_wallet_state_and_history(read_client, wallet_address.0)
             .await
             .map(Into::into)?;
 
         Ok(Json(wallet_state_and_history))
     }
 
-    #[allow(clippy::unused_async)]
     #[oai(path = "/transfer/prepare", method = "post")]
     async fn prepare_transfer(
         &self,

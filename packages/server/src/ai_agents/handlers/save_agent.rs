@@ -2,14 +2,14 @@ use firefly_client::models::SignedCode;
 use firefly_client::{WriteNodeClient, template};
 use uuid::Uuid;
 
-use crate::ai_agents::models::{CreateAgentReq, CreateAgentResp, Directory};
+use crate::ai_agents::models::{Directory, SaveAgentReq, SaveAgentResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
 
 template! {
-    #[template(path = "ai_agents/create_agent.rho")]
+    #[template(path = "ai_agents/save_agent.rho")]
     #[derive(Debug, Clone)]
-    struct CreateAgent {
+    struct SaveAgent {
         id: String,
         version: String,
         name: String,
@@ -25,14 +25,16 @@ template! {
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub fn prepare_create_agent_contract(request: CreateAgentReq) -> anyhow::Result<CreateAgentResp> {
+pub fn prepare_save_agent_contract(
+    id: String,
+    request: SaveAgentReq,
+) -> anyhow::Result<SaveAgentResp> {
     record_trace!(request);
 
-    let id = Uuid::new_v4();
     let version = Uuid::now_v7();
 
-    let contract = CreateAgent {
-        id: id.to_string(),
+    let contract = SaveAgent {
+        id,
         version: version.to_string(),
         name: request.name,
         shard: request.shard,
@@ -40,8 +42,7 @@ pub fn prepare_create_agent_contract(request: CreateAgentReq) -> anyhow::Result<
     }
     .render()?;
 
-    Ok(CreateAgentResp {
-        id: id.into(),
+    Ok(SaveAgentResp {
         version: version.into(),
         contract: prepare_for_signing(contract),
     })
@@ -54,7 +55,7 @@ pub fn prepare_create_agent_contract(request: CreateAgentReq) -> anyhow::Result<
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub async fn deploy_signed_create_agent(
+pub async fn deploy_signed_save_agent(
     client: &mut WriteNodeClient,
     contract: SignedCode,
 ) -> anyhow::Result<()> {

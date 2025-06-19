@@ -55,7 +55,7 @@ pub enum Operation {
         wallet_address_from: WalletAddress,
         wallet_address_to: WalletAddress,
         amount: Amount,
-        description: String,
+        description: Option<String>,
     },
 }
 

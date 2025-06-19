@@ -13,6 +13,7 @@ chrono             = { version = "0.4", features = ["serde"] }
 derive_more        = { version = "2.0", features = ["full"] }
 figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }
+hex                = { version = "0.4" }
 html-escape        = "0.2.13"
 itertools          = { version = "0.14" }
 poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
@@ -29,11 +30,13 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid               = { version = "1.17", features = ["serde", "v7"] }
 
 [lints.clippy]
-default_trait_access = "allow"
-implicit_hasher      = "allow"
-missing_errors_doc   = "allow"
-must_use_candidate   = "allow"
-too_many_lines       = "allow"
+default_trait_access  = "allow"
+ignored_unit_patterns = "allow"
+implicit_hasher       = "allow"
+match_same_arms       = "allow"
+missing_errors_doc    = "allow"
+must_use_candidate    = "allow"
+too_many_lines        = "allow"
 
 [lints.clippy.pedantic]
 level    = "warn"

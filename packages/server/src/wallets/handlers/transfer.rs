@@ -1,6 +1,6 @@
 use askama::Template;
-use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
+use firefly_client::{WriteNodeClient, template};
 
 use crate::common::models::PreparedContract;
 use crate::common::rendering::{PrepareForSigning, RhoValue};

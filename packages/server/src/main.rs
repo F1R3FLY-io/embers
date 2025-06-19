@@ -7,7 +7,6 @@ use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
-use tracing::trace;
 use wallets::models::InitWalletEnv;
 
 use crate::ai_agents::api::AIAgents;
