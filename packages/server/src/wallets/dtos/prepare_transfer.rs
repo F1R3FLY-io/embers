@@ -15,7 +15,7 @@ pub struct PrepareTransferInputDto {
 }
 
 #[derive(Debug, Clone, Error)]
-pub enum TransformPrepareTransferInputError {
+pub enum TransferValidationError {
     #[error("amount field can't be empty")]
     EmptyAmount,
     #[error("receiver wallet adress has wrong format: {0}")]
@@ -26,14 +26,14 @@ pub enum TransformPrepareTransferInputError {
     DescriptionError(#[from] DescriptionError),
 }
 
-impl ResponseError for TransformPrepareTransferInputError {
+impl ResponseError for TransferValidationError {
     fn status(&self) -> poem::http::StatusCode {
         StatusCode::BAD_REQUEST
     }
 }
 
 impl TryFrom<PrepareTransferInputDto> for PrepareTransferInput {
-    type Error = TransformPrepareTransferInputError;
+    type Error = TransferValidationError;
 
     fn try_from(value: PrepareTransferInputDto) -> Result<Self, Self::Error> {
         let to = value

@@ -3,7 +3,9 @@ new rl(`rho:registry:lookup`),
     getValueOr,
     revVaultCh,
     doTransfer,
-    updateTransferHistory
+    updateTransferHistory,
+    getTransactionsHistory,
+    getBalance
 in {
   rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
 
@@ -36,15 +38,15 @@ in {
     revVaultCh!(revVault)
   } |
 
-  contract doTransfer(@deployerId, @wallet_address_from, @wallet_address_to, @amount, ret) = {
+  contract doTransfer(@deployerId, @walletAddressFrom, @walletAddressTo, @amount, ret) = {
     new vaultCh, vaultToCh, revVaultkeyCh, resultCh in {
       for (revVault <<- revVaultCh) {
-        revVault!("findOrCreate", wallet_address_from, *vaultCh) |
-        revVault!("findOrCreate", wallet_address_to, *vaultToCh) |
+        revVault!("findOrCreate", walletAddressFrom, *vaultCh) |
+        revVault!("findOrCreate", walletAddressTo, *vaultToCh) |
         revVault!("deployerAuthKey", deployerId, *revVaultkeyCh) |
 
         for (@(true, vault) <- vaultCh; key <- revVaultkeyCh; _ <- vaultToCh) {
-          @vault!("transfer", wallet_address_to, amount, *key, *resultCh) |
+          @vault!("transfer", walletAddressTo, amount, *key, *resultCh) |
 
           for (@(true , _) <- resultCh) {
             ret!((true, Nil))
@@ -62,16 +64,16 @@ in {
     }
   } |
 
-  contract updateTransferHistory(@id, @wallet_owner, @wallet_address_from, @wallet_address_to, @amount, @description) = {
+  contract updateTransferHistory(@id, @walletOwner, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
     new valueCh, nilCh, retCh in {
-      getValueOr!(wallet_owner, *valueCh, *nilCh) |
+      getValueOr!(walletOwner, *valueCh, *nilCh) |
 
       for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
-        treeHashMap!("set", *map, wallet_owner,
+        treeHashMap!("set", *map, walletOwner,
           [{
             "id": id,
-            "from": wallet_address_from,
-            "to": wallet_address_to,
+            "from": walletAddressFrom,
+            "to": walletAddressTo,
             "amount": amount,
             "description": description
           }],
@@ -79,11 +81,11 @@ in {
       } |
 
       for(@transactionsHistory <- valueCh; treeHashMap, map <<- treeHashMapCh) {
-        treeHashMap!("set", *map, wallet_owner,
+        treeHashMap!("set", *map, walletOwner,
           transactionsHistory ++ [{
             "id": id,
-            "from": wallet_address_from,
-            "to": wallet_address_to,
+            "from": walletAddressFrom,
+            "to": walletAddressTo,
             "amount": amount,
             "description": description
           }],
@@ -92,13 +94,13 @@ in {
     }
   } |
 
-  contract @"sendTransfer"(@deployerId, @id, @wallet_address_from, @wallet_address_to, @amount, @description) = {
+  contract @"sendTransfer"(@deployerId, @id, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
     new retCh, debug(`rho:io:stdout`) in {
-      doTransfer!(deployerId, wallet_address_from, wallet_address_to, amount, *retCh) |
+      doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *retCh) |
 
       for (@(true, _) <- retCh) {
-        updateTransferHistory!(id, wallet_address_from, wallet_address_from, wallet_address_to, amount, description) |
-        updateTransferHistory!(id, wallet_address_to,   wallet_address_from, wallet_address_to, amount, description)
+        updateTransferHistory!(id, walletAddressFrom, walletAddressFrom, walletAddressTo, amount, description) |
+        updateTransferHistory!(id, walletAddressTo,   walletAddressFrom, walletAddressTo, amount, description)
       } |
 
       for (@(false, err) <- retCh) {
@@ -107,9 +109,9 @@ in {
     }
   } |
 
-  contract @"getTransactionsHistory"(@wallet_address, ret) = {
+  contract getTransactionsHistory(@walletAddress, ret) = {
     new valueCh, nilCh in {
-      getValueOr!(wallet_address, *valueCh, *nilCh) |
+      getValueOr!(walletAddress, *valueCh, *nilCh) |
 
       for(<- nilCh) {
         ret!([])
@@ -121,10 +123,10 @@ in {
     }
   } |
 
-  contract @"getBalance"(@wallet_address, ret) = {
+  contract getBalance(@walletAddress, ret) = {
     new vaultCh in {
       for (revVault <<- revVaultCh) {
-        revVault!("findOrCreate", wallet_address, *vaultCh) |
+        revVault!("findOrCreate", walletAddress, *vaultCh) |
 
         for (@(true, vault) <- vaultCh) {
           @vault!("balance", *ret)
@@ -133,6 +135,20 @@ in {
         for(@(false, err) <- vaultCh) {
           ret!((false, "REV vault cannot be found: " ++ err))
         }
+      }
+    }
+  } |
+
+  contract @"getBalanceAndHistory"(@walletAddress, ret) = {
+    new balanceCh, historyCh in {
+      getBalance!(walletAddress, *balanceCh) |
+      getTransactionsHistory!(walletAddress, *historyCh) |
+
+      for(@balance <- balanceCh; @history <- historyCh) {
+        ret!({
+          "balance": balance,
+          "history": history,
+        })
       }
     }
   }
