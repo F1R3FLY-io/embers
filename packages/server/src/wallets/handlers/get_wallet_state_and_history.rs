@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use firefly_client::{ReadNodeClient, template};
 
+use crate::common::tracing::record_trace;
 use crate::wallets::dtos::{BlockChainTransactionRecord, Transaction};
 use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
 
@@ -20,11 +21,19 @@ template! {
     }
 }
 
-#[tracing::instrument(level = "trace", skip_all, ret(Debug), err(Debug))]
+#[tracing::instrument(
+    level = "info",
+    skip_all,
+    fields(address),
+    err(Debug),
+    ret(Debug, level = "trace")
+)]
 pub async fn get_wallet_state_and_history(
     client: &ReadNodeClient,
     address: WalletAddress,
 ) -> anyhow::Result<WalletStateAndHistory> {
+    record_trace!(address);
+
     let contract = CheckBalance {
         wallet_address: address.clone(),
     }
@@ -67,6 +76,8 @@ pub async fn get_wallet_state_and_history(
     Ok(WalletStateAndHistory {
         balance,
         transfers,
-        ..Default::default()
+        requests: vec![],
+        exchanges: vec![],
+        boosts: vec![],
     })
 }

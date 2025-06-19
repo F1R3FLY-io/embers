@@ -29,7 +29,7 @@ pub enum Direction {
     Outgoing,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct WalletStateAndHistory {
     pub balance: u64,
     pub requests: Vec<Request>,
@@ -48,18 +48,7 @@ pub struct Boost {
     pub post: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "UPPERCASE")]
-pub enum Operation {
-    Transfer {
-        wallet_address_from: WalletAddress,
-        wallet_address_to: WalletAddress,
-        amount: Amount,
-        description: Option<String>,
-    },
-}
-
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Request {
     pub id: String,
     pub date: DateTime<Utc>,
@@ -68,14 +57,14 @@ pub struct Request {
 }
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum RequestStatus {
     Done,
     Ongoing,
     Cancelled,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Exchange {}
 
 #[derive(Debug, Clone)]
@@ -86,7 +75,7 @@ pub struct PrepareTransferInput {
     pub description: Option<Description>,
 }
 
-#[derive(Debug, Clone, Default, Into, AsRef)]
+#[derive(Debug, Clone, Into, AsRef)]
 pub struct Description(String);
 
 const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;

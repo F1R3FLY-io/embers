@@ -1,6 +1,5 @@
 mod chain_operation_record;
 mod prepare_transfer;
-mod transfer;
 
 pub use chain_operation_record::*;
 use chrono::{DateTime, Utc};
