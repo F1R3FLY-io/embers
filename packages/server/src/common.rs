@@ -4,7 +4,6 @@ use firefly_client::models::casper::DeployDataProto;
 use prost::Message;
 
 use crate::common::models::PreparedContract;
-
 use crate::wallets::models::Id;
 
 pub mod bootstrap_contracts;

@@ -1,6 +1,7 @@
 use askama::Template;
 
-use crate::{common::rendering::RhoValue, wallets::models::WalletAddress};
+use crate::common::rendering::RhoValue;
+use crate::wallets::models::WalletAddress;
 
 #[derive(Template)]
 #[template(path = "wallet/get_transactions_history.rho", escape = "none")]

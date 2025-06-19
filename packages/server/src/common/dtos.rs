@@ -6,7 +6,12 @@ use derive_more::From;
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
-    ParseError, ParseFromJSON, ParseFromParameter, ParseResult, ToJSON, Type,
+    ParseError,
+    ParseFromJSON,
+    ParseFromParameter,
+    ParseResult,
+    ToJSON,
+    Type,
 };
 use poem_openapi::{ApiResponse, Object, Tags};
 use structural_convert::StructuralConvert;
