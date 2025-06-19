@@ -162,7 +162,7 @@ pub enum ApiTags {
     AIAgents,
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
+#[derive(Debug, Clone, Object)]
 pub struct InternalError {
     description: String,
 }

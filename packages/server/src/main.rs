@@ -42,14 +42,15 @@ async fn main() -> anyhow::Result<()> {
     let contracts = vec![
         InitAgentsEnv
             .render()
-            .expect("Can't render InitAgentsEnv bootstrap code"),
+            .context("can't render InitAgentsEnv bootstrap code")?,
         InitWalletEnv
             .render()
-            .expect("Can't render InitWalletEnv bootstrap code"),
+            .context("can't render InitWalletEnv bootstrap code")?,
     ];
-    let _ = bootstrap_contracts(&mut write_client, &config.service_key, contracts)
+
+    bootstrap_contracts(&mut write_client, &config.service_key, contracts)
         .await
-        .expect("Can't bootstrap Infrastructure's Rho contracts");
+        .context("can't bootstrap Infrastructure's Rho contracts")?;
 
     let api = OpenApiService::new((WalletsApi, AIAgents), "Embers API", "0.1.0").url_prefix("/api");
 

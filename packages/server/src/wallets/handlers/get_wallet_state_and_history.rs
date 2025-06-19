@@ -1,19 +1,40 @@
 use chrono::{DateTime, Utc};
-use firefly_client::ReadNodeClient;
+use firefly_client::{ReadNodeClient, template};
 
-use crate::wallets::contracts::{create_check_balance_contract, get_user_history_contract};
 use crate::wallets::dtos::{BlockChainTransactionRecord, Transaction};
 use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
+
+template! {
+    #[template(path = "wallet/check_balance.rho")]
+    #[derive(Debug, Clone)]
+    struct CheckBalance {
+        wallet_address: WalletAddress,
+    }
+}
+
+template! {
+    #[template(path = "wallet/get_transactions_history.rho")]
+    #[derive(Debug, Clone)]
+    struct GetUserHistory {
+        wallet_address: WalletAddress,
+    }
+}
 
 #[tracing::instrument(level = "trace", skip_all, ret(Debug), err(Debug))]
 pub async fn get_wallet_state_and_history(
     client: &ReadNodeClient,
     address: WalletAddress,
 ) -> anyhow::Result<WalletStateAndHistory> {
-    let contract = create_check_balance_contract(&address);
+    let contract = CheckBalance {
+        wallet_address: address.clone(),
+    }
+    .render()?;
     let balance = client.get_data(contract).await?;
 
-    let contract = get_user_history_contract(address.clone())?;
+    let contract = GetUserHistory {
+        wallet_address: address.clone(),
+    }
+    .render()?;
     let get_data: Vec<BlockChainTransactionRecord> = client.get_data(contract).await?;
 
     let transfers: Vec<_> = get_data
