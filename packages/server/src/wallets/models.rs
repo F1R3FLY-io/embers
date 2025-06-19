@@ -135,6 +135,6 @@ impl TryFrom<String> for WalletAddress {
     }
 }
 
-#[derive(Template)]
+#[derive(Debug, Clone, Template)]
 #[template(path = "wallets/init.rho", escape = "none")]
 pub struct InitWalletEnv;

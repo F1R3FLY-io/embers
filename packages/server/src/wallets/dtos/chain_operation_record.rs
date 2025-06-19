@@ -20,7 +20,7 @@ pub struct BlockChainTransactionRecord {
     description: Option<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Transaction {
     pub id: Id,
@@ -30,7 +30,7 @@ pub struct Transaction {
     pub description: Option<Description>,
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum TransformTransactionError {
     #[error("amount field can't be empty")]
     EmptyAmount,
