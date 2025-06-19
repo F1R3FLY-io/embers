@@ -82,7 +82,7 @@ const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
 
 #[derive(Debug, Clone, Error)]
 pub enum DescriptionError {
-    #[error("Maximum description length reached")]
+    #[error("maximum description length reached")]
     TooLong,
 }
 
@@ -103,13 +103,13 @@ pub struct WalletAddress(String);
 
 #[derive(Debug, Clone, Error)]
 pub enum ParseWalletAddressError {
-    #[error("Internal encoder error: {0}")]
+    #[error("internal encoder error: {0}")]
     EncoderError(bs58::decode::Error),
 
-    #[error("Invalid address size")]
+    #[error("invalid address size")]
     InvalidRevAddressSize,
 
-    #[error("Invalid address format: {0}")]
+    #[error("invalid address format: {0}")]
     InvalidAddress(String),
 }
 
@@ -136,5 +136,5 @@ impl TryFrom<String> for WalletAddress {
 }
 
 #[derive(Template)]
-#[template(path = "wallet/init.rho", escape = "none")]
+#[template(path = "wallets/init.rho", escape = "none")]
 pub struct InitWalletEnv;

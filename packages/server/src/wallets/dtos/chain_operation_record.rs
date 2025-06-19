@@ -3,7 +3,13 @@ use std::num::NonZero;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::wallets::models::{Id, WalletAddress};
+use crate::wallets::models::{
+    Description,
+    DescriptionError,
+    Id,
+    ParseWalletAddressError,
+    WalletAddress,
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BlockChainTransactionRecord {
@@ -21,34 +27,46 @@ pub struct Transaction {
     pub from: WalletAddress,
     pub to: WalletAddress,
     pub amount: NonZero<u64>,
-    pub description: Option<String>,
+    pub description: Option<Description>,
 }
 
 #[derive(Debug, Error)]
-pub enum TransformError {
-    #[error("Invalid from address")]
-    FromAddress,
-    #[error("Invalid to address")]
-    ToAddress,
-    #[error("Invalid amount")]
-    Amount,
+pub enum TransformTransactionError {
+    #[error("amount field can't be empty")]
+    EmptyAmount,
+    #[error("receiver wallet adress has wrong format: {0}")]
+    WrongReceiverAddressFormat(ParseWalletAddressError),
+    #[error("sender wallet adress has wrong format: {0}")]
+    WrongSenderAddressFormat(ParseWalletAddressError),
+    #[error("description format error: {0}")]
+    DescriptionError(#[from] DescriptionError),
 }
 
 impl TryFrom<BlockChainTransactionRecord> for Transaction {
-    type Error = TransformError;
+    type Error = TransformTransactionError;
 
     fn try_from(record: BlockChainTransactionRecord) -> Result<Self, Self::Error> {
-        let from = WalletAddress::try_from(record.from).map_err(|_| TransformError::FromAddress)?;
-        let to = WalletAddress::try_from(record.to).map_err(|_| TransformError::ToAddress)?;
+        let from = record
+            .from
+            .try_into()
+            .map_err(Self::Error::WrongSenderAddressFormat)?;
+        let to = record
+            .to
+            .try_into()
+            .map_err(Self::Error::WrongReceiverAddressFormat)?;
 
-        let amount = NonZero::try_from(record.amount).map_err(|_| TransformError::Amount)?;
+        let amount = record
+            .amount
+            .try_into()
+            .map_err(|_| Self::Error::EmptyAmount)?;
+        let description = record.description.map(TryFrom::try_from).transpose()?;
 
         Ok(Self {
             id: record.id,
             from,
             to,
             amount,
-            description: record.description,
+            description,
         })
     }
 }

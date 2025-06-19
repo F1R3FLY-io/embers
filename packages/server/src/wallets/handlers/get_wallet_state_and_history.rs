@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
 use firefly_client::{ReadNodeClient, template};
 
 use crate::common::tracing::record_trace;
@@ -6,7 +6,7 @@ use crate::wallets::dtos::{BlockChainTransactionRecord, Transaction};
 use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
 
 template! {
-    #[template(path = "wallet/check_balance.rho")]
+    #[template(path = "wallets/check_balance.rho")]
     #[derive(Debug, Clone)]
     struct CheckBalance {
         wallet_address: WalletAddress,
@@ -14,7 +14,7 @@ template! {
 }
 
 template! {
-    #[template(path = "wallet/get_transactions_history.rho")]
+    #[template(path = "wallets/get_transactions_history.rho")]
     #[derive(Debug, Clone)]
     struct GetUserHistory {
         wallet_address: WalletAddress,
@@ -56,9 +56,14 @@ pub async fn get_wallet_state_and_history(
                 Direction::Outgoing
             };
 
-            operation.id.get_timestamp().map(|date| {
-                let timestamp = i64::try_from(date.to_unix().0).ok()?;
-                DateTime::<Utc>::from_timestamp(timestamp, 0).map(|date| {
+            operation
+                .id
+                .get_timestamp()
+                .and_then(|date| {
+                    let timestamp = i64::try_from(date.to_unix().0).ok()?;
+                    DateTime::from_timestamp(timestamp, 0)
+                })
+                .map(|date| {
                     Transfer {
                         id: operation.id,
                         direction,
@@ -68,16 +73,14 @@ pub async fn get_wallet_state_and_history(
                         cost: 0, // Assuming cost is not provided in the operation
                     }
                 })
-            })
         })
-        .flatten()
         .collect();
 
     Ok(WalletStateAndHistory {
         balance,
         transfers,
-        requests: vec![],
-        exchanges: vec![],
         boosts: vec![],
+        exchanges: vec![],
+        requests: vec![],
     })
 }
