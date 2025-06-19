@@ -13,7 +13,7 @@ pub type Amount = NonZero<u64>;
 
 pub type Id = Uuid;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Transfer {
     pub id: Id,
     pub direction: Direction,
@@ -23,13 +23,13 @@ pub struct Transfer {
     pub cost: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub enum Direction {
     Incoming,
     Outgoing,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct WalletStateAndHistory {
     pub balance: u64,
     pub requests: Vec<Request>,
@@ -38,7 +38,7 @@ pub struct WalletStateAndHistory {
     pub transfers: Vec<Transfer>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Boost {
     pub id: String,
     pub username: String,
@@ -102,11 +102,10 @@ impl TryFrom<String> for Description {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.chars().count() > MAX_DESCRIPTION_CHARS_COUNT {
-            return Result::Err(DescriptionError::TooLong);
+            return Err(DescriptionError::TooLong);
         }
 
-        let description = html_escape::encode_safe(&value).into_owned();
-        Ok(Self(description))
+        Ok(Self(value))
     }
 }
 
@@ -144,12 +143,6 @@ impl TryFrom<String> for WalletAddress {
         }
 
         Ok(Self(value))
-    }
-}
-
-impl<'a> From<&'a WalletAddress> for &'a str {
-    fn from(value: &'a WalletAddress) -> Self {
-        value.0.as_str()
     }
 }
 

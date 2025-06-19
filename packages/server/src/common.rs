@@ -4,12 +4,10 @@ use firefly_client::models::casper::DeployDataProto;
 use prost::Message;
 
 use crate::common::models::PreparedContract;
-use crate::wallets::models::Id;
 
 pub mod bootstrap_contracts;
 pub mod dtos;
 pub mod models;
-pub mod rendering;
 pub mod tracing;
 
 pub use bootstrap_contracts::*;
@@ -20,10 +18,6 @@ pub async fn deploy_signed_contract(
 ) -> anyhow::Result<()> {
     client.deploy_signed_contract(contract).await?;
     client.propose().await.map(|_| ())
-}
-
-pub fn generate_id() -> Id {
-    uuid::Uuid::new_v7(uuid::Timestamp::now(uuid::ContextV7::new()))
 }
 
 pub fn prepare_for_signing(code: String) -> PreparedContract {

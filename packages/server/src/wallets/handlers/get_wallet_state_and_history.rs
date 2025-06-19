@@ -13,10 +13,8 @@ pub async fn get_wallet_state_and_history(
     let contract = create_check_balance_contract(&address);
     let balance = client.get_data(contract).await?;
 
-    let contract = get_user_history_contract(&address);
-    let get_data = client
-        .get_data::<Vec<BlockChainTransactionRecord>>(contract)
-        .await?;
+    let contract = get_user_history_contract(address.clone())?;
+    let get_data: Vec<BlockChainTransactionRecord> = client.get_data(contract).await?;
 
     let transfers: Vec<_> = get_data
         .into_iter()

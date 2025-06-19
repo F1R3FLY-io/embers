@@ -1,18 +1,19 @@
-use askama::Template;
+use firefly_client::template;
 
-use crate::common::rendering::RhoValue;
 use crate::wallets::models::WalletAddress;
 
-#[derive(Template)]
-#[template(path = "wallet/get_transactions_history.rho", escape = "none")]
-struct GetUserHistory {
-    wallet_address: RhoValue<String>,
+template! {
+    #[template(path = "wallet/get_transactions_history.rho")]
+    #[derive(Debug, Clone)]
+    struct GetUserHistory {
+        wallet_address: WalletAddress,
+    }
 }
 
-pub fn get_user_history_contract(address: &WalletAddress) -> String {
+pub fn get_user_history_contract(address: WalletAddress) -> anyhow::Result<String> {
     GetUserHistory {
-        wallet_address: String::from(address.to_owned()).into(),
+        wallet_address: address,
     }
     .render()
-    .unwrap()
+    .map_err(Into::into)
 }

@@ -1,6 +1,5 @@
 mod create_agent;
 mod get_agent;
-mod init_agents_env;
 mod list_agent_versions;
 mod list_agents;
 mod save_agent;

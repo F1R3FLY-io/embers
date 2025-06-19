@@ -36,10 +36,10 @@ impl WalletsApi {
         &self,
         Json(input): Json<PrepareTransferInputDto>,
     ) -> poem::Result<Json<PreparedContract>> {
-        let input = PrepareTransferInput::try_from(input).map_err(anyhow::Error::from)?;
-        let result = prepare_transfer_contract(input);
+        let input = PrepareTransferInput::try_from(input)?;
+        let result = prepare_transfer_contract(input)?;
 
-        poem::Result::Ok(Json(result))
+        Ok(Json(result))
     }
 
     #[oai(path = "/transfer/send", method = "post")]
