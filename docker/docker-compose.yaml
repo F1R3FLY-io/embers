@@ -4,12 +4,8 @@ services:
       context: .
       dockerfile: firefly.dockerfile
     ports:
-      - 40400:40400
-      - 40401:40401
-      - 40402:40402
-      - 40403:40403
-      - 40404:40404
-      - 40405:40405
+      - 14401:40401 # deploy service
+      - 14402:40402 # propose service
     volumes:
       - ./ssl:/data/ssl
     command:
@@ -32,11 +28,7 @@ services:
       context: .
       dockerfile: firefly.dockerfile
     ports:
-      - 40411:40401
-      - 40413:40403
-      - 40415:40405
-      - 40410:40410
-      - 40414:40414
+      - 14413:40403 # rest api
     command:
       - run
       - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly?protocol=40400&discovery=40404

@@ -1,1 +1,3 @@
-@"saveAiAgent"!({{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ filesystem }})
+new deployerId(`rho:rchain:deployerId`) in {
+    @"saveAiAgent"!(*deployerId, {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ filesystem }})
+}

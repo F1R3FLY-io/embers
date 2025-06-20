@@ -27,6 +27,22 @@ install_crate = "rustfmt"
 toolchain     = "nightly"
 workspace     = false
 
+[tasks.docker-up]
+args = [
+    "compose",
+    "--file",
+    "docker/docker-compose.yaml",
+    "--project-name",
+    "embers",
+    "up",
+    "--build",
+    "--force-recreate",
+    "--detach",
+    "--wait",
+]
+command = "docker"
+workspace = false
+
 [tasks.run]
 script = '''
 cd packages/${1}

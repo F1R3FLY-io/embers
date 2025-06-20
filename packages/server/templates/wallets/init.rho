@@ -2,6 +2,7 @@ new rl(`rho:registry:lookup`),
     treeHashMapCh,
     getValueOr,
     revVaultCh,
+    eitherCh,
     doTransfer,
     updateTransferHistory,
     getTransactionsHistory,
@@ -38,27 +39,25 @@ in {
         revVaultCh!(revVault)
     } |
 
+    rl!(`rho:lang:either`, *eitherCh) |
+
+    for(@(_, either) <- eitherCh) {
+        eitherCh!(either)
+    } |
+
     contract doTransfer(@deployerId, @walletAddressFrom, @walletAddressTo, @amount, ret) = {
-        new vaultCh, vaultToCh, revVaultkeyCh, resultCh in {
+        new vaultCh, vaultToCh, revVaultkeyCh, transferOp in {
             for(revVault <<- revVaultCh) {
                 revVault!("findOrCreate", walletAddressFrom, *vaultCh) |
                 revVault!("findOrCreate", walletAddressTo, *vaultToCh) |
                 revVault!("deployerAuthKey", deployerId, *revVaultkeyCh) |
 
-                for(@(true, vault) <- vaultCh; key <- revVaultkeyCh; _ <- vaultToCh) {
-                    @vault!("transfer", walletAddressTo, amount, *key, *resultCh) |
-
-                    for(@(true , _) <- resultCh) {
-                        ret!((true, Nil))
+                for(either <<- eitherCh; key <- revVaultkeyCh; _ <- vaultToCh) {
+                    for(vault, return <- transferOp) {
+                        vault!("transfer", walletAddressTo, amount, *key, *return)
                     } |
 
-                    for(@(false, err) <- resultCh) {
-                        ret!((false, "Transfer failed: " ++ err))
-                    }
-                } |
-
-                for(@(false, err) <- vaultCh) {
-                    ret!((false, "REV vault cannot be found or created: " ++ err))
+                    either!("flatMap <-", *vaultCh, *transferOp, *ret)
                 }
             }
         }
@@ -99,16 +98,23 @@ in {
     } |
 
     contract @"sendTransfer"(@deployerId, @id, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
-        new retCh, debug(`rho:io:stdout`) in {
-            doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *retCh) |
+        new transferResult, updateHistory, retCh, debug(`rho:io:stdout`) in {
+            for(either <<- eitherCh) {
+                doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *transferResult) |
 
-            for(@(true, _) <- retCh) {
-                updateTransferHistory!(id, walletAddressFrom, walletAddressFrom, walletAddressTo, amount, description) |
-                updateTransferHistory!(id, walletAddressTo,   walletAddressFrom, walletAddressTo, amount, description)
-            } |
+                for(@v, return <- updateHistory) {
+                    updateTransferHistory!(id, walletAddressFrom, walletAddressFrom, walletAddressTo, amount, description) |
+                    updateTransferHistory!(id, walletAddressTo,   walletAddressFrom, walletAddressTo, amount, description) |
+                    return!(v)
+                } |
 
-            for(@(false, err) <- retCh) {
-                debug!("Transfer failed: " ++ err)
+                for(@result <- retCh) {
+                    match result {
+                        (false, err) => debug!(["taransfer failed", err])
+                    }
+                } |
+
+                either!("map <-", *transferResult, *updateHistory, *retCh)
             }
         }
     } |
@@ -128,36 +134,30 @@ in {
     } |
 
     contract getBalance(@walletAddress, ret) = {
-        new vaultCh, balanceCh in {
-            for(revVault <<- revVaultCh) {
+        new vaultCh, balanceOp in {
+            for(revVault <<- revVaultCh; either <<- eitherCh) {
                 revVault!("findOrCreate", walletAddress, *vaultCh) |
 
-                for(@(true, vault) <- vaultCh) {
-                    @vault!("balance", *balanceCh) |
-
-                    for(@balance <- balanceCh) {
-                        ret!((true, balance))
-                    }
+                for(vault, return <- balanceOp) {
+                    vault!("balance", *return)
                 } |
 
-                for(@(false, err) <- vaultCh) {
-                    ret!((false, "REV vault cannot be found: " ++ err))
-                }
+                either!("map <-", *vaultCh, *balanceOp, *ret)
             }
         }
     } |
 
     contract @"getBalanceAndHistory"(@walletAddress, ret) = {
-        new balanceCh, historyCh in {
-            getBalance!(walletAddress, *balanceCh) |
-            getTransactionsHistory!(walletAddress, *historyCh) |
+        new balanceCh, historyCh, mapOp in {
+            for(either <<- eitherCh) {
+                getBalance!(walletAddress, *balanceCh) |
+                getTransactionsHistory!(walletAddress, *historyCh) |
 
-            for(@(true, balance) <- balanceCh; @history <- historyCh) {
-                ret!((true, {"balance": balance, "history": history}))
-            } |
+                for(@balance, return <- mapOp; @history <- historyCh) {
+                    return!({"balance": balance, "history": history})
+                } |
 
-            for(@(false, err) <- balanceCh) {
-                ret!((false, err))
+                either!("map <-", *balanceCh, *mapOp, *ret)
             }
         }
     }

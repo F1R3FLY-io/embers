@@ -1,5 +1,6 @@
-new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
+new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
+
     for(treeHashMap <- treeHashMapCh) {
         treeHashMap!("init", 3, *treeHashMapCh) |
         for(map <- treeHashMapCh) {
@@ -22,9 +23,15 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
         }
     } |
 
-    contract @"createAiAgent"(@id, @version, @name, @shard, @filesystem) = {
-        new deployerId(`rho:rchain:deployerId`), revAddress(`rho:rev:address`), retCh, valueCh, nilCh in {
-            revAddress!("fromDeployerId", *deployerId, *retCh) |
+    rl!(`rho:lang:listOps`, *listOpsCh) |
+
+    for(@(_, listOps) <- listOpsCh) {
+        listOpsCh!(listOps)
+    } |
+
+    contract @"createAiAgent"(@deployerId, @id, @version, @name, @shard, @filesystem) = {
+        new revAddress(`rho:rev:address`), retCh, valueCh, nilCh in {
+            revAddress!("fromDeployerId", deployerId, *retCh) |
 
             for(@address <- retCh) {
                 for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
@@ -67,25 +74,24 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
                         }, *retCh)
                 } |
 
-                getValueOr!(address, *valueCh, *nilCh) |
-                for(_ <- retCh) {Nil}
+                for(_ <- retCh) {
+                    Nil
+                } |
+
+                getValueOr!(address, *valueCh, *nilCh)
             }
         }
     } |
 
     contract @"listAiAgents"(@address, ret) = {
-        new valueCh, nilCh in {
+        new valueCh, nilCh, retCh, toAgentHeader in {
             for(@agents <- valueCh) {
-                new retCh, toAgentHeader in {
-                    rl!(`rho:lang:listOps`, *retCh) |
+                contract toAgentHeader(@(id, versions), ret) = {
+                    ret!(versions.get("latest").delete("filesystem").set("id", id))
+                } |
 
-                    contract toAgentHeader(@(id, versions), ret) = {
-                        ret!(versions.get("latest").delete("filesystem").set("id", id))
-                    } |
-
-                    for(@(_, listOps) <- retCh) {
-                        @listOps!("map", agents.toList(), *toAgentHeader, *ret)
-                    }
+                for(listOps <<- listOpsCh) {
+                    listOps!("map", agents.toList(), *toAgentHeader, *ret)
                 }
             } |
 
@@ -98,21 +104,17 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
     } |
 
     contract @"listAiAgentVersions"(@address, @id, ret) = {
-        new valueCh, nilCh in {
+        new valueCh, nilCh, retCh, toAgentHeader in {
             for(@agents <- valueCh) {
                 match agents.get(id) {
                     Nil => nilCh!()
                     versions => {
-                        new retCh, toAgentHeader in {
-                            rl!(`rho:lang:listOps`, *retCh) |
+                        contract toAgentHeader(@(version, agent), ret) = {
+                            ret!(agent.delete("filesystem").union({"id": id, "version": version}))
+                        } |
 
-                            contract toAgentHeader(@(version, agent), ret) = {
-                                ret!(agent.delete("filesystem").union({"id": id, "version": version}))
-                            } |
-
-                            for(@(_, listOps) <- retCh) {
-                                @listOps!("map", versions.delete("latest").toList(), *toAgentHeader, *ret)
-                            }
+                        for(listOps <<- listOpsCh) {
+                            listOps!("map", versions.delete("latest").toList(), *toAgentHeader, *ret)
                         }
                     }
                 }
@@ -143,9 +145,9 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
         }
     } |
 
-    contract @"saveAiAgent"(@id, @version, @name, @shard, @filesystem) = {
-        new deployerId(`rho:rchain:deployerId`), revAddress(`rho:rev:address`), valueCh, nilCh, retCh in {
-            revAddress!("fromDeployerId", *deployerId, *retCh) |
+    contract @"saveAiAgent"(@deployerId, @id, @version, @name, @shard, @filesystem) = {
+        new revAddress(`rho:rev:address`), valueCh, nilCh, retCh in {
+            revAddress!("fromDeployerId", deployerId, *retCh) |
 
             for(@address <- retCh) {
                 for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
@@ -171,7 +173,9 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr in {
                                         ), *retCh)
                     } |
 
-                    for(_ <- retCh) {Nil}
+                    for(_ <- retCh) {
+                        Nil
+                    }
                 } |
 
                 for(<- nilCh) {
