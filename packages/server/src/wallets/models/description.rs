@@ -1,7 +1,8 @@
 use derive_more::{AsRef, Into};
+use serde::Serialize;
 use thiserror::Error;
 
-#[derive(Debug, Clone, Into, AsRef)]
+#[derive(Debug, Clone, Serialize, Into, AsRef)]
 pub struct Description(String);
 
 const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
@@ -17,7 +18,7 @@ impl TryFrom<String> for Description {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         if value.chars().count() > MAX_DESCRIPTION_CHARS_COUNT {
-            return Err(DescriptionError::TooLong);
+            return Err(Self::Error::TooLong);
         }
 
         Ok(Self(value))

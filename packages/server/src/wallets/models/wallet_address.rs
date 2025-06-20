@@ -1,10 +1,10 @@
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 use derive_more::{AsRef, Into};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Into, AsRef)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Into, AsRef)]
 pub struct WalletAddress(String);
 
 #[derive(Debug, Clone, Error)]

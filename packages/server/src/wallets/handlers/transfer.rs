@@ -1,3 +1,5 @@
+use std::num::NonZero;
+
 use firefly_client::models::SignedCode;
 use firefly_client::{WriteNodeClient, template};
 use uuid::Uuid;
@@ -5,7 +7,7 @@ use uuid::Uuid;
 use crate::common::models::PreparedContract;
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
-use crate::wallets::models::{Id, PrepareTransferInput, WalletAddress};
+use crate::wallets::models::{Description, Id, PrepareTransferInput, WalletAddress};
 
 template! {
     #[template(path = "wallets/send_tokens.rho")]
@@ -14,8 +16,8 @@ template! {
         id: Id,
         wallet_address_from: WalletAddress,
         wallet_address_to: WalletAddress,
-        amount: u64,
-        description: Option<String>,
+        amount: NonZero<u64>,
+        description: Option<Description>,
     }
 }
 
@@ -33,8 +35,8 @@ pub fn prepare_transfer_contract(value: PrepareTransferInput) -> anyhow::Result<
         id: Uuid::now_v7(),
         wallet_address_from: value.from,
         wallet_address_to: value.to,
-        amount: value.amount.get(),
-        description: value.description.map(Into::into),
+        amount: value.amount,
+        description: value.description,
     }
     .render()?;
 
