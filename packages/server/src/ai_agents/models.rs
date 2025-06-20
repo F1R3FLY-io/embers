@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use crate::common::models::PreparedContract;
 
 #[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents/init_agents_env.rho", escape = "none")]
+#[template(path = "ai_agents/init.rho", escape = "none")]
 pub struct InitAgentsEnv;
 
 #[derive(Debug, Clone, Deserialize)]
