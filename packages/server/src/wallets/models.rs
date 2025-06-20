@@ -1,19 +1,22 @@
+use std::num::NonZero;
+
+use askama::Template;
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
 mod description;
 mod wallet_address;
 
-use std::num::NonZero;
-
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
-pub use self::description::*;
-pub use self::wallet_address::*;
+pub use description::*;
+pub use wallet_address::*;
 
 pub type Amount = NonZero<u64>;
 
+pub type Id = Uuid;
+
 #[derive(Debug, Clone)]
 pub struct Transfer {
-    pub id: String,
+    pub id: Id,
     pub direction: Direction,
     pub date: DateTime<Utc>,
     pub amount: Amount,
@@ -21,7 +24,7 @@ pub struct Transfer {
     pub cost: u64,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Direction {
     Incoming,
     Outgoing,
@@ -44,17 +47,6 @@ pub struct Boost {
     pub date: DateTime<Utc>,
     pub amount: Amount,
     pub post: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "UPPERCASE")]
-pub enum Operation {
-    Transfer {
-        wallet_address_from: WalletAddress,
-        wallet_address_to: WalletAddress,
-        amount: Amount,
-        description: Option<String>,
-    },
 }
 
 #[derive(Debug, Clone)]
@@ -83,3 +75,7 @@ pub struct PrepareTransferInput {
     pub amount: Amount,
     pub description: Option<Description>,
 }
+
+#[derive(Debug, Clone, Template)]
+#[template(path = "wallets/init.rho", escape = "none")]
+pub struct InitWalletEnv;

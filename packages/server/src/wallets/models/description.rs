@@ -1,14 +1,15 @@
 use derive_more::{AsRef, Into};
+use serde::Serialize;
 use thiserror::Error;
 
-#[derive(Debug, Clone, Into, AsRef)]
+#[derive(Debug, Clone, Serialize, Into, AsRef)]
 pub struct Description(String);
 
 const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
 
 #[derive(Debug, Clone, Error)]
 pub enum DescriptionError {
-    #[error("Maximum description length reached")]
+    #[error("maximum description length reached")]
     TooLong,
 }
 

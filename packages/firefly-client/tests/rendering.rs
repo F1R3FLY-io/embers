@@ -163,9 +163,7 @@ fn test_serialize_newtype_variant() {
         .unwrap();
 
     let expected = RhoValue::Map(
-        [("Variant".to_owned(), RhoValue::String("str".into()))]
-            .into_iter()
-            .collect(),
+        std::iter::once(("Variant".to_owned(), RhoValue::String("str".into()))).collect(),
     );
     assert_eq!(result, expected);
 }
@@ -220,14 +218,13 @@ fn test_serialize_tuple_variant() {
         .unwrap();
 
     let expected = RhoValue::Map(
-        [(
+        std::iter::once((
             "Variant".to_owned(),
             RhoValue::Tuple(vec![
                 RhoValue::String("foo".into()),
                 RhoValue::String("bar".into()),
             ]),
-        )]
-        .into_iter()
+        ))
         .collect(),
     );
     assert_eq!(result, expected);
@@ -235,16 +232,13 @@ fn test_serialize_tuple_variant() {
 
 #[test]
 fn test_serialize_map() {
-    let result = [("foo", "bar")]
-        .into_iter()
+    let result = std::iter::once(("foo", "bar"))
         .collect::<BTreeMap<_, _>>()
         .serialize(Serializer)
         .unwrap();
 
     let expected = RhoValue::Map(
-        [("foo".to_owned(), RhoValue::String("bar".to_owned()))]
-            .into_iter()
-            .collect(),
+        std::iter::once(("foo".to_owned(), RhoValue::String("bar".to_owned()))).collect(),
     );
     assert_eq!(result, expected);
 }
@@ -252,8 +246,7 @@ fn test_serialize_map() {
 #[test]
 fn test_serialize_map_with_non_string_keys() {
     assert!(
-        [(1, "bar")]
-            .into_iter()
+        std::iter::once((1, "bar"))
             .collect::<BTreeMap<_, _>>()
             .serialize(Serializer)
             .is_err()
@@ -301,7 +294,7 @@ fn test_serialize_struct_variant() {
     .unwrap();
 
     let expected = RhoValue::Map(
-        [(
+        std::iter::once((
             "Variant".to_owned(),
             RhoValue::Map(
                 [
@@ -311,8 +304,7 @@ fn test_serialize_struct_variant() {
                 .into_iter()
                 .collect(),
             ),
-        )]
-        .into_iter()
+        ))
         .collect(),
     );
     assert_eq!(result, expected);

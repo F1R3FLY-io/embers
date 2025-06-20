@@ -9,7 +9,7 @@ anyhow             = { version = "1.0", features = ["std"] }
 askama             = { version = "0.14" }
 blake2             = { version = "0.10" }
 bs58               = { version = "0.5" }
-chrono             = { version = "0.4" }
+chrono             = { version = "0.4", features = ["serde"] }
 derive_more        = { version = "2.0", features = ["full"] }
 figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }

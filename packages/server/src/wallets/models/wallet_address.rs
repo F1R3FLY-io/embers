@@ -1,21 +1,21 @@
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 use derive_more::{AsRef, Into};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use thiserror::Error;
 
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Into, AsRef)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Into, AsRef)]
 pub struct WalletAddress(String);
 
 #[derive(Debug, Clone, Error)]
 pub enum ParseWalletAddressError {
-    #[error("Internal encoder error: {0}")]
+    #[error("internal encoder error: {0}")]
     EncoderError(bs58::decode::Error),
 
-    #[error("Invalid address size")]
+    #[error("invalid address size")]
     InvalidRevAddressSize,
 
-    #[error("Invalid address format: {0}")]
+    #[error("invalid address format: {0}")]
     InvalidAddress(String),
 }
 

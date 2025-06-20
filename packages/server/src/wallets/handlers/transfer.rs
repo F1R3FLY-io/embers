@@ -2,21 +2,22 @@ use std::num::NonZero;
 
 use firefly_client::models::SignedCode;
 use firefly_client::{WriteNodeClient, template};
+use uuid::Uuid;
 
 use crate::common::models::PreparedContract;
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
-use crate::wallets::models::{PrepareTransferInput, WalletAddress};
+use crate::wallets::models::{Description, Id, PrepareTransferInput, WalletAddress};
 
 template! {
-    #[template(path = "wallets/transfer_contract.rho")]
+    #[template(path = "wallets/send_tokens.rho")]
     #[derive(Debug, Clone)]
     struct TransferContract {
+        id: Id,
         wallet_address_from: WalletAddress,
         wallet_address_to: WalletAddress,
         amount: NonZero<u64>,
-        #[allow(dead_code)]
-        description: Option<String>,
+        description: Option<Description>,
     }
 }
 
@@ -27,16 +28,15 @@ template! {
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub fn prepare_transfer_contract(
-    request: PrepareTransferInput,
-) -> anyhow::Result<PreparedContract> {
-    record_trace!(request);
+pub fn prepare_transfer_contract(value: PrepareTransferInput) -> anyhow::Result<PreparedContract> {
+    record_trace!(value);
 
     let contract = TransferContract {
-        wallet_address_from: request.from,
-        wallet_address_to: request.to,
-        amount: request.amount,
-        description: request.description.map(Into::into),
+        id: Uuid::now_v7(),
+        wallet_address_from: value.from,
+        wallet_address_to: value.to,
+        amount: value.amount,
+        description: value.description,
     }
     .render()?;
 

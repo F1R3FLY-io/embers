@@ -1,8 +1,13 @@
 #![allow(dead_code)]
 
+use askama::Template;
 use serde::{Deserialize, Serialize};
 
 use crate::common::models::PreparedContract;
+
+#[derive(Debug, Clone, Template)]
+#[template(path = "ai_agents/init_agents_env.rho", escape = "none")]
+pub struct InitAgentsEnv;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Agents {

@@ -1,5 +1,7 @@
+mod chain_operation_record;
 mod prepare_transfer;
 
+pub use chain_operation_record::*;
 use chrono::{DateTime, Utc};
 use poem_openapi::{Enum, Object};
 use structural_convert::StructuralConvert;

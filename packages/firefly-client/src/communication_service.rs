@@ -45,7 +45,7 @@ where
     async fn send_notification(
         &self,
         request: tonic::Request<UpdateNotification>,
-    ) -> std::result::Result<tonic::Response<UpdateNotificationResponse>, tonic::Status> {
+    ) -> Result<tonic::Response<UpdateNotificationResponse>, tonic::Status> {
         let request = request.into_inner();
 
         let decoded = BASE64_STANDARD

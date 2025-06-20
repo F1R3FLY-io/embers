@@ -16,7 +16,7 @@ use poem_openapi::types::{
 use poem_openapi::{ApiResponse, Object, Tags};
 use structural_convert::StructuralConvert;
 
-use crate::common;
+use super::models::PreparedContract;
 
 /// Transforms T to [`String`] before serialization/deserialization
 /// and keeps original format in `OpenApi` model.
@@ -210,7 +210,7 @@ where
 }
 
 #[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
-#[convert(from(common::models::PreparedContract))]
+#[convert(from(PreparedContract))]
 pub struct PreparedContractDto {
     #[debug("\"{}...\"", hex::encode(&contract[..32]))]
     pub contract: Vec<u8>,
