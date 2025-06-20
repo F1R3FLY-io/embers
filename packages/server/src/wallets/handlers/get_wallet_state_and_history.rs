@@ -1,4 +1,5 @@
 use chrono::DateTime;
+use firefly_client::models::Either;
 use firefly_client::{ReadNodeClient, template};
 
 use crate::common::tracing::record_trace;
@@ -30,7 +31,12 @@ pub async fn get_wallet_state_and_history(
         wallet_address: address.clone(),
     }
     .render()?;
-    let state: BalanceAndHistory = client.get_data(contract).await?;
+
+    let state = client
+        .get_data::<Either<String, BalanceAndHistory>>(contract)
+        .await?
+        .to_result()
+        .map_err(|err| anyhow::anyhow!("error from contract: {err}"))?;
 
     let transfers: Vec<_> = state
         .history

@@ -1,13 +1,14 @@
 use std::num::NonZero;
 
 use askama::Template;
-use blake2::digest::consts::U32;
-use blake2::{Blake2b, Digest};
 use chrono::{DateTime, Utc};
-use derive_more::{AsRef, Into};
-use serde::{Deserialize, Serialize};
-use thiserror::Error;
 use uuid::Uuid;
+
+mod description;
+mod wallet_address;
+
+pub use description::*;
+pub use wallet_address::*;
 
 pub type Amount = NonZero<u64>;
 
@@ -73,66 +74,6 @@ pub struct PrepareTransferInput {
     pub to: WalletAddress,
     pub amount: Amount,
     pub description: Option<Description>,
-}
-
-#[derive(Debug, Clone, Into, AsRef)]
-pub struct Description(String);
-
-const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
-
-#[derive(Debug, Clone, Error)]
-pub enum DescriptionError {
-    #[error("maximum description length reached")]
-    TooLong,
-}
-
-impl TryFrom<String> for Description {
-    type Error = DescriptionError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        if value.chars().count() > MAX_DESCRIPTION_CHARS_COUNT {
-            return Err(DescriptionError::TooLong);
-        }
-
-        Ok(Self(value))
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize, Into, AsRef)]
-pub struct WalletAddress(String);
-
-#[derive(Debug, Clone, Error)]
-pub enum ParseWalletAddressError {
-    #[error("internal encoder error: {0}")]
-    EncoderError(bs58::decode::Error),
-
-    #[error("invalid address size")]
-    InvalidRevAddressSize,
-
-    #[error("invalid address format: {0}")]
-    InvalidAddress(String),
-}
-
-impl TryFrom<String> for WalletAddress {
-    type Error = ParseWalletAddressError;
-
-    fn try_from(value: String) -> Result<Self, Self::Error> {
-        let decoded = bs58::decode(&value)
-            .into_vec()
-            .map_err(Self::Error::EncoderError)?;
-
-        let (payload, checksum) = decoded
-            .split_at_checked(decoded.len().wrapping_sub(4))
-            .ok_or(ParseWalletAddressError::InvalidRevAddressSize)?;
-
-        let hash = Blake2b::<U32>::new().chain_update(payload).finalize();
-
-        if checksum != &hash[..4] {
-            return Err(ParseWalletAddressError::InvalidAddress(value));
-        }
-
-        Ok(Self(value))
-    }
 }
 
 #[derive(Debug, Clone, Template)]

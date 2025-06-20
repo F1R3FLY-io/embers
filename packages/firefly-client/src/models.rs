@@ -1,6 +1,7 @@
 use std::collections::HashMap;
+use std::marker::PhantomData;
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 
 pub mod servicemodelapi {
     #![allow(warnings)]
@@ -102,5 +103,75 @@ impl From<ReadNodeExpr> for serde_json::Value {
             ReadNodeExpr::ExprString { data } => Self::String(data),
             ReadNodeExpr::ExprUri { data } => Self::String(data),
         }
+    }
+}
+
+pub enum Either<L, R> {
+    Left(L),
+    Right(R),
+}
+
+impl<L, R> Either<L, R> {
+    pub fn to_result(self) -> Result<R, L> {
+        self.into()
+    }
+}
+
+impl<L, R> From<Either<L, R>> for Result<R, L> {
+    fn from(value: Either<L, R>) -> Self {
+        match value {
+            Either::Left(err) => Err(err),
+            Either::Right(v) => Ok(v),
+        }
+    }
+}
+
+impl<'de, L, R> Deserialize<'de> for Either<L, R>
+where
+    L: Deserialize<'de>,
+    R: Deserialize<'de>,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_tuple(
+            2,
+            EitherVisitor {
+                phantom: PhantomData,
+            },
+        )
+    }
+}
+
+struct EitherVisitor<L, R> {
+    phantom: PhantomData<(L, R)>,
+}
+
+impl<'de, L, R> de::Visitor<'de> for EitherVisitor<L, R>
+where
+    L: Deserialize<'de>,
+    R: Deserialize<'de>,
+{
+    type Value = Either<L, R>;
+
+    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+        formatter.write_str("a sequence of (bool, value)")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: de::SeqAccess<'de>,
+    {
+        let valid: bool = seq
+            .next_element()?
+            .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+
+        if valid {
+            seq.next_element()?.map(Either::Right)
+        } else {
+            seq.next_element()?.map(Either::Left)
+        }
+        .ok_or_else(|| de::Error::invalid_length(1, &self))
     }
 }
