@@ -6,23 +6,25 @@ use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
 use super::handlers::{deploy_signed_transfer, prepare_transfer_contract};
-use crate::common::dtos::{ApiTags, ParseFromString, PreparedContractDto, SignedContractDto};
-use crate::wallets::dtos::{PrepareTransferInputDto, WalletStateAndHistoryDto};
+use crate::common::api::dtos::{ApiTags, ParseFromString, PreparedContract, SignedContract};
+use crate::wallets::api::dtos::{PrepareTransferInput, WalletStateAndHistory};
 use crate::wallets::handlers::get_wallet_state_and_history;
-use crate::wallets::models::{PrepareTransferInput, WalletAddress};
+use crate::wallets::models::WalletAddress;
+
+mod dtos;
 
 #[derive(Debug, Clone)]
 pub struct WalletsApi;
 
 #[allow(clippy::unused_async)]
-#[OpenApi(prefix_path = "/wallet", tag = ApiTags::Wallets)]
+#[OpenApi(prefix_path = "/wallets", tag = ApiTags::Wallets)]
 impl WalletsApi {
-    #[oai(path = "/state/:address", method = "get")]
+    #[oai(path = "/:address/state", method = "get")]
     async fn wallet_state_and_history(
         &self,
         Path(wallet_address): Path<ParseFromString<WalletAddress>>,
         Data(read_client): Data<&ReadNodeClient>,
-    ) -> poem::Result<Json<WalletStateAndHistoryDto>> {
+    ) -> poem::Result<Json<WalletStateAndHistory>> {
         let wallet_state_and_history = get_wallet_state_and_history(read_client, wallet_address.0)
             .await
             .map(Into::into)?;
@@ -33,9 +35,9 @@ impl WalletsApi {
     #[oai(path = "/transfer/prepare", method = "post")]
     async fn prepare_transfer(
         &self,
-        Json(input): Json<PrepareTransferInputDto>,
-    ) -> poem::Result<Json<PreparedContractDto>> {
-        let input = PrepareTransferInput::try_from(input)?;
+        Json(input): Json<PrepareTransferInput>,
+    ) -> poem::Result<Json<PreparedContract>> {
+        let input = input.try_into()?;
         let result = prepare_transfer_contract(input)?;
 
         Ok(Json(result.into()))
@@ -44,7 +46,7 @@ impl WalletsApi {
     #[oai(path = "/transfer/send", method = "post")]
     async fn transfer(
         &self,
-        Json(body): Json<SignedContractDto>,
+        Json(body): Json<SignedContract>,
         Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<()> {
         let mut client = client.to_owned();

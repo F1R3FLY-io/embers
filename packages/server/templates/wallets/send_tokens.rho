@@ -1,3 +1,11 @@
-new deployerId(`rho:rchain:deployerId`) in {
-    @"sendTransfer"!(*deployerId, {{ id }}, {{ wallet_address_from }}, {{ wallet_address_to }}, {{ amount }}, {{ description }})
+new deployerId(`rho:rchain:deployerId`), deployId(`rho:rchain:deployId`) in {
+    @"sendTransfer"!(
+        *deployerId,
+        *deployId,
+        {{ timestamp }},
+        {{ wallet_address_from }},
+        {{ wallet_address_to }},
+        {{ amount }},
+        {{ description }}
+    )
 }

@@ -63,7 +63,7 @@ in {
         }
     } |
 
-    contract updateTransferHistory(@id, @walletOwner, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
+    contract updateTransferHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
         new valueCh, nilCh, retCh in {
             getValueOr!(walletOwner, *valueCh, *nilCh) |
 
@@ -71,6 +71,7 @@ in {
                 treeHashMap!("set", *map, walletOwner,
                     [{
                         "id": id,
+                        "timestamp": timestamp,
                         "from": walletAddressFrom,
                         "to": walletAddressTo,
                         "amount": amount,
@@ -83,6 +84,7 @@ in {
                 treeHashMap!("set", *map, walletOwner,
                     transactionsHistory ++ [{
                         "id": id,
+                        "timestamp": timestamp,
                         "from": walletAddressFrom,
                         "to": walletAddressTo,
                         "amount": amount,
@@ -97,14 +99,14 @@ in {
         }
     } |
 
-    contract @"sendTransfer"(@deployerId, @id, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
+    contract @"sendTransfer"(@deployerId, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
         new transferResult, updateHistory, retCh, debug(`rho:io:stdout`) in {
             for(either <<- eitherCh) {
                 doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *transferResult) |
 
                 for(@v, return <- updateHistory) {
-                    updateTransferHistory!(id, walletAddressFrom, walletAddressFrom, walletAddressTo, amount, description) |
-                    updateTransferHistory!(id, walletAddressTo,   walletAddressFrom, walletAddressTo, amount, description) |
+                    updateTransferHistory!(walletAddressFrom, id, timestamp, walletAddressFrom, walletAddressTo, amount, description) |
+                    updateTransferHistory!(walletAddressTo  , id, timestamp, walletAddressFrom, walletAddressTo, amount, description) |
                     return!(v)
                 } |
 

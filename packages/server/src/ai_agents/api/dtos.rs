@@ -2,7 +2,7 @@ use poem_openapi::{Enum, Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents::models;
-use crate::common::dtos::PreparedContractDto;
+use crate::common::api::dtos::PreparedContract;
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::Agents))]
@@ -64,7 +64,7 @@ pub struct Agent {
 pub struct CreateAgentResp {
     pub id: String,
     pub version: String,
-    pub contract: PreparedContractDto,
+    pub contract: PreparedContract,
 }
 
 pub type SaveAgentReq = CreateAgentReq;
@@ -73,7 +73,7 @@ pub type SaveAgentReq = CreateAgentReq;
 #[convert(from(models::SaveAgentResp))]
 pub struct SaveAgentResp {
     pub version: String,
-    pub contract: PreparedContractDto,
+    pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]

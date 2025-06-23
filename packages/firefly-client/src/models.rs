@@ -69,6 +69,23 @@ pub struct SignedCode {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+pub enum ReadNodeExprUnforg {
+    UnforgPrivate { data: String },
+    UnforgDeploy { data: String },
+    UnforgDeployer { data: String },
+}
+
+impl From<ReadNodeExprUnforg> for serde_json::Value {
+    fn from(value: ReadNodeExprUnforg) -> Self {
+        match value {
+            ReadNodeExprUnforg::UnforgPrivate { data } => Self::String(data),
+            ReadNodeExprUnforg::UnforgDeploy { data } => Self::String(data),
+            ReadNodeExprUnforg::UnforgDeployer { data } => Self::String(data),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
 pub enum ReadNodeExpr {
     ExprTuple { data: Vec<ReadNodeExpr> },
     ExprList { data: Vec<ReadNodeExpr> },
@@ -80,6 +97,7 @@ pub enum ReadNodeExpr {
     ExprInt { data: serde_json::Number },
     ExprString { data: String },
     ExprUri { data: String },
+    ExprUnforg { data: ReadNodeExprUnforg },
 }
 
 impl From<ReadNodeExpr> for serde_json::Value {
@@ -102,6 +120,7 @@ impl From<ReadNodeExpr> for serde_json::Value {
             ReadNodeExpr::ExprInt { data } => Self::Number(data),
             ReadNodeExpr::ExprString { data } => Self::String(data),
             ReadNodeExpr::ExprUri { data } => Self::String(data),
+            ReadNodeExpr::ExprUnforg { data } => data.into(),
         }
     }
 }

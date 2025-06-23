@@ -1,5 +1,6 @@
 use firefly_client::{ReadNodeClient, template};
 
+use crate::ai_agents::blockchain::dtos;
 use crate::ai_agents::models::Agent;
 use crate::common::tracing::record_trace;
 use crate::wallets::models::WalletAddress;
@@ -36,5 +37,6 @@ pub async fn get_agent(
     }
     .render()?;
 
-    client.get_data(code).await
+    let agent: Option<dtos::Agent> = client.get_data(code).await?;
+    Ok(agent.map(Into::into))
 }

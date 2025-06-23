@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use askama::Template;
-use serde::{Deserialize, Serialize};
 
 use crate::common::models::PreparedContract;
 
@@ -9,12 +8,12 @@ use crate::common::models::PreparedContract;
 #[template(path = "ai_agents/init.rho", escape = "none")]
 pub struct InitAgentsEnv;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Agents {
     pub agents: Vec<AgentHeader>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct AgentHeader {
     pub id: String,
     pub version: String,
@@ -29,26 +28,25 @@ pub struct CreateAgentReq {
     pub filesystem: Option<Directory>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[derive(Debug, Clone)]
 pub enum Filesystem {
     Directory(Directory),
     File(File),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Directory {
     pub name: String,
     pub members: Vec<Filesystem>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct File {
     pub name: String,
     pub content: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct Agent {
     pub id: String,
     pub version: String,

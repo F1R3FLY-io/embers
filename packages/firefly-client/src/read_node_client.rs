@@ -1,6 +1,6 @@
-use anyhow::Context;
 use serde_json::Value;
 
+use crate::errors::ReadNodeError;
 use crate::models::ReadNodeExpr;
 
 #[derive(Clone)]
@@ -17,25 +17,24 @@ impl ReadNodeClient {
         }
     }
 
-    pub async fn get_data<T>(&self, rholang_code: String) -> anyhow::Result<T>
+    pub async fn get_data<T>(&self, rholang_code: String) -> Result<T, ReadNodeError>
     where
         T: serde::de::DeserializeOwned,
     {
-        let mut response_json = self.get_value(rholang_code).await?;
+        let mut response_json = self.explore_deploy(rholang_code).await?;
 
         let data_value = response_json
             .pointer_mut("/expr/0")
             .map(Value::take)
-            .context("failed to extract data from response structure")?;
+            .ok_or(ReadNodeError::ReturnValueMissing)?;
 
-        let intermediate: ReadNodeExpr = serde_json::from_value(data_value)
-            .context("failed to deserialize response data into intermediate type")?;
+        let intermediate: ReadNodeExpr =
+            serde_json::from_value(data_value).map_err(ReadNodeError::InvalidIntermediateModel)?;
 
-        serde_json::from_value(intermediate.into())
-            .context("failed to deserialize response data into target type")
+        serde_json::from_value(intermediate.into()).map_err(ReadNodeError::InvalidFinalModel)
     }
 
-    async fn get_value(&self, rholang_code: String) -> anyhow::Result<Value> {
+    async fn explore_deploy(&self, rholang_code: String) -> Result<Value, ReadNodeError> {
         self.client
             .post(format!("{}/api/explore-deploy", self.url))
             .body(rholang_code)
@@ -45,6 +44,6 @@ impl ReadNodeClient {
             .error_for_status()?
             .json()
             .await
-            .context("failed to parse responce as json")
+            .map_err(Into::into)
     }
 }

@@ -5,12 +5,9 @@ use prost::Message;
 
 use crate::common::models::PreparedContract;
 
-pub mod bootstrap_contracts;
-pub mod dtos;
+pub mod api;
 pub mod models;
 pub mod tracing;
-
-pub use bootstrap_contracts::*;
 
 pub async fn deploy_signed_contract(
     client: &mut WriteNodeClient,

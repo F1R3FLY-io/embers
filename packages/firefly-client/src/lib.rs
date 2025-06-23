@@ -1,5 +1,6 @@
 mod blocks_client;
 mod communication_service;
+pub mod errors;
 pub mod helpers;
 pub mod models;
 mod read_node_client;

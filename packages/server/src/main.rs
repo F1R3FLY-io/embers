@@ -1,19 +1,17 @@
-use ai_agents::models::InitAgentsEnv;
 use anyhow::Context;
-use askama::Template;
-use common::bootstrap_contracts;
-use firefly_client::{BlocksClient, ReadNodeClient, WriteNodeClient};
+use firefly_client::{ReadNodeClient, WriteNodeClient};
 use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
-use wallets::models::InitWalletEnv;
 
 use crate::ai_agents::api::AIAgents;
+use crate::bootstrap::bootstrap_contracts;
 use crate::configuration::collect_config;
 use crate::wallets::api::WalletsApi;
 
 mod ai_agents;
+mod bootstrap;
 mod common;
 mod configuration;
 mod wallets;
@@ -37,18 +35,8 @@ async fn main() -> anyhow::Result<()> {
     let read_client = ReadNodeClient::new(config.read_node_url.clone());
     let mut write_client =
         WriteNodeClient::new(config.deploy_service_url, config.propose_service_url).await?;
-    let blocks_client = BlocksClient::new(config.read_node_url);
 
-    let contracts = vec![
-        InitAgentsEnv
-            .render()
-            .context("can't render InitAgentsEnv bootstrap code")?,
-        InitWalletEnv
-            .render()
-            .context("can't render InitWalletEnv bootstrap code")?,
-    ];
-
-    bootstrap_contracts(&mut write_client, &config.service_key, contracts)
+    bootstrap_contracts(&mut write_client, &config.service_key)
         .await
         .context("can't bootstrap Infrastructure's Rho contracts")?;
 
@@ -63,7 +51,6 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/openapi.json", spec)
         .data(read_client)
         .data(write_client)
-        .data(blocks_client)
         .with(Cors::new().allow_origin_regex("*"))
         .with(RequestId::default())
         .with(Tracing)

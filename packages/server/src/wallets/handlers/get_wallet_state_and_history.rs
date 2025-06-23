@@ -1,9 +1,8 @@
-use chrono::DateTime;
 use firefly_client::models::Either;
 use firefly_client::{ReadNodeClient, template};
 
 use crate::common::tracing::record_trace;
-use crate::wallets::dtos::{BalanceAndHistory, Transaction};
+use crate::wallets::blockchain::dtos;
 use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
 
 template! {
@@ -33,7 +32,7 @@ pub async fn get_wallet_state_and_history(
     .render()?;
 
     let state = client
-        .get_data::<Either<String, BalanceAndHistory>>(contract)
+        .get_data::<Either<String, dtos::BalanceAndHistory>>(contract)
         .await?
         .to_result()
         .map_err(|err| anyhow::anyhow!("error from contract: {err}"))?;
@@ -41,31 +40,22 @@ pub async fn get_wallet_state_and_history(
     let transfers: Vec<_> = state
         .history
         .into_iter()
-        .flat_map(Transaction::try_from)
-        .filter_map(|operation| {
+        .flat_map(dtos::Transaction::try_from)
+        .map(|operation| {
             let direction = if address == operation.to {
                 Direction::Incoming
             } else {
                 Direction::Outgoing
             };
 
-            operation
-                .id
-                .get_timestamp()
-                .and_then(|date| {
-                    let timestamp = i64::try_from(date.to_unix().0).ok()?;
-                    DateTime::from_timestamp(timestamp, 0)
-                })
-                .map(|date| {
-                    Transfer {
-                        id: operation.id,
-                        direction,
-                        amount: operation.amount,
-                        date,
-                        to_address: operation.to,
-                        cost: 0, // Assuming cost is not provided in the operation
-                    }
-                })
+            Transfer {
+                id: operation.id,
+                direction,
+                amount: operation.amount,
+                date: operation.timestamp,
+                to_address: operation.to,
+                cost: 0, // Assuming cost is not provided in the operation
+            }
         })
         .collect();
 

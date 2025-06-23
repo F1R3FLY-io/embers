@@ -2,7 +2,6 @@ use std::num::NonZero;
 
 use askama::Template;
 use chrono::{DateTime, Utc};
-use uuid::Uuid;
 
 mod description;
 mod wallet_address;
@@ -10,9 +9,13 @@ mod wallet_address;
 pub use description::*;
 pub use wallet_address::*;
 
+#[derive(Debug, Clone, Template)]
+#[template(path = "wallets/init.rho", escape = "none")]
+pub struct InitWalletsEnv;
+
 pub type Amount = NonZero<u64>;
 
-pub type Id = Uuid;
+pub type Id = String;
 
 #[derive(Debug, Clone)]
 pub struct Transfer {
@@ -75,7 +78,3 @@ pub struct PrepareTransferInput {
     pub amount: Amount,
     pub description: Option<Description>,
 }
-
-#[derive(Debug, Clone, Template)]
-#[template(path = "wallets/init.rho", escape = "none")]
-pub struct InitWalletEnv;
