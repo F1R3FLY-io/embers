@@ -1,6 +1,7 @@
 use firefly_client::{ReadNodeClient, template};
 
-use crate::ai_agents::models::{AgentHeader, Agents};
+use crate::ai_agents::blockchain::dtos;
+use crate::ai_agents::models::Agents;
 use crate::common::tracing::record_trace;
 use crate::wallets::models::WalletAddress;
 
@@ -29,9 +30,11 @@ pub async fn list_agent_versions(
 
     let code = ListAgentVersions { address, id }.render()?;
 
-    let agents: Option<Vec<AgentHeader>> = client.get_data(code).await?;
+    let agents: Option<Vec<dtos::AgentHeader>> = client.get_data(code).await?;
     Ok(agents.map(|mut agents| {
         agents.sort_by(|l, r| l.version.cmp(&r.version));
-        Agents { agents }
+        Agents {
+            agents: agents.into_iter().map(Into::into).collect(),
+        }
     }))
 }

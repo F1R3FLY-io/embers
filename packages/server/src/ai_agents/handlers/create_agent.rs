@@ -2,7 +2,8 @@ use firefly_client::models::SignedCode;
 use firefly_client::{WriteNodeClient, template};
 use uuid::Uuid;
 
-use crate::ai_agents::models::{CreateAgentReq, CreateAgentResp, Directory};
+use crate::ai_agents::blockchain::dtos;
+use crate::ai_agents::models::{CreateAgentReq, CreateAgentResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
 
@@ -10,11 +11,11 @@ template! {
     #[template(path = "ai_agents/create_agent.rho")]
     #[derive(Debug, Clone)]
     struct CreateAgent {
-        id: String,
-        version: String,
+        id: Uuid,
+        version: Uuid,
         name: String,
         shard: Option<String>,
-        filesystem: Option<Directory>,
+        filesystem: Option<dtos::Directory>,
     }
 }
 
@@ -32,11 +33,11 @@ pub fn prepare_create_agent_contract(request: CreateAgentReq) -> anyhow::Result<
     let version = Uuid::now_v7();
 
     let contract = CreateAgent {
-        id: id.to_string(),
-        version: version.to_string(),
+        id,
+        version,
         name: request.name,
         shard: request.shard,
-        filesystem: request.filesystem,
+        filesystem: request.filesystem.map(Into::into),
     }
     .render()?;
 

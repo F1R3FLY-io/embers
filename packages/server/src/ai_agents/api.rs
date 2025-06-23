@@ -4,7 +4,7 @@ use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
-use crate::ai_agents::dtos::{
+use crate::ai_agents::api::dtos::{
     Agent,
     Agents,
     CreateAgentReq,
@@ -25,8 +25,10 @@ use crate::ai_agents::handlers::{
     prepare_create_agent_contract,
     prepare_save_agent_contract,
 };
-use crate::common::dtos::{ApiTags, MaybeNotFound, ParseFromString, SignedContractDto};
+use crate::common::api::dtos::{ApiTags, MaybeNotFound, ParseFromString, SignedContract};
 use crate::wallets::models::WalletAddress;
+
+mod dtos;
 
 #[derive(Debug, Clone)]
 pub struct AIAgents;
@@ -77,7 +79,7 @@ impl AIAgents {
     #[oai(path = "/create/send", method = "post")]
     async fn create(
         &self,
-        Json(body): Json<SignedContractDto>,
+        Json(body): Json<SignedContract>,
         Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<()> {
         let mut client = client.to_owned();
@@ -104,7 +106,7 @@ impl AIAgents {
     #[oai(path = "/:id/save/send", method = "post")]
     async fn save(
         &self,
-        Json(body): Json<SignedContractDto>,
+        Json(body): Json<SignedContract>,
         Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<()> {
         let mut client = client.to_owned();
