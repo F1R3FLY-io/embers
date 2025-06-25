@@ -25,25 +25,7 @@ pub struct AgentHeader {
 pub struct CreateAgentReq {
     pub name: String,
     pub shard: Option<String>,
-    pub filesystem: Option<Directory>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Filesystem {
-    Directory(Directory),
-    File(File),
-}
-
-#[derive(Debug, Clone)]
-pub struct Directory {
-    pub name: String,
-    pub members: Vec<Filesystem>,
-}
-
-#[derive(Debug, Clone)]
-pub struct File {
-    pub name: String,
-    pub content: String,
+    pub code: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +34,7 @@ pub struct Agent {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
-    pub filesystem: Option<Directory>,
+    pub code: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -82,17 +64,6 @@ pub struct TestAgentResp {
 }
 
 #[derive(Debug, Clone)]
-pub struct DeployAgentReq {
-    pub welcome_message: String,
-    pub input_prompt: String,
-    pub access: Access,
+pub struct DeployAgentResp {
+    pub contract: PreparedContract,
 }
-
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub enum Access {
-    Private,
-    Public,
-}
-
-#[derive(Debug, Clone)]
-pub struct DeployAgentResp {}
