@@ -29,30 +29,31 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
         listOpsCh!(listOps)
     } |
 
-    contract @"createAiAgent"(@deployerId, @id, @version, @name, @shard, @filesystem) = {
-        new revAddress(`rho:rev:address`), retCh, valueCh, nilCh in {
+    contract @"createAiAgent"(@deployerId, @id, @version, @name, @shard, @code) = {
+        new revAddress(`rho:rev:address`), retCh, valueCh, nilCh, errCh in {
             revAddress!("fromDeployerId", deployerId, *retCh) |
 
             for(@address <- retCh) {
                 for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
-                    treeHashMap!("set", *map, address,
-                        agents.set(id,
-                            agents.getOrElse(id, {}).union(
-                                {
-                                    version: {
-                                        "name": name,
-                                        "shard": shard,
-                                        "filesystem": filesystem,
-                                    },
-                                    "latest": {
-                                        "version": version,
-                                        "name": name,
-                                        "shard": shard,
-                                        "filesystem": filesystem,
-                                    }
-                                }
-                            )
-                        ), *retCh)
+                    match agents.get(id) {
+                        Nil => treeHashMap!("set", *map, address,
+                                    agents.set(id,
+                                        {
+                                            version: {
+                                                "name": name,
+                                                "shard": shard,
+                                                "code": code,
+                                            },
+                                            "latest": {
+                                                "version": version,
+                                                "name": name,
+                                                "shard": shard,
+                                                "code": code,
+                                            }
+                                        }
+                                    ), *retCh)
+                        versions => errCh!()
+                    }
                 } |
 
                 for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
@@ -62,19 +63,23 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
                                 version: {
                                     "name": name,
                                     "shard": shard,
-                                    "filesystem": filesystem,
+                                    "code": code,
                                 },
                                 "latest": {
                                     "version": version,
                                     "name": name,
                                     "shard": shard,
-                                    "filesystem": filesystem,
+                                    "code": code,
                                 }
                             }
                         }, *retCh)
                 } |
 
                 for(_ <- retCh) {
+                    Nil
+                } |
+
+                for(<- errCh) {
                     Nil
                 } |
 
@@ -87,7 +92,7 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
         new valueCh, nilCh, retCh, toAgentHeader in {
             for(@agents <- valueCh) {
                 contract toAgentHeader(@(id, versions), ret) = {
-                    ret!(versions.get("latest").delete("filesystem").set("id", id))
+                    ret!(versions.get("latest").delete("code").set("id", id))
                 } |
 
                 for(listOps <<- listOpsCh) {
@@ -104,13 +109,13 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
     } |
 
     contract @"listAiAgentVersions"(@address, @id, ret) = {
-        new valueCh, nilCh, retCh, toAgentHeader in {
+        new valueCh, nilCh, toAgentHeader in {
             for(@agents <- valueCh) {
                 match agents.get(id) {
                     Nil => nilCh!()
                     versions => {
                         contract toAgentHeader(@(version, agent), ret) = {
-                            ret!(agent.delete("filesystem").union({"id": id, "version": version}))
+                            ret!(agent.delete("code").union({"id": id, "version": version}))
                         } |
 
                         for(listOps <<- listOpsCh) {
@@ -145,32 +150,31 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
         }
     } |
 
-    contract @"saveAiAgent"(@deployerId, @id, @version, @name, @shard, @filesystem) = {
-        new revAddress(`rho:rev:address`), valueCh, nilCh, retCh in {
+    contract @"saveAiAgent"(@deployerId, @id, @version, @name, @shard, @code) = {
+        new revAddress(`rho:rev:address`), valueCh, errCh, retCh in {
             revAddress!("fromDeployerId", deployerId, *retCh) |
 
             for(@address <- retCh) {
                 for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
                     match agents.get(id) {
-                        Nil => nilCh!()
+                        Nil => errCh!()
                         versions => treeHashMap!("set", *map, address,
                                         agents.set(id,
-                                            versions.union(
-                                                {
-                                                    version: {
-                                                        "name": name,
-                                                        "shard": shard,
-                                                        "filesystem": filesystem,
-                                                    },
-                                                    "latest": {
-                                                        "version": version,
-                                                        "name": name,
-                                                        "shard": shard,
-                                                        "filesystem": filesystem,
-                                                    }
+                                            versions.union({
+                                                version: {
+                                                    "name": name,
+                                                    "shard": shard,
+                                                    "code": code,
+                                                },
+                                                "latest": {
+                                                    "version": version,
+                                                    "name": name,
+                                                    "shard": shard,
+                                                    "code": code,
                                                 }
-                                            )
-                                        ), *retCh)
+                                            })
+                                        )
+                                    ), *retCh)
                     } |
 
                     for(_ <- retCh) {
@@ -178,11 +182,11 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
                     }
                 } |
 
-                for(<- nilCh) {
+                for(<- errCh) {
                     Nil
                 } |
 
-                getValueOr!(address, *valueCh, *nilCh)
+                getValueOr!(address, *valueCh, *errCh)
             }
         }
     }

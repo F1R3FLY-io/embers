@@ -2,7 +2,6 @@ use firefly_client::models::SignedCode;
 use firefly_client::{WriteNodeClient, template};
 use uuid::Uuid;
 
-use crate::ai_agents::blockchain::dtos;
 use crate::ai_agents::models::{SaveAgentReq, SaveAgentResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
@@ -15,14 +14,14 @@ template! {
         version: Uuid,
         name: String,
         shard: Option<String>,
-        filesystem: Option<dtos::Directory>,
+        code: Option<String>,
     }
 }
 
 #[tracing::instrument(
     level = "info",
     skip_all,
-    fields(request),
+    fields(id, request),
     err(Debug),
     ret(Debug, level = "trace")
 )]
@@ -30,7 +29,7 @@ pub fn prepare_save_agent_contract(
     id: String,
     request: SaveAgentReq,
 ) -> anyhow::Result<SaveAgentResp> {
-    record_trace!(request);
+    record_trace!(id, request);
 
     let version = Uuid::now_v7();
 
@@ -39,7 +38,7 @@ pub fn prepare_save_agent_contract(
         version,
         name: request.name,
         shard: request.shard,
-        filesystem: request.filesystem.map(Into::into),
+        code: request.code,
     }
     .render()?;
 

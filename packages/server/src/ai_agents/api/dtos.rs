@@ -1,4 +1,4 @@
-use poem_openapi::{Enum, Object, Union};
+use poem_openapi::Object;
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents::models;
@@ -24,29 +24,7 @@ pub struct AgentHeader {
 pub struct CreateAgentReq {
     pub name: String,
     pub shard: Option<String>,
-    pub filesystem: Option<Directory>,
-}
-
-#[derive(Debug, Clone, StructuralConvert, Union)]
-#[oai(discriminator_name = "type", rename_all = "lowercase")]
-#[convert(into(models::Filesystem), from(models::Filesystem))]
-pub enum Filesystem {
-    Directory(Directory),
-    File(File),
-}
-
-#[derive(Debug, Clone, StructuralConvert, Object)]
-#[convert(into(models::Directory), from(models::Directory))]
-pub struct Directory {
-    pub name: String,
-    pub members: Vec<Filesystem>,
-}
-
-#[derive(Debug, Clone, StructuralConvert, Object)]
-#[convert(into(models::File), from(models::File))]
-pub struct File {
-    pub name: String,
-    pub content: String,
+    pub code: Option<String>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -56,7 +34,7 @@ pub struct Agent {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
-    pub filesystem: Option<Directory>,
+    pub code: Option<String>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -90,20 +68,7 @@ pub struct TestAgentResp {
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
-#[convert(into(models::DeployAgentReq))]
-pub struct DeployAgentReq {
-    pub welcome_message: String,
-    pub input_prompt: String,
-    pub access: Access,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
-#[convert(into(models::Access))]
-pub enum Access {
-    Private,
-    Public,
-}
-
-#[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::DeployAgentResp))]
-pub struct DeployAgentResp {}
+pub struct DeployAgentResp {
+    pub contract: PreparedContract,
+}

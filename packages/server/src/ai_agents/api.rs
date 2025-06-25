@@ -9,7 +9,6 @@ use crate::ai_agents::api::dtos::{
     Agents,
     CreateAgentReq,
     CreateAgentResp,
-    DeployAgentReq,
     DeployAgentResp,
     SaveAgentReq,
     SaveAgentResp,
@@ -18,11 +17,13 @@ use crate::ai_agents::api::dtos::{
 };
 use crate::ai_agents::handlers::{
     deploy_signed_create_agent,
+    deploy_signed_deploy_agent,
     deploy_signed_save_agent,
     get_agent,
     list_agent_versions,
     list_agents,
     prepare_create_agent_contract,
+    prepare_deploy_agent_contract,
     prepare_save_agent_contract,
 };
 use crate::common::api::dtos::{ApiTags, MaybeNotFound, ParseFromString, SignedContract};
@@ -115,13 +116,28 @@ impl AIAgents {
             .map_err(Into::into)
     }
 
-    #[oai(path = "/:id/:version/deploy", method = "post")]
-    async fn deploy(
+    #[oai(path = "/:address/:id/:version/deploy/prepare", method = "post")]
+    async fn prepare_deploy_agent(
         &self,
+        Path(wallet_address): Path<ParseFromString<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
-        Json(input): Json<DeployAgentReq>,
+        Data(read_client): Data<&ReadNodeClient>,
     ) -> poem::Result<Json<DeployAgentResp>> {
-        todo!()
+        let contract =
+            prepare_deploy_agent_contract(wallet_address.0, id, version, read_client).await?;
+        Ok(Json(contract.into()))
+    }
+
+    #[oai(path = "/:address/:id/:version/deploy/send", method = "post")]
+    async fn deploy_agent(
+        &self,
+        Json(body): Json<SignedContract>,
+        Data(client): Data<&WriteNodeClient>,
+    ) -> poem::Result<()> {
+        let mut client = client.to_owned();
+        deploy_signed_deploy_agent(&mut client, body.into())
+            .await
+            .map_err(Into::into)
     }
 }

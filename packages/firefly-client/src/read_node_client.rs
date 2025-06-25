@@ -1,3 +1,4 @@
+use anyhow::Context;
 use serde_json::Value;
 
 use crate::errors::ReadNodeError;
@@ -28,22 +29,30 @@ impl ReadNodeClient {
             .map(Value::take)
             .ok_or(ReadNodeError::ReturnValueMissing)?;
 
-        let intermediate: ReadNodeExpr =
-            serde_json::from_value(data_value).map_err(ReadNodeError::InvalidIntermediateModel)?;
+        let intermediate: ReadNodeExpr = serde_json::from_value(data_value)
+            .context("failed to deserialize intermediate model")
+            .map_err(ReadNodeError::Deserialization)?;
 
-        serde_json::from_value(intermediate.into()).map_err(ReadNodeError::InvalidFinalModel)
+        serde_json::from_value(intermediate.into())
+            .context("failed to deserialize filed model")
+            .map_err(ReadNodeError::Deserialization)
     }
 
     async fn explore_deploy(&self, rholang_code: String) -> Result<Value, ReadNodeError> {
-        self.client
+        let request = self
+            .client
             .post(format!("{}/api/explore-deploy", self.url))
             .body(rholang_code)
             .header("Content-Type", "text/plain")
             .send()
-            .await?
-            .error_for_status()?
-            .json()
-            .await
-            .map_err(Into::into)
+            .await?;
+
+        if !request.status().is_success() {
+            let status = request.status();
+            let body = request.text().await?;
+            return Err(ReadNodeError::Api(status, body));
+        }
+
+        request.json().await.map_err(Into::into)
     }
 }
