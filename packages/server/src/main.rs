@@ -7,6 +7,7 @@ use poem_openapi::OpenApiService;
 
 use crate::ai_agents::api::AIAgents;
 use crate::bootstrap::bootstrap_contracts;
+use crate::common::api::TestNet;
 use crate::configuration::collect_config;
 use crate::wallets::api::WalletsApi;
 
@@ -32,11 +33,21 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let read_client = ReadNodeClient::new(config.read_node_url.clone());
-    let mut write_client =
-        WriteNodeClient::new(config.deploy_service_url, config.propose_service_url).await?;
+    let read_client = ReadNodeClient::new(config.mainnet.read_node_url);
+    let mut write_client = WriteNodeClient::new(
+        config.mainnet.deploy_service_url,
+        config.mainnet.propose_service_url,
+    )
+    .await?;
 
-    bootstrap_contracts(&mut write_client, &config.service_key)
+    let testnet_read_client = ReadNodeClient::new(config.testnet.read_node_url);
+    let testnet_write_client = WriteNodeClient::new(
+        config.testnet.deploy_service_url,
+        config.testnet.propose_service_url,
+    )
+    .await?;
+
+    bootstrap_contracts(&mut write_client, &config.mainnet.service_key)
         .await
         .context("can't bootstrap Infrastructure's Rho contracts")?;
 
@@ -51,6 +62,9 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/openapi.json", spec)
         .data(read_client)
         .data(write_client)
+        .data(TestNet(testnet_read_client))
+        .data(TestNet(testnet_write_client))
+        .data(TestNet(config.testnet.service_key))
         .with(Cors::new().allow_origin_regex("*"))
         .with(RequestId::default())
         .with(Tracing)

@@ -2,8 +2,8 @@ use firefly_client::{ReadNodeClient, template};
 
 use crate::ai_agents::blockchain::dtos;
 use crate::ai_agents::models::Agent;
+use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
-use crate::wallets::models::WalletAddress;
 
 template! {
     #[template(path = "ai_agents/get_agent.rho")]

@@ -1,19 +1,19 @@
-use std::num::NonZero;
-
 use askama::Template;
 use chrono::{DateTime, Utc};
 
 mod description;
-mod wallet_address;
+mod positive_non_zero;
 
 pub use description::*;
-pub use wallet_address::*;
+pub use positive_non_zero::*;
+
+use crate::common::models::WalletAddress;
 
 #[derive(Debug, Clone, Template)]
 #[template(path = "wallets/init.rho", escape = "none")]
 pub struct InitWalletsEnv;
 
-pub type Amount = NonZero<u64>;
+pub type Amount = PositiveNonZero<i64>;
 
 pub type Id = String;
 

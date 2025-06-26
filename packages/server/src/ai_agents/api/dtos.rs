@@ -54,17 +54,17 @@ pub struct SaveAgentResp {
     pub contract: PreparedContract,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
-#[convert(into(models::TestAgentReq))]
-pub struct TestAgentReq {
-    pub code: String,
+#[derive(Debug, Clone, Object)]
+pub struct CreateTestwalletResp {
+    pub key: String,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
-#[convert(from(models::TestAgentResp))]
-pub struct TestAgentResp {
-    pub logs: Vec<String>,
-    pub result: serde_json::Value,
+impl From<models::CreateTestwalletResp> for CreateTestwalletResp {
+    fn from(value: models::CreateTestwalletResp) -> Self {
+        Self {
+            key: value.key.display_secret().to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]

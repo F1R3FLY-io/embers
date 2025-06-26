@@ -1,16 +1,9 @@
-use std::num::NonZero;
-
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::wallets::models::{
-    Description,
-    DescriptionError,
-    Id,
-    ParseWalletAddressError,
-    WalletAddress,
-};
+use crate::common::models::{ParseWalletAddressError, WalletAddress};
+use crate::wallets::models::{Amount, Description, DescriptionError, Id};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BlockChainTransactionRecord {
@@ -18,7 +11,7 @@ pub struct BlockChainTransactionRecord {
     timestamp: DateTime<Utc>,
     from: String,
     to: String,
-    amount: u64,
+    amount: i64,
     description: Option<String>,
 }
 
@@ -29,7 +22,7 @@ pub struct Transaction {
     pub timestamp: DateTime<Utc>,
     pub from: WalletAddress,
     pub to: WalletAddress,
-    pub amount: NonZero<u64>,
+    pub amount: Amount,
     pub description: Option<Description>,
 }
 

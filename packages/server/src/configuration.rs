@@ -5,13 +5,19 @@ use secp256k1::SecretKey;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Config {
-    pub log_level: String,
-    pub service_key: SecretKey,
+pub struct Nodes {
     pub deploy_service_url: String,
     pub propose_service_url: String,
     pub read_node_url: String,
+    pub service_key: SecretKey,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Config {
     pub port: u32,
+    pub log_level: String,
+    pub mainnet: Nodes,
+    pub testnet: Nodes,
 }
 
 pub fn collect_config() -> anyhow::Result<Config> {

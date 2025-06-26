@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use askama::Template;
+use secp256k1::SecretKey;
 
 use crate::common::models::PreparedContract;
 
@@ -53,14 +54,8 @@ pub struct SaveAgentResp {
 }
 
 #[derive(Debug, Clone)]
-pub struct TestAgentReq {
-    pub code: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct TestAgentResp {
-    pub logs: Vec<String>,
-    pub result: serde_json::Value,
+pub struct CreateTestwalletResp {
+    pub key: SecretKey,
 }
 
 #[derive(Debug, Clone)]

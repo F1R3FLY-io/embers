@@ -1,13 +1,11 @@
-use std::num::NonZero;
-
 use chrono::{DateTime, Utc};
 use firefly_client::models::SignedCode;
 use firefly_client::{WriteNodeClient, template};
 
-use crate::common::models::PreparedContract;
+use crate::common::models::{PreparedContract, WalletAddress};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
-use crate::wallets::models::{Description, PrepareTransferInput, WalletAddress};
+use crate::wallets::models::{Description, PrepareTransferInput};
 
 template! {
     #[template(path = "wallets/send_tokens.rho")]
@@ -16,7 +14,7 @@ template! {
         timestamp: DateTime<Utc>,
         wallet_address_from: WalletAddress,
         wallet_address_to: WalletAddress,
-        amount: NonZero<u64>,
+        amount: i64,
         description: Option<Description>,
     }
 }
@@ -35,7 +33,7 @@ pub fn prepare_transfer_contract(value: PrepareTransferInput) -> anyhow::Result<
         timestamp: Utc::now(),
         wallet_address_from: value.from,
         wallet_address_to: value.to,
-        amount: value.amount,
+        amount: value.amount.0,
         description: value.description,
     }
     .render()?;

@@ -6,8 +6,9 @@ use structural_convert::StructuralConvert;
 use thiserror::Error;
 
 use crate::common::api::dtos::Stringified;
+use crate::common::models::ParseWalletAddressError;
 use crate::wallets::models;
-use crate::wallets::models::{DescriptionError, ParseWalletAddressError};
+use crate::wallets::models::DescriptionError;
 
 #[derive(Debug, Clone, Eq, PartialEq, Enum, StructuralConvert)]
 #[oai(rename_all = "lowercase")]
@@ -75,7 +76,7 @@ pub struct WalletStateAndHistory {
 pub struct PrepareTransferInput {
     from: String,
     to: String,
-    amount: Stringified<u64>,
+    amount: Stringified<i64>,
     description: Option<String>,
 }
 

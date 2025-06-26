@@ -3,19 +3,20 @@ use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
+use secp256k1::SecretKey;
 
 use crate::ai_agents::api::dtos::{
     Agent,
     Agents,
     CreateAgentReq,
     CreateAgentResp,
+    CreateTestwalletResp,
     DeployAgentResp,
     SaveAgentReq,
     SaveAgentResp,
-    TestAgentReq,
-    TestAgentResp,
 };
 use crate::ai_agents::handlers::{
+    create_test_wallet,
     deploy_signed_create_agent,
     deploy_signed_deploy_agent,
     deploy_signed_save_agent,
@@ -26,8 +27,9 @@ use crate::ai_agents::handlers::{
     prepare_deploy_agent_contract,
     prepare_save_agent_contract,
 };
+use crate::common::api::TestNet;
 use crate::common::api::dtos::{ApiTags, MaybeNotFound, ParseFromString, SignedContract};
-use crate::wallets::models::WalletAddress;
+use crate::common::models::WalletAddress;
 
 mod dtos;
 
@@ -89,9 +91,16 @@ impl AIAgents {
             .map_err(Into::into)
     }
 
-    #[oai(path = "/test", method = "post")]
-    async fn test(&self, Json(input): Json<TestAgentReq>) -> poem::Result<Json<TestAgentResp>> {
-        todo!()
+    #[oai(path = "/test/account", method = "post")]
+    async fn create_test_wallet(
+        &self,
+        Data(test_client): Data<&TestNet<WriteNodeClient>>,
+        Data(test_service_key): Data<&TestNet<SecretKey>>,
+    ) -> poem::Result<Json<CreateTestwalletResp>> {
+        let mut test_client = test_client.0.clone();
+
+        let test_client = create_test_wallet(&mut test_client, &test_service_key.0).await?;
+        Ok(Json(test_client.into()))
     }
 
     #[oai(path = "/:id/save/prepare", method = "post")]

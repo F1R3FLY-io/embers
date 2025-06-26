@@ -17,6 +17,7 @@ use poem_openapi::{ApiResponse, Object, Tags};
 use structural_convert::StructuralConvert;
 
 use crate::common::models;
+use crate::wallets::models::PositiveNonZero;
 
 /// Transforms T to [`String`] before serialization/deserialization
 /// and keeps original format in `OpenApi` model.
@@ -107,6 +108,32 @@ impl ToJSON for Stringified<u64> {
 impl From<NonZero<u64>> for Stringified<u64> {
     fn from(value: NonZero<u64>) -> Self {
         Self(value.get())
+    }
+}
+
+impl From<PositiveNonZero<i64>> for Stringified<u64> {
+    fn from(value: PositiveNonZero<i64>) -> Self {
+        #[allow(clippy::cast_sign_loss)]
+        Self(value.0 as u64)
+    }
+}
+
+impl Format for i64 {
+    fn format() -> &'static str {
+        "int64"
+    }
+}
+
+impl ParseFromJSON for Stringified<i64> {
+    fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
+        let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
+        value.parse::<i64>().map(Self).map_err(ParseError::custom)
+    }
+}
+
+impl ToJSON for Stringified<i64> {
+    fn to_json(&self) -> Option<serde_json::Value> {
+        self.0.to_string().to_json()
     }
 }
 
