@@ -1,0 +1,39 @@
+new rl(`rho:registry:lookup`),
+    deployerId(`rho:rchain:deployerId`),
+    revVaultCh,
+    eitherCh,
+    okOrAbort,
+    vaultCh,
+    vaultToCh,
+    revVaultkeyCh,
+    transferOp,
+    transferResultCh
+in {
+    rl!(`rho:rchain:revVault`, *revVaultCh) |
+    rl!(`rho:lang:either`, *eitherCh) |
+
+    contract okOrAbort(eitherCh, @log) = {
+        new debug(`rho:io:stdout`) in {
+            for(@either <- eitherCh) {
+                match either {
+                    (false, err) => debug!([log, err]),
+                }
+            }
+        }
+    } |
+
+    for(revVault <- revVaultCh) {
+        revVault!("findOrCreate", {{ wallet_address_from }}, *vaultCh) |
+        revVault!("findOrCreate", {{ wallet_address_to }}, *vaultToCh) |
+        revVault!("deployerAuthKey", *deployerId, *revVaultkeyCh) |
+
+        for(@(_, either) <- eitherCh; key <- revVaultkeyCh; _ <- vaultToCh) {
+            for(vault, return <- transferOp) {
+                vault!("transfer", {{ wallet_address_to }}, {{ amount }}, *key, *return)
+            } |
+
+            @either!("flatMap <-", *vaultCh, *transferOp, *transferResultCh) |
+            okOrAbort!(*transferResultCh, "transfer failed")
+        }
+    }
+}

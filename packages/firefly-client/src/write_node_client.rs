@@ -5,13 +5,13 @@ use prost::Message as _;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
 use crate::helpers::FromExpr;
-use crate::models::SignedCode;
 use crate::models::casper::v1::deploy_service_client::DeployServiceClient;
 use crate::models::casper::v1::propose_service_client::ProposeServiceClient;
 use crate::models::casper::v1::{deploy_response, propose_response, rho_data_response};
 use crate::models::casper::{DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
+use crate::models::{BlockId, DeployId, SignedCode};
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -38,58 +38,7 @@ impl WriteNodeClient {
         })
     }
 
-    pub async fn deploy_signed_contract(&mut self, contract: SignedCode) -> anyhow::Result<()> {
-        let msg = {
-            let mut msg = DeployDataProto::decode(contract.contract.as_slice())?;
-
-            msg.sig = contract.sig;
-            msg.sig_algorithm = contract.sig_algorithm;
-            msg.deployer = contract.deployer;
-
-            msg
-        };
-
-        let resp = self
-            .deploy_client
-            .do_deploy(msg)
-            .await?
-            .into_inner()
-            .message
-            .context("missing do_deploy responce")?;
-
-        match resp {
-            deploy_response::Message::Result(_) => (),
-            deploy_response::Message::Error(err) => {
-                return Err(anyhow!("do_deploy error: {err:?}"));
-            }
-        }
-
-        Ok(())
-    }
-
-    pub async fn propose(&mut self) -> anyhow::Result<String> {
-        let resp = self
-            .propose_client
-            .propose(ProposeQuery { is_async: false })
-            .await
-            .context("propose grpc error")?
-            .into_inner()
-            .message
-            .context("missing propose responce")?;
-
-        let block_hash = match resp {
-            propose_response::Message::Result(block_hash) => block_hash,
-            propose_response::Message::Error(err) => return Err(anyhow!("propose error: {err:?}")),
-        };
-
-        block_hash
-            .strip_prefix("Success! Block ")
-            .and_then(|block_hash| block_hash.strip_suffix(" created and added."))
-            .map(Into::into)
-            .context("failed to extract block hash")
-    }
-
-    pub async fn deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<&mut Self> {
+    pub async fn deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<DeployId> {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
@@ -126,13 +75,86 @@ impl WriteNodeClient {
             .message
             .context("missing do_deploy responce")?;
 
-        match resp {
-            deploy_response::Message::Result(_) => Ok(self),
-            deploy_response::Message::Error(err) => Err(anyhow!("do_deploy error: {err:?}")),
-        }
+        let deploy_id = match resp {
+            deploy_response::Message::Result(deploy_id) => deploy_id,
+            deploy_response::Message::Error(err) => {
+                return Err(anyhow!("do_deploy error: {err:?}"));
+            }
+        };
+
+        deploy_id
+            .strip_prefix("Success! DeployId is: ")
+            .map(|id| DeployId::from(id.to_owned()))
+            .context("failed to extract deploy_id")
     }
 
-    pub async fn get_channel_value<T>(&mut self, hash: String, channel: String) -> anyhow::Result<T>
+    pub async fn deploy_signed_contract(
+        &mut self,
+        contract: SignedCode,
+    ) -> anyhow::Result<DeployId> {
+        let msg = {
+            let mut msg = DeployDataProto::decode(contract.contract.as_slice())?;
+
+            msg.sig = contract.sig;
+            msg.sig_algorithm = contract.sig_algorithm;
+            msg.deployer = contract.deployer;
+
+            msg
+        };
+
+        let resp = self
+            .deploy_client
+            .do_deploy(msg)
+            .await?
+            .into_inner()
+            .message
+            .context("missing do_deploy responce")?;
+
+        let deploy_id = match resp {
+            deploy_response::Message::Result(deploy_id) => deploy_id,
+            deploy_response::Message::Error(err) => {
+                return Err(anyhow!("do_deploy error: {err:?}"));
+            }
+        };
+
+        deploy_id
+            .strip_prefix("Success! DeployId is: ")
+            .map(|id| DeployId::from(id.to_owned()))
+            .context("failed to extract deploy_id")
+    }
+
+    pub async fn propose(&mut self) -> anyhow::Result<BlockId> {
+        let resp = self
+            .propose_client
+            .propose(ProposeQuery { is_async: false })
+            .await
+            .context("propose grpc error")?
+            .into_inner()
+            .message
+            .context("missing propose responce")?;
+
+        let block_hash = match resp {
+            propose_response::Message::Result(block_hash) => block_hash,
+            propose_response::Message::Error(err) => return Err(anyhow!("propose error: {err:?}")),
+        };
+
+        block_hash
+            .strip_prefix("Success! Block ")
+            .and_then(|block_hash| block_hash.strip_suffix(" created and added."))
+            .map(|id| BlockId::from(id.to_owned()))
+            .context("failed to extract block hash")
+    }
+
+    pub async fn full_deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<BlockId> {
+        self.deploy(key, term).await?;
+        self.propose().await
+    }
+
+    pub async fn get_channel_value<T>(
+        &mut self,
+        hash: BlockId,
+        channel: String,
+    ) -> anyhow::Result<T>
     where
         T: FromExpr,
     {
@@ -145,7 +167,7 @@ impl WriteNodeClient {
             .deploy_client
             .get_data_at_name(DataAtNameByBlockQuery {
                 par: Some(par),
-                block_hash: hash,
+                block_hash: hash.into(),
                 use_pre_state_hash: false,
             })
             .await

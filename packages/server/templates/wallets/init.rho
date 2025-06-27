@@ -3,6 +3,7 @@ new rl(`rho:registry:lookup`),
     getValueOr,
     revVaultCh,
     eitherCh,
+    okOrAbort,
     doTransfer,
     updateTransferHistory,
     getTransactionsHistory,
@@ -45,6 +46,17 @@ in {
         eitherCh!(either)
     } |
 
+    contract okOrAbort(eitherCh, f, @log, return) = {
+        new debug(`rho:io:stdout`) in {
+            for(@either <- eitherCh) {
+                match either {
+                    (true, v) => f!(v, *return)
+                    (false, err) => debug!([log, err])
+                }
+            }
+        }
+    } |
+
     contract doTransfer(@deployerId, @walletAddressFrom, @walletAddressTo, @amount, ret) = {
         new vaultCh, vaultToCh, revVaultkeyCh, transferOp in {
             for(revVault <<- revVaultCh) {
@@ -64,7 +76,7 @@ in {
     } |
 
     contract updateTransferHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
-        new valueCh, nilCh, retCh in {
+        new valueCh, nilCh, done in {
             getValueOr!(walletOwner, *valueCh, *nilCh) |
 
             for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
@@ -77,7 +89,7 @@ in {
                         "amount": amount,
                         "description": description
                     }],
-                    *retCh)
+                    *done)
             } |
 
             for(@transactionsHistory <- valueCh; treeHashMap, map <<- treeHashMapCh) {
@@ -90,19 +102,15 @@ in {
                         "amount": amount,
                         "description": description
                     }],
-                    *retCh)
-            } |
-
-            for(_ <- retCh) {
-                Nil
+                    *done)
             }
         }
     } |
 
     contract @"sendTransfer"(@deployerId, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
-        new transferResult, updateHistory, retCh, debug(`rho:io:stdout`) in {
+        new transferResultCh, updateHistory, done in {
             for(either <<- eitherCh) {
-                doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *transferResult) |
+                doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *transferResultCh) |
 
                 for(@v, return <- updateHistory) {
                     updateTransferHistory!(walletAddressFrom, id, timestamp, walletAddressFrom, walletAddressTo, amount, description) |
@@ -110,13 +118,7 @@ in {
                     return!(v)
                 } |
 
-                for(@result <- retCh) {
-                    match result {
-                        (false, err) => debug!(["taransfer failed", err])
-                    }
-                } |
-
-                either!("map <-", *transferResult, *updateHistory, *retCh)
+                okOrAbort!(*transferResultCh, *updateHistory, "transfer failed", *done)
             }
         }
     } |

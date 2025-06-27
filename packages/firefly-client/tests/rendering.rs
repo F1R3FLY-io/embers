@@ -12,22 +12,30 @@ fn test_serialize_bool() {
 
 #[test]
 fn test_serialize_i8() {
-    assert!(1i8.serialize(Serializer).is_err());
+    let result = 1i8.serialize(Serializer).unwrap();
+    let expected = RhoValue::Number(1);
+    assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_i16() {
-    assert!(1i16.serialize(Serializer).is_err());
+    let result = 1i16.serialize(Serializer).unwrap();
+    let expected = RhoValue::Number(1);
+    assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_i32() {
-    assert!(1i32.serialize(Serializer).is_err());
+    let result = 1i32.serialize(Serializer).unwrap();
+    let expected = RhoValue::Number(1);
+    assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_i64() {
-    assert!(1i64.serialize(Serializer).is_err());
+    let result = 1i64.serialize(Serializer).unwrap();
+    let expected = RhoValue::Number(1);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -51,9 +59,7 @@ fn test_serialize_u32() {
 
 #[test]
 fn test_serialize_u64() {
-    let result = 1u64.serialize(Serializer).unwrap();
-    let expected = RhoValue::Number(1);
-    assert_eq!(result, expected);
+    assert!(1u64.serialize(Serializer).is_err());
 }
 
 #[test]
@@ -94,21 +100,16 @@ fn test_serialize_str_is_escaped() {
 }
 
 #[test]
-fn test_serialize_bytes() {
-    assert!(b"str".serialize(Serializer).is_err());
-}
-
-#[test]
 fn test_serialize_none() {
-    let result = None::<u64>.serialize(Serializer).unwrap();
+    let result = None::<String>.serialize(Serializer).unwrap();
     let expected = RhoValue::Nil;
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_some() {
-    let result = Some(1u64).serialize(Serializer).unwrap();
-    let expected = RhoValue::Number(1);
+    let result = Some("str").serialize(Serializer).unwrap();
+    let expected = RhoValue::String("str".into());
     assert_eq!(result, expected);
 }
 

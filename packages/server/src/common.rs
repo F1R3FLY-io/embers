@@ -1,6 +1,6 @@
 use firefly_client::WriteNodeClient;
-use firefly_client::models::SignedCode;
 use firefly_client::models::casper::DeployDataProto;
+use firefly_client::models::{BlockId, SignedCode};
 use prost::Message;
 
 use crate::common::models::PreparedContract;
@@ -12,9 +12,9 @@ pub mod tracing;
 pub async fn deploy_signed_contract(
     client: &mut WriteNodeClient,
     contract: SignedCode,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<BlockId> {
     client.deploy_signed_contract(contract).await?;
-    client.propose().await.map(|_| ())
+    client.propose().await
 }
 
 pub fn prepare_for_signing(code: String) -> PreparedContract {

@@ -1,0 +1,57 @@
+new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, log in {
+    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
+
+    for(treeHashMap <- treeHashMapCh) {
+        treeHashMap!("init", 3, *treeHashMapCh) |
+        for(map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, *map)
+        }
+    } |
+
+    contract getValueOr(@address, valueCh, nilCh) = {
+        new retCh in {
+            for(treeHashMap, map <<- treeHashMapCh) {
+                treeHashMap!("get", *map, address, *retCh) |
+
+                for(@value <- retCh) {
+                    match value {
+                        Nil => nilCh!()
+                        value => valueCh!(value)
+                    }
+                }
+            }
+        }
+    } |
+
+    contract log(@level, @deployId, @message) = {
+        new valueCh, nilCh, done in {
+            for(@logs <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                treeHashMap!("set", *map, deployId, logs ++ [{"level": level, "message": message}], *done)
+            } |
+
+            for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
+                treeHashMap!("set", *map, deployId, [{"level": level, "message": message}], *done)
+            } |
+
+            getValueOr!(deployId, *valueCh, *nilCh)
+        }
+    } |
+
+    contract @"logDebug"(@deployId, @message) = {
+        log!("Debug", deployId, message)
+    } |
+
+    contract @"logInfo"(@deployId, @message) = {
+        log!("Info", deployId, message)
+    } |
+
+    contract @"logError"(@deployId, @message) = {
+        log!("Error", deployId, message)
+    } |
+
+    contract @"getLogs"(@deployId, ret) = {
+        for(treeHashMap, map <<- treeHashMapCh) {
+            treeHashMap!("get", *map, deployId, *ret)
+        }
+    }
+}

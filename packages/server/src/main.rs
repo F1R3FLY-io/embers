@@ -4,9 +4,11 @@ use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
+use tokio::try_join;
 
 use crate::ai_agents::api::AIAgents;
-use crate::bootstrap::bootstrap_contracts;
+use crate::bootstrap::{bootstrap_mainnet_contracts, bootstrap_testnet_contracts};
+use crate::common::api::TestNet;
 use crate::configuration::collect_config;
 use crate::wallets::api::WalletsApi;
 
@@ -18,7 +20,7 @@ mod wallets;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let config = collect_config().context("can't read bootstrap configuration")?;
+    let config = collect_config().context("failed to read configuration")?;
 
     let env_filter = tracing_subscriber::EnvFilter::try_new(config.log_level)
         .context("failed to init log filter")?;
@@ -32,13 +34,34 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let read_client = ReadNodeClient::new(config.read_node_url.clone());
-    let mut write_client =
-        WriteNodeClient::new(config.deploy_service_url, config.propose_service_url).await?;
+    let read_client = ReadNodeClient::new(config.mainnet.read_node_url);
+    let testnet_read_client = ReadNodeClient::new(config.testnet.read_node_url);
 
-    bootstrap_contracts(&mut write_client, &config.service_key)
-        .await
-        .context("can't bootstrap Infrastructure's Rho contracts")?;
+    let (write_client, testnet_write_client) = try_join!(
+        async {
+            let mut write_client = WriteNodeClient::new(
+                config.mainnet.deploy_service_url,
+                config.mainnet.propose_service_url,
+            )
+            .await?;
+
+            bootstrap_mainnet_contracts(&mut write_client, &config.mainnet.service_key).await?;
+
+            anyhow::Ok(write_client)
+        },
+        async {
+            let mut testnet_write_client = WriteNodeClient::new(
+                config.testnet.deploy_service_url,
+                config.testnet.propose_service_url,
+            )
+            .await?;
+
+            bootstrap_testnet_contracts(&mut testnet_write_client, &config.testnet.service_key)
+                .await?;
+
+            anyhow::Ok(testnet_write_client)
+        },
+    )?;
 
     let api = OpenApiService::new((WalletsApi, AIAgents), "Embers API", "0.1.0").url_prefix("/api");
 
@@ -51,6 +74,9 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/openapi.json", spec)
         .data(read_client)
         .data(write_client)
+        .data(TestNet(testnet_read_client))
+        .data(TestNet(testnet_write_client))
+        .data(TestNet(config.testnet.service_key))
         .with(Cors::new().allow_origin_regex("*"))
         .with(RequestId::default())
         .with(Tracing)

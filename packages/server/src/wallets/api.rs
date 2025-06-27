@@ -7,9 +7,9 @@ use poem_openapi::payload::Json;
 
 use super::handlers::{deploy_signed_transfer, prepare_transfer_contract};
 use crate::common::api::dtos::{ApiTags, ParseFromString, PreparedContract, SignedContract};
+use crate::common::models::WalletAddress;
 use crate::wallets::api::dtos::{PrepareTransferInput, WalletStateAndHistory};
 use crate::wallets::handlers::get_wallet_state_and_history;
-use crate::wallets::models::WalletAddress;
 
 mod dtos;
 

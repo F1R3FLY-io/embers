@@ -3,11 +3,13 @@ services:
     build:
       context: .
       dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: mainnet
     ports:
       - 14401:40401 # deploy service
       - 14402:40402 # propose service
     volumes:
-      - ./ssl:/data/ssl
+      - ./mainnet/ssl:/data/ssl
     command:
       - run
       - -s
@@ -27,12 +29,61 @@ services:
     build:
       context: .
       dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: mainnet
     ports:
       - 14413:40403 # rest api
     command:
       - run
       - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly?protocol=40400&discovery=40404
       - --host=firefly-read
+      - --no-upnp
+      - --allow-private-addresses
+      - --protocol-port=40410
+      - --discovery-port=40414
+      - --approve-duration=10seconds
+      - --approve-interval=10seconds
+      - --fork-choice-check-if-stale-interval=30seconds
+      - --fork-choice-stale-threshold=30seconds
+
+  firefly-testnet:
+    build:
+      context: .
+      dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: testnet
+    ports:
+      - 15401:40401 # deploy service
+      - 15402:40402 # propose service
+    volumes:
+      - ./testnet/ssl:/data/ssl
+    command:
+      - run
+      - -s
+      - --validator-private-key=6a786ec387aff99fcce1bd6faa35916bfad3686d5c98e90a89f77670f535607c
+      - --host=firefly-testnet
+      - --no-upnp
+      - --allow-private-addresses
+      - --synchrony-constraint-threshold=0.0
+      - --approve-duration=10seconds
+      - --approve-interval=10seconds
+      - --protocol-port=40400
+      - --discovery-port=40404
+      - --tls-certificate-path=/data/ssl/node.certificate.pem
+      - --tls-key-path=/data/ssl/node.key.pem
+
+  firefly-read-testnet:
+    build:
+      context: .
+      dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: testnet
+    ports:
+      - 15413:40403 # rest api
+    command:
+      - run
+      - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly-testnet?protocol=40400&discovery=40404
+      - --host=firefly-read-testnet
       - --no-upnp
       - --allow-private-addresses
       - --protocol-port=40410

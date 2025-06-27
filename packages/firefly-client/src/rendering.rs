@@ -10,7 +10,7 @@ pub enum RhoValue {
 
     Nil,
     Bool(bool),
-    Number(u64),
+    Number(i64),
     String(String),
     Uri(String),
 }
@@ -109,19 +109,19 @@ impl serde::Serializer for Serializer {
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::NoSuported(type_name_of_val(&v)))
+        self.serialize_i64(v.into())
     }
 
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::NoSuported(type_name_of_val(&v)))
+        self.serialize_i64(v.into())
     }
 
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::NoSuported(type_name_of_val(&v)))
+        self.serialize_i64(v.into())
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
-        Err(Self::Error::NoSuported(type_name_of_val(&v)))
+        Ok(Self::Ok::Number(v))
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
@@ -129,15 +129,15 @@ impl serde::Serializer for Serializer {
     }
 
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
-        self.serialize_u64(v.into())
+        self.serialize_i64(v.into())
     }
 
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
-        self.serialize_u64(v.into())
+        self.serialize_i64(v.into())
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
-        Ok(Self::Ok::Number(v))
+        Err(Self::Error::NoSuported(type_name_of_val(&v)))
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {

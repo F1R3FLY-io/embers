@@ -1,9 +1,10 @@
 use firefly_client::models::Either;
 use firefly_client::{ReadNodeClient, template};
 
+use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
 use crate::wallets::blockchain::dtos;
-use crate::wallets::models::{Direction, Transfer, WalletAddress, WalletStateAndHistory};
+use crate::wallets::models::{Direction, Transfer, WalletStateAndHistory};
 
 template! {
     #[template(path = "wallets/get_balance_and_histry.rho")]
