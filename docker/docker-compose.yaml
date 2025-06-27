@@ -8,6 +8,7 @@ services:
     ports:
       - 14401:40401 # deploy service
       - 14402:40402 # propose service
+      - 14403:40403 # rest api
     volumes:
       - ./mainnet/ssl:/data/ssl
     command:

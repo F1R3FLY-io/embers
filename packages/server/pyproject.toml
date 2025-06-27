@@ -1,0 +1,39 @@
+[project]
+dependencies = [
+    "base58 (>=2.1.1,<3.0.0)",
+    "cryptography (>=45.0.4,<46.0.0)",
+    "pycryptodome (>=3.23.0,<4.0.0)",
+    "pytest (>=8.4.1,<9.0.0)",
+    "requests (>=2.32.4,<3.0.0)",
+    "ruff (>=0.12.1,<0.13.0)",
+]
+name = "server-tests"
+requires-python = ">=3.13,<4"
+version = "0.1.0"
+
+[build-system]
+build-backend = "poetry.core.masonry.api"
+requires      = ["poetry-core>=2.0.0,<3.0.0"]
+
+[tool.poetry]
+package-mode = false
+
+[tool.ruff]
+include        = ["tests/*.py"]
+line-length    = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+ignore = [
+    "ANN401",  # typing.Any
+    "D",       # docstrings
+    "PLR2004", # magic value
+    "S101",    # assert
+]
+select = ["ALL"]
+
+[tool.ruff.lint.flake8-annotations]
+suppress-none-returning = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
