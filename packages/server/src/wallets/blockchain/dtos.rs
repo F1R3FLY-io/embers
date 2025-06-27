@@ -3,7 +3,13 @@ use serde::Deserialize;
 use thiserror::Error;
 
 use crate::common::models::{ParseWalletAddressError, WalletAddress};
-use crate::wallets::models::{Amount, Description, DescriptionError, Id};
+use crate::wallets::models::{
+    Amount,
+    Description,
+    DescriptionError,
+    Id,
+    PositiveNonZeroParsingError,
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BlockChainTransactionRecord {
@@ -28,8 +34,8 @@ pub struct Transaction {
 
 #[derive(Debug, Clone, Error)]
 pub enum TransferValidationError {
-    #[error("amount field can't be empty")]
-    EmptyAmount,
+    #[error("description format error: {0}")]
+    AmountError(#[from] PositiveNonZeroParsingError),
     #[error("receiver wallet adress has wrong format: {0}")]
     WrongReceiverAddressFormat(ParseWalletAddressError),
     #[error("sender wallet adress has wrong format: {0}")]
@@ -51,10 +57,7 @@ impl TryFrom<BlockChainTransactionRecord> for Transaction {
             .try_into()
             .map_err(Self::Error::WrongReceiverAddressFormat)?;
 
-        let amount = record
-            .amount
-            .try_into()
-            .map_err(|_| Self::Error::EmptyAmount)?;
+        let amount = record.amount.try_into()?;
         let description = record.description.map(TryFrom::try_from).transpose()?;
 
         Ok(Self {

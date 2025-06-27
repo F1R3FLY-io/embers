@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use derive_more::{AsRef, Display, From, Into};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 pub mod servicemodelapi {
@@ -31,12 +32,22 @@ pub mod casper {
     }
 }
 
+#[derive(
+    Debug, Clone, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Into, From, Serialize, Deserialize,
+)]
+pub struct BlockId(String);
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockInfo {
-    pub block_hash: String,
-    pub parents_hash_list: Vec<String>,
+    pub block_hash: BlockId,
+    pub parents_hash_list: Vec<BlockId>,
 }
+
+#[derive(
+    Debug, Clone, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Into, From, Serialize, Deserialize,
+)]
+pub struct DeployId(String);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

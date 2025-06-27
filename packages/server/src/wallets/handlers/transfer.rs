@@ -54,5 +54,6 @@ pub async fn deploy_signed_transfer(
 ) -> anyhow::Result<()> {
     record_trace!(contract);
 
-    deploy_signed_contract(client, contract).await
+    deploy_signed_contract(client, contract).await?;
+    Ok(())
 }

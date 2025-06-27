@@ -60,5 +60,6 @@ pub async fn deploy_signed_create_agent(
 ) -> anyhow::Result<()> {
     record_trace!(contract);
 
-    deploy_signed_contract(client, contract).await
+    deploy_signed_contract(client, contract).await?;
+    Ok(())
 }

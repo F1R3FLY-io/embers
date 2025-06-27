@@ -2,7 +2,7 @@ use poem_openapi::Object;
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents::models;
-use crate::common::api::dtos::PreparedContract;
+use crate::common::api::dtos::{PreparedContract, SignedContract};
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::Agents))]
@@ -65,6 +65,27 @@ impl From<models::CreateTestwalletResp> for CreateTestwalletResp {
             key: value.key.display_secret().to_string(),
         }
     }
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(into(models::DeployTestReq))]
+pub struct DeployTestReq {
+    pub env: Option<String>,
+    pub test: String,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::DeployTestResp))]
+pub struct DeployTestResp {
+    pub env_contract: Option<PreparedContract>,
+    pub test_contract: PreparedContract,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(into(models::DeploySignedTestReq))]
+pub struct DeploySignedTestReq {
+    pub env: Option<SignedContract>,
+    pub test: SignedContract,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]

@@ -8,6 +8,7 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use firefly_client::helpers::FromExpr;
+use firefly_client::models::BlockId;
 use firefly_client::models::rhoapi::expr::ExprInstance;
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
@@ -53,7 +54,7 @@ enum Commands {
     Download {
         /// Block hash
         #[arg(long)]
-        hash: String,
+        hash: BlockId,
     },
 
     /// Initialize contract
@@ -84,11 +85,7 @@ async fn main() -> anyhow::Result<()> {
                 let sql = run_pg_dump(&db_url)?;
 
                 let rho_code = rho_sql_dump_template(channel_name, sql);
-                let hash = client
-                    .deploy(&args.wallet_key, rho_code)
-                    .await?
-                    .propose()
-                    .await?;
+                let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
                 println!("dump hash: {hash}");
 
                 let rho_code = rho_save_hash_template(
@@ -98,11 +95,7 @@ async fn main() -> anyhow::Result<()> {
                         channel_name,
                     },
                 );
-                let hash = client
-                    .deploy(&args.wallet_key, rho_code)
-                    .await?
-                    .propose()
-                    .await?;
+                let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
                 println!("save hash: {hash}");
             }
         }
@@ -124,11 +117,7 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Init => {
             let rho_code = rho_save_hash_contract(&args.service_id);
-            let hash = client
-                .deploy(&args.wallet_key, rho_code)
-                .await?
-                .propose()
-                .await?;
+            let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
             println!("{hash}");
         }
     }
@@ -163,7 +152,7 @@ fn rho_save_hash_contract(service_id: &str) -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServiceHash {
-    block_hash: String,
+    block_hash: BlockId,
     channel_name: Uuid,
 }
 
@@ -178,7 +167,7 @@ impl FromExpr for ServiceHash {
         let channel_name: Uuid = channel_name.parse()?;
 
         Ok(Self {
-            block_hash,
+            block_hash: block_hash.into(),
             channel_name,
         })
     }
