@@ -63,3 +63,29 @@ jobs:
 
       - name: Run tests
         run: cargo make test
+
+  lint-python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install python
+        uses: actions/setup-python@v5
+        with:
+          python-version: 3.13
+
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install dependencies
+        working-directory: ./packages/server/tests
+        run: poetry install
+
+      - name: Format tests
+        working-directory: ./packages/server/tests
+        run: poetry run ruff format --check
+
+      - name: Lint tests
+        working-directory: ./packages/server/tests
+        run: poetry run ruff check
