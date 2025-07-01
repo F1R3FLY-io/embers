@@ -1,0 +1,105 @@
+import json
+from dataclasses import dataclass
+from functools import cached_property
+from hashlib import blake2b
+from typing import Any
+
+import base58
+import requests
+from Crypto.Hash import keccak
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec, utils
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+FIRECAP_ID = bytes([0, 0, 0])
+FIRECAP_VERSION = bytes([0])
+
+
+@dataclass
+class Wallet:
+    private_key: ec.EllipticCurvePrivateKey
+
+    @cached_property
+    def public_key(self) -> ec.EllipticCurvePublicKey:
+        return self.private_key.public_key()
+
+    @cached_property
+    def public_key_bytes(self) -> bytes:
+        return self.public_key.public_bytes(encoding=Encoding.X962, format=PublicFormat.UncompressedPoint)
+
+    @cached_property
+    def address(self) -> str:
+        key_hash = keccak.new(digest_bits=256).update(self.public_key_bytes[1:]).digest()
+        eth_hash = keccak.new(digest_bits=256).update(key_hash[-20:]).digest()
+
+        checksum_hash = blake2b(FIRECAP_ID + FIRECAP_VERSION + eth_hash, digest_size=32).digest()
+        checksum = checksum_hash[:4]
+
+        return base58.b58encode(FIRECAP_ID + FIRECAP_VERSION + eth_hash + checksum).decode()
+
+    def sign(self, contract: bytes) -> bytes:
+        prehashed = blake2b(contract, digest_size=32).digest()
+        return self.private_key.sign(prehashed, ec.ECDSA(utils.Prehashed(hashes.BLAKE2s(digest_size=32))))
+
+
+@dataclass
+class Responce:
+    status: int
+    body: str
+
+    def __init__(self, r: requests.Response):
+        self.status = r.status_code
+        self.body = r.text
+
+    @cached_property
+    def json(self) -> Any:
+        return json.loads(self.body)
+
+
+class HttpClient:
+    def __init__(self, base_url: str):
+        self._base_url = base_url
+
+    def get(self, url: str) -> Responce:
+        url = self._base_url + url
+        r = requests.get(url, timeout=10)
+        return Responce(r)
+
+    def post(self, url: str, json: Any | None = None) -> Responce:
+        url = self._base_url + url
+        r = requests.post(url, json=json, timeout=10)
+        return Responce(r)
+
+
+class WalletsApi:
+    def __init__(self, client: HttpClient):
+        self._client = client
+
+    def get_wallet_state_and_history(self, address: str) -> Responce:
+        return self._client.get(f"/wallets/{address}/state")
+
+    def transfer(self, from_wallet: Wallet, to_wallet: Wallet, amount: int, description: str | None = None) -> Responce:
+        resp = self._client.post(
+            "/wallets/transfer/prepare",
+            json={"from": from_wallet.address, "to": to_wallet.address, "amount": amount, "description": description},
+        )
+        assert resp.status == 200
+
+        contract = bytes(resp.json["contract"])
+        signature = from_wallet.sign(contract)
+
+        return self._client.post(
+            "/wallets/transfer/send",
+            json={
+                "contract": resp.json["contract"],
+                "sig_algorithm": "secp256k1",
+                "sig": list(signature),
+                "deployer": list(from_wallet.public_key_bytes),
+            },
+        )
+
+
+class ApiClient:
+    def __init__(self, backend_url: str):
+        self._http_client = HttpClient(backend_url)
+        self.wallets = WalletsApi(self._http_client)
