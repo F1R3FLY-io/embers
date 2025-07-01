@@ -4,9 +4,9 @@ use firefly_client::{ReadNodeClient, WriteNodeClient};
 
 use crate::ai_agents::handlers::get_agent;
 use crate::ai_agents::models::DeployAgentResp;
+use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
-use crate::wallets::models::WalletAddress;
 
 #[tracing::instrument(
     level = "info",
@@ -47,5 +47,6 @@ pub async fn deploy_signed_deploy_agent(
 ) -> anyhow::Result<()> {
     record_trace!(contract);
 
-    deploy_signed_contract(client, contract).await
+    deploy_signed_contract(client, contract).await?;
+    Ok(())
 }

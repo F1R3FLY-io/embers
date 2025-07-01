@@ -8,10 +8,11 @@ version = "0.1.0"
 anyhow       = { version = "1.0" }
 askama       = { version = "0.14" }
 async-stream = { version = "0.3" }
+backon       = { version = "1.5" }
 base64       = { version = "0.22" }
 blake2       = { version = "0.10" }
 chrono       = { version = "0.4" }
-derive_more  = { version = "2.0", features = ["debug"] }
+derive_more  = { version = "2.0", features = ["full"] }
 futures      = { version = "0.3" }
 hex          = { version = "0.4" }
 prost        = { version = "0.13" }

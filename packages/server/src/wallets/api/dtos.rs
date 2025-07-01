@@ -6,12 +6,12 @@ use structural_convert::StructuralConvert;
 use thiserror::Error;
 
 use crate::common::api::dtos::Stringified;
-use crate::wallets::models;
-use crate::wallets::models::{DescriptionError, ParseWalletAddressError};
+use crate::common::models::ParseWalletAddressError;
+use crate::wallets::models::{self, DescriptionError, PositiveNonZeroParsingError};
 
-#[derive(Debug, Clone, Eq, PartialEq, Enum, StructuralConvert)]
-#[oai(rename_all = "lowercase")]
+#[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
 #[convert(from(models::Direction))]
+#[oai(rename_all = "lowercase")]
 pub enum Direction {
     Incoming,
     Outgoing,
@@ -32,9 +32,9 @@ pub struct Boost {
 #[convert(from(models::Exchange))]
 pub struct Exchange {}
 
-#[derive(Debug, Clone, Eq, PartialEq, Enum, StructuralConvert)]
-#[oai(rename_all = "lowercase")]
+#[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
 #[convert(from(models::RequestStatus))]
+#[oai(rename_all = "lowercase")]
 pub enum RequestStatus {
     Done,
     Ongoing,
@@ -75,14 +75,14 @@ pub struct WalletStateAndHistory {
 pub struct PrepareTransferInput {
     from: String,
     to: String,
-    amount: Stringified<u64>,
+    amount: Stringified<i64>,
     description: Option<String>,
 }
 
 #[derive(Debug, Clone, Error)]
 pub enum TransferValidationError {
-    #[error("amount field can't be empty")]
-    EmptyAmount,
+    #[error("description format error: {0}")]
+    AmountError(#[from] PositiveNonZeroParsingError),
     #[error("receiver wallet adress has wrong format: {0}")]
     WrongReceiverAddressFormat(ParseWalletAddressError),
     #[error("sender wallet adress has wrong format: {0}")]
@@ -111,11 +111,7 @@ impl TryFrom<PrepareTransferInput> for models::PrepareTransferInput {
             .try_into()
             .map_err(Self::Error::WrongSenderAddressFormat)?;
 
-        let amount = value
-            .amount
-            .0
-            .try_into()
-            .map_err(|_| Self::Error::EmptyAmount)?;
+        let amount = value.amount.0.try_into()?;
         let description = value.description.map(TryFrom::try_from).transpose()?;
 
         Ok(Self {
