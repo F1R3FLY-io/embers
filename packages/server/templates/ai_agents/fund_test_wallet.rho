@@ -2,6 +2,7 @@ new rl(`rho:registry:lookup`),
     deployerId(`rho:rchain:deployerId`),
     revVaultCh,
     eitherCh,
+    debug(`rho:io:stdout`),
     okOrAbort,
     vaultCh,
     vaultToCh,
@@ -13,12 +14,8 @@ in {
     rl!(`rho:lang:either`, *eitherCh) |
 
     contract okOrAbort(eitherCh, @log) = {
-        new debug(`rho:io:stdout`) in {
-            for(@either <- eitherCh) {
-                match either {
-                    (false, err) => debug!([log, err]),
-                }
-            }
+        for(@(false, err) <- eitherCh) {
+            debug!([log, err])
         }
     } |
 

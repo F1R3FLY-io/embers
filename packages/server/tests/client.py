@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
 from functools import cached_property
@@ -13,33 +15,6 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 FIRECAP_ID = bytes([0, 0, 0])
 FIRECAP_VERSION = bytes([0])
-
-
-@dataclass
-class Wallet:
-    private_key: ec.EllipticCurvePrivateKey
-
-    @cached_property
-    def public_key(self) -> ec.EllipticCurvePublicKey:
-        return self.private_key.public_key()
-
-    @cached_property
-    def public_key_bytes(self) -> bytes:
-        return self.public_key.public_bytes(encoding=Encoding.X962, format=PublicFormat.UncompressedPoint)
-
-    @cached_property
-    def address(self) -> str:
-        key_hash = keccak.new(digest_bits=256).update(self.public_key_bytes[1:]).digest()
-        eth_hash = keccak.new(digest_bits=256).update(key_hash[-20:]).digest()
-
-        checksum_hash = blake2b(FIRECAP_ID + FIRECAP_VERSION + eth_hash, digest_size=32).digest()
-        checksum = checksum_hash[:4]
-
-        return base58.b58encode(FIRECAP_ID + FIRECAP_VERSION + eth_hash + checksum).decode()
-
-    def sign(self, contract: bytes) -> bytes:
-        prehashed = blake2b(contract, digest_size=32).digest()
-        return self.private_key.sign(prehashed, ec.ECDSA(utils.Prehashed(hashes.BLAKE2s(digest_size=32))))
 
 
 @dataclass
@@ -71,6 +46,33 @@ class HttpClient:
         return Responce(r)
 
 
+@dataclass
+class Wallet:
+    private_key: ec.EllipticCurvePrivateKey
+
+    @cached_property
+    def public_key(self) -> ec.EllipticCurvePublicKey:
+        return self.private_key.public_key()
+
+    @cached_property
+    def public_key_bytes(self) -> bytes:
+        return self.public_key.public_bytes(encoding=Encoding.X962, format=PublicFormat.UncompressedPoint)
+
+    @cached_property
+    def address(self) -> str:
+        key_hash = keccak.new(digest_bits=256).update(self.public_key_bytes[1:]).digest()
+        eth_hash = keccak.new(digest_bits=256).update(key_hash[-20:]).digest()
+
+        checksum_hash = blake2b(FIRECAP_ID + FIRECAP_VERSION + eth_hash, digest_size=32).digest()
+        checksum = checksum_hash[:4]
+
+        return base58.b58encode(FIRECAP_ID + FIRECAP_VERSION + eth_hash + checksum).decode()
+
+    def sign(self, contract: bytes) -> bytes:
+        prehashed = blake2b(contract, digest_size=32).digest()
+        return self.private_key.sign(prehashed, ec.ECDSA(utils.Prehashed(hashes.BLAKE2s(digest_size=32))))
+
+
 class WalletsApi:
     def __init__(self, client: HttpClient):
         self._client = client
@@ -85,21 +87,81 @@ class WalletsApi:
         )
         assert resp.status == 200
 
-        contract = bytes(resp.json["contract"])
-        signature = from_wallet.sign(contract)
+        resp_next = self._client.post("/wallets/transfer/send", json=sing_contract(from_wallet, resp.json["contract"]))
+        assert resp_next.status == 200
 
-        return self._client.post(
-            "/wallets/transfer/send",
-            json={
-                "contract": resp.json["contract"],
-                "sig_algorithm": "secp256k1",
-                "sig": list(signature),
-                "deployer": list(from_wallet.public_key_bytes),
-            },
+        return resp
+
+
+@dataclass
+class Agent:
+    id: str
+    version: str
+    name: str
+    shard: str | None = None
+    code: str | None = None
+
+
+class AiAgentsApi:
+    def __init__(self, client: HttpClient):
+        self._client = client
+
+    def list(self, address: str) -> Responce:
+        return self._client.get(f"/ai-agents/{address}")
+
+    def list_versions(self, address: str, agent_id: str) -> Responce:
+        return self._client.get(f"/ai-agents/{address}/{agent_id}/versions")
+
+    def get(self, address: str, agent_id: str, agent_version: str) -> Responce:
+        return self._client.get(f"/ai-agents/{address}/{agent_id}/{agent_version}")
+
+    def create(self, wallet: Wallet, name: str, shard: str | None = None, code: str | None = None) -> Responce:
+        resp = self._client.post("/ai-agents/create/prepare", json={"name": name, "shard": shard, "code": code})
+        assert resp.status == 200
+
+        resp_next = self._client.post("/ai-agents/create/send", json=sing_contract(wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return resp
+
+    def save(
+        self,
+        wallet: Wallet,
+        agent_id: str,
+        name: str,
+        shard: str | None = None,
+        code: str | None = None,
+    ) -> Responce:
+        resp = self._client.post(
+            f"/ai-agents/{agent_id}/save/prepare",
+            json={"name": name, "shard": shard, "code": code},
         )
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/ai-agents/{agent_id}/save/send",
+            json=sing_contract(wallet, resp.json["contract"]),
+        )
+        assert resp_next.status == 200
+
+        return resp
+
+    def test_wallet(self) -> Responce:
+        return self._client.post("/ai-agents/test/wallet")
 
 
 class ApiClient:
     def __init__(self, backend_url: str):
         self._http_client = HttpClient(backend_url)
         self.wallets = WalletsApi(self._http_client)
+        self.ai_agents = AiAgentsApi(self._http_client)
+
+
+def sing_contract(wallet: Wallet, contract: Any) -> dict:
+    signature = wallet.sign(bytes(contract))
+    return {
+        "contract": contract,
+        "sig_algorithm": "secp256k1",
+        "sig": list(signature),
+        "deployer": list(wallet.public_key_bytes),
+    }

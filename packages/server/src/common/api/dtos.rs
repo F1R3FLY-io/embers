@@ -13,7 +13,7 @@ use poem_openapi::types::{
     ToJSON,
     Type,
 };
-use poem_openapi::{ApiResponse, Object, Tags};
+use poem_openapi::{ApiResponse, NewType, Object, Tags};
 use structural_convert::StructuralConvert;
 
 use crate::common::models;
@@ -236,12 +236,11 @@ where
     }
 }
 
-#[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
+#[derive(derive_more::Debug, Clone, NewType, StructuralConvert)]
+#[oai(to_header = false)]
 #[convert(from(models::PreparedContract))]
-pub struct PreparedContract {
-    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
-    pub contract: Vec<u8>,
-}
+#[debug("\"{}...\"", hex::encode(&_0[..32]))]
+pub struct PreparedContract(pub Vec<u8>);
 
 #[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
 #[convert(into(firefly_client::models::SignedCode))]

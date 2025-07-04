@@ -98,7 +98,7 @@ impl AIAgents {
             .map_err(Into::into)
     }
 
-    #[oai(path = "/test/account", method = "post")]
+    #[oai(path = "/test/wallet", method = "post")]
     async fn create_test_wallet(
         &self,
         Data(test_client): Data<&TestNet<WriteNodeClient>>,

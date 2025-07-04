@@ -3,6 +3,8 @@ new rl(`rho:registry:lookup`),
     getValueOr,
     revVaultCh,
     eitherCh,
+    stackCh,
+    debug(`rho:io:stdout`),
     okOrAbort,
     doTransfer,
     updateTransferHistory,
@@ -10,19 +12,18 @@ new rl(`rho:registry:lookup`),
     getBalance
 in {
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-
     for(treeHashMap <- treeHashMapCh) {
         treeHashMap!("init", 3, *treeHashMapCh) |
 
-        for(map <- treeHashMapCh) {
-            treeHashMapCh!(*treeHashMap, *map)
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
         }
     } |
 
     contract getValueOr(@address, valueCh, nilCh) = {
         new retCh in {
-            for(treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("get", *map, address, *retCh) |
+            for(treeHashMap, @map <<- treeHashMapCh) {
+                treeHashMap!("get", map, address, *retCh) |
 
                 for(@value <- retCh) {
                     match value {
@@ -35,24 +36,25 @@ in {
     } |
 
     rl!(`rho:rchain:revVault`, *revVaultCh) |
-
     for(@(_, revVault) <- revVaultCh) {
         revVaultCh!(revVault)
     } |
 
     rl!(`rho:lang:either`, *eitherCh) |
-
     for(@(_, either) <- eitherCh) {
         eitherCh!(either)
     } |
 
-    contract okOrAbort(eitherCh, f, @log, return) = {
-        new debug(`rho:io:stdout`) in {
-            for(@either <- eitherCh) {
-                match either {
-                    (true, v) => f!(v, *return)
-                    (false, err) => debug!([log, err])
-                }
+    rl!(`rho:lang:stack`, *stackCh) |
+    for(@(_, stack) <- stackCh) {
+        stackCh!(stack)
+    } |
+
+    contract okOrAbort(eitherCh, f, @log) = {
+        for(@either <- eitherCh) {
+            match either {
+                (true, v) => f!(v)
+                (false, err) => debug!([log, err])
             }
         }
     } |
@@ -79,46 +81,48 @@ in {
         new valueCh, nilCh, done in {
             getValueOr!(walletOwner, *valueCh, *nilCh) |
 
-            for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("set", *map, walletOwner,
-                    [{
-                        "id": id,
-                        "timestamp": timestamp,
-                        "from": walletAddressFrom,
-                        "to": walletAddressTo,
-                        "amount": amount,
-                        "description": description
-                    }],
-                    *done)
+            for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                new userHistoryCh in {
+                    stack!("init", *userHistoryCh) |
+
+                    for(@history <- userHistoryCh) {
+                        stack!("push", history, {
+                            "id": id,
+                            "timestamp": timestamp,
+                            "from": walletAddressFrom,
+                            "to": walletAddressTo,
+                            "amount": amount,
+                            "description": description,
+                        }, *done) |
+                        treeHashMap!("set", map, walletOwner, history, *done)
+                    }
+                }
             } |
 
-            for(@transactionsHistory <- valueCh; treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("set", *map, walletOwner,
-                    transactionsHistory ++ [{
-                        "id": id,
-                        "timestamp": timestamp,
-                        "from": walletAddressFrom,
-                        "to": walletAddressTo,
-                        "amount": amount,
-                        "description": description
-                    }],
-                    *done)
+            for(@history <- valueCh; stack <<- stackCh) {
+                stack!("push", history, {
+                    "id": id,
+                    "timestamp": timestamp,
+                    "from": walletAddressFrom,
+                    "to": walletAddressTo,
+                    "amount": amount,
+                    "description": description,
+                }, *done)
             }
         }
     } |
 
     contract @"sendTransfer"(@deployerId, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
-        new transferResultCh, updateHistory, done in {
+        new transferResultCh, updateHistory in {
             for(either <<- eitherCh) {
                 doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *transferResultCh) |
 
-                for(@v, return <- updateHistory) {
+                for(_ <- updateHistory) {
                     updateTransferHistory!(walletAddressFrom, id, timestamp, walletAddressFrom, walletAddressTo, amount, description) |
-                    updateTransferHistory!(walletAddressTo  , id, timestamp, walletAddressFrom, walletAddressTo, amount, description) |
-                    return!(v)
+                    updateTransferHistory!(walletAddressTo  , id, timestamp, walletAddressFrom, walletAddressTo, amount, description)
                 } |
 
-                okOrAbort!(*transferResultCh, *updateHistory, "transfer failed", *done)
+                okOrAbort!(*transferResultCh, *updateHistory, "transfer failed")
             }
         }
     } |
@@ -131,8 +135,14 @@ in {
                 ret!([])
             } |
 
-            for(@transactionsHistory <- valueCh) {
-                ret!(transactionsHistory)
+            for(@history <- valueCh; stack <<- stackCh) {
+                new listCh in {
+                    stack!("toList", history, *listCh) |
+
+                    for(@transactionsHistory <- listCh) {
+                        ret!(transactionsHistory)
+                    }
+                }
             }
         }
     } |
