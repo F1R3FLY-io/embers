@@ -3,15 +3,15 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
 
     for(treeHashMap <- treeHashMapCh) {
         treeHashMap!("init", 3, *treeHashMapCh) |
-        for(map <- treeHashMapCh) {
-            treeHashMapCh!(*treeHashMap, *map)
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
         }
     } |
 
     contract getValueOr(@address, valueCh, nilCh) = {
         new retCh in {
-            for(treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("get", *map, address, *retCh) |
+            for(treeHashMap, @map <<- treeHashMapCh) {
+                treeHashMap!("get", map, address, *retCh) |
 
                 for(@value <- retCh) {
                     match value {
@@ -34,9 +34,9 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
             for(@address <- deployerAddressCh) {
-                for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                for(@agents <- valueCh; treeHashMap, @map <<- treeHashMapCh) {
                     match agents.get(id) {
-                        Nil => treeHashMap!("set", *map, address,
+                        Nil => treeHashMap!("set", map, address,
                                     agents.set(id,
                                         {
                                             version: {
@@ -56,8 +56,8 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
                     }
                 } |
 
-                for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
-                    treeHashMap!("set", *map, address,
+                for(<- nilCh; treeHashMap, @map <<- treeHashMapCh) {
+                    treeHashMap!("set", map, address,
                         {
                             id: {
                                 version: {
@@ -151,10 +151,10 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
             for(@address <- deployerAddressCh) {
-                for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
+                for(@agents <- valueCh; treeHashMap, @map <<- treeHashMapCh) {
                     match agents.get(id) {
                         Nil => errCh!()
-                        versions => treeHashMap!("set", *map, address,
+                        versions => treeHashMap!("set", map, address,
                                         agents.set(id,
                                             versions.union({
                                                 version: {

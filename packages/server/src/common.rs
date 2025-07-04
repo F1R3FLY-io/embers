@@ -30,5 +30,5 @@ pub fn prepare_for_signing(code: String) -> PreparedContract {
     }
     .encode_to_vec();
 
-    PreparedContract { contract }
+    PreparedContract(contract)
 }

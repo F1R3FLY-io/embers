@@ -6,9 +6,9 @@ use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
 use super::handlers::{deploy_signed_transfer, prepare_transfer_contract};
-use crate::common::api::dtos::{ApiTags, ParseFromString, PreparedContract, SignedContract};
+use crate::common::api::dtos::{ApiTags, ParseFromString, SignedContract};
 use crate::common::models::WalletAddress;
-use crate::wallets::api::dtos::{PrepareTransferInput, WalletStateAndHistory};
+use crate::wallets::api::dtos::{TransferReq, TransferResp, WalletStateAndHistory};
 use crate::wallets::handlers::get_wallet_state_and_history;
 
 mod dtos;
@@ -35,12 +35,14 @@ impl WalletsApi {
     #[oai(path = "/transfer/prepare", method = "post")]
     async fn prepare_transfer(
         &self,
-        Json(input): Json<PrepareTransferInput>,
-    ) -> poem::Result<Json<PreparedContract>> {
+        Json(input): Json<TransferReq>,
+    ) -> poem::Result<Json<TransferResp>> {
         let input = input.try_into()?;
         let result = prepare_transfer_contract(input)?;
 
-        Ok(Json(result.into()))
+        Ok(Json(TransferResp {
+            contract: result.into(),
+        }))
     }
 
     #[oai(path = "/transfer/send", method = "post")]

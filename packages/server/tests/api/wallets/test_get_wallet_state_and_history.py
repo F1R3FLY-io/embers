@@ -4,7 +4,7 @@ from tests.client import ApiClient
 from tests.conftest import Wallet, assert_match_transfer
 
 
-def test_get_empty_wallet_state_and_history(client: ApiClient, wallet: Wallet):
+def test_get_wallet_state_and_history__empty_wallet(client: ApiClient, wallet: Wallet):
     resp = client.wallets.get_wallet_state_and_history(wallet.address)
 
     assert resp.status == 200
@@ -15,8 +15,8 @@ def test_get_empty_wallet_state_and_history(client: ApiClient, wallet: Wallet):
     assert resp.json["transfers"] == []
 
 
-@pytest.mark.parametrize("funded_wallet", [10000], indirect=True)
-def test_get_funded_wallet_state_and_history(client: ApiClient, funded_wallet: Wallet):
+@pytest.mark.parametrize("funded_wallet", [10_000], indirect=True)
+def test_get_wallet_state_and_history__funded_wallet(client: ApiClient, funded_wallet: Wallet):
     resp = client.wallets.get_wallet_state_and_history(funded_wallet.address)
 
     assert resp.status == 200

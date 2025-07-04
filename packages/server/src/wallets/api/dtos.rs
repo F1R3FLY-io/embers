@@ -5,7 +5,7 @@ use poem_openapi::{Enum, Object};
 use structural_convert::StructuralConvert;
 use thiserror::Error;
 
-use crate::common::api::dtos::Stringified;
+use crate::common::api::dtos::{PreparedContract, Stringified};
 use crate::common::models::ParseWalletAddressError;
 use crate::wallets::models::{self, DescriptionError, PositiveNonZeroParsingError};
 
@@ -72,11 +72,16 @@ pub struct WalletStateAndHistory {
 }
 
 #[derive(Debug, Clone, Object)]
-pub struct PrepareTransferInput {
+pub struct TransferReq {
     from: String,
     to: String,
     amount: Stringified<i64>,
     description: Option<String>,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct TransferResp {
+    pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -97,10 +102,10 @@ impl ResponseError for TransferValidationError {
     }
 }
 
-impl TryFrom<PrepareTransferInput> for models::PrepareTransferInput {
+impl TryFrom<TransferReq> for models::PrepareTransferInput {
     type Error = TransferValidationError;
 
-    fn try_from(value: PrepareTransferInput) -> Result<Self, Self::Error> {
+    fn try_from(value: TransferReq) -> Result<Self, Self::Error> {
         let to = value
             .to
             .try_into()
