@@ -1,5 +1,6 @@
 new rl(`rho:registry:lookup`),
     revAddress(`rho:rev:address`),
+    devNull(`rho:io:devNull`),
     treeHashMapCh,
     listOpsCh,
     stackCh,
@@ -67,14 +68,14 @@ in {
     } |
 
     contract @"createAiAgent"(@deployerId, @id, @version, @name, @shard, @code) = {
-        new deployerAddressCh, valueCh, nilCh, errCh, done in {
+        new deployerAddressCh, valueCh, nilCh, errCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
             for(@address <- deployerAddressCh) {
                 for(@(agents, agentsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
                     new insertAgentCh, agentVersionsCh, agentVersionsIndexCh in {
                         for(<- insertAgentCh) {
-                            stack!("push", agentsIndex, id, *done) |
+                            stack!("push", agentsIndex, id, *devNull) |
 
                             treeHashMap!("init", 3, *agentVersionsCh) |
                             stack!("init", *agentVersionsIndexCh) |
@@ -83,14 +84,14 @@ in {
                                 @agentVersions <- agentVersionsCh &
                                 @agentVersionsIndex <- agentVersionsIndexCh
                             ) {
-                                treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *done) |
+                                treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *devNull) |
 
                                 treeHashMap!("set", agentVersions, version,
                                     {
                                         "name": name,
                                         "shard": shard,
                                         "code": code,
-                                    }, *done) |
+                                    }, *devNull) |
 
                                 treeHashMap!("set", agentVersions, "latest",
                                     {
@@ -98,9 +99,9 @@ in {
                                         "name": name,
                                         "shard": shard,
                                         "code": code,
-                                    }, *done) |
+                                    }, *devNull) |
 
-                                stack!("push", agentVersionsIndex, version, *done)
+                                stack!("push", agentVersionsIndex, version, *devNull)
                             }
                         } |
 
@@ -122,17 +123,17 @@ in {
                             @agentVersions <- agentVersionsCh &
                             @agentVersionsIndex <- agentVersionsIndexCh
                         ) {
-                            treeHashMap!("set", map, address, (agents, agentsIndex), *done) |
+                            treeHashMap!("set", map, address, (agents, agentsIndex), *devNull) |
 
-                            treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *done) |
-                            stack!("push", agentsIndex, id, *done) |
+                            treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *devNull) |
+                            stack!("push", agentsIndex, id, *devNull) |
 
                             treeHashMap!("set", agentVersions, version,
                                 {
                                     "name": name,
                                     "shard": shard,
                                     "code": code,
-                                }, *done) |
+                                }, *devNull) |
 
                             treeHashMap!("set", agentVersions, "latest",
                                 {
@@ -140,9 +141,9 @@ in {
                                     "name": name,
                                     "shard": shard,
                                     "code": code,
-                                }, *done) |
+                                }, *devNull) |
 
-                            stack!("push", agentVersionsIndex, version, *done)
+                            stack!("push", agentVersionsIndex, version, *devNull)
                         }
                     }
                 } |
@@ -233,20 +234,20 @@ in {
     } |
 
     contract @"saveAiAgent"(@deployerId, @id, @version, @name, @shard, @code) = {
-        new deployerAddressCh, valueCh, errCh, insertAgentVersionCh, done in {
+        new deployerAddressCh, valueCh, errCh, insertAgentVersionCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
             for(@address <- deployerAddressCh) {
                 for(@(agentVersions, agentVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
                     for(<- insertAgentVersionCh) {
-                        stack!("push", agentVersionsIndex, version, *done) |
+                        stack!("push", agentVersionsIndex, version, *devNull) |
 
                         treeHashMap!("set", agentVersions, version,
                             {
                                 "name": name,
                                 "shard": shard,
                                 "code": code,
-                            }, *done) |
+                            }, *devNull) |
 
                         treeHashMap!("set", agentVersions, "latest",
                             {
@@ -254,7 +255,7 @@ in {
                                 "name": name,
                                 "shard": shard,
                                 "code": code,
-                            }, *done)
+                            }, *devNull)
                     } |
 
                     getValueOr!(agentVersions, version, *errCh, *insertAgentVersionCh)
