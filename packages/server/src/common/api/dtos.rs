@@ -3,6 +3,7 @@ use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
+use firefly_client::helpers::ShortHex;
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
@@ -239,13 +240,13 @@ where
 #[derive(derive_more::Debug, Clone, NewType, StructuralConvert)]
 #[oai(to_header = false)]
 #[convert(from(models::PreparedContract))]
-#[debug("\"{}...\"", hex::encode(&_0[..32]))]
+#[debug("{:?}", _0.short_hex(32))]
 pub struct PreparedContract(pub Vec<u8>);
 
 #[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
 #[convert(into(firefly_client::models::SignedCode))]
 pub struct SignedContract {
-    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
+    #[debug("{:?}", contract.short_hex(32))]
     pub contract: Vec<u8>,
     #[debug("{:?}", hex::encode(sig))]
     pub sig: Vec<u8>,

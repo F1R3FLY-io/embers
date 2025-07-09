@@ -56,6 +56,7 @@ services:
     ports:
       - 15401:40401 # deploy service
       - 15402:40402 # propose service
+      - 15403:40403 # rest api
     volumes:
       - ./testnet/ssl:/data/ssl
     command:

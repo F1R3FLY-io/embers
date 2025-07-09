@@ -49,3 +49,10 @@ cd packages/${1}
 cargo make run
 '''
 workspace = false
+
+[tasks.server]
+script = '''
+cd packages/server
+cargo make ${1}
+'''
+workspace = false

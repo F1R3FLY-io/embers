@@ -436,12 +436,6 @@ impl serde::ser::SerializeStructVariant for SerializeStructVariant {
     }
 }
 
-impl askama::Value for RhoValue {
-    fn ref_any(&self) -> Option<&dyn std::any::Any> {
-        Some(self)
-    }
-}
-
 pub mod _dependencies {
     pub use {askama, serde};
 }

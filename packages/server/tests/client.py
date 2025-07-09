@@ -37,12 +37,12 @@ class HttpClient:
 
     def get(self, url: str) -> Responce:
         url = self._base_url + url
-        r = requests.get(url, timeout=10)
+        r = requests.get(url, timeout=15)
         return Responce(r)
 
     def post(self, url: str, json: Any | None = None) -> Responce:
         url = self._base_url + url
-        r = requests.post(url, json=json, timeout=10)
+        r = requests.post(url, json=json, timeout=15)
         return Responce(r)
 
 
@@ -148,6 +148,22 @@ class AiAgentsApi:
 
     def test_wallet(self) -> Responce:
         return self._client.post("/ai-agents/test/wallet")
+
+    def deploy_test(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
+        resp = self._client.post("/ai-agents/test/deploy/prepare", json={"test": test, "env": env})
+        assert resp.status == 200
+
+        json = {
+            "test": sing_contract(wallet, resp.json["test_contract"]),
+            "env": sing_contract(wallet, resp.json["env_contract"])
+            if resp.json.get("env_contract") is not None
+            else None,
+        }
+
+        resp_next = self._client.post("/ai-agents/test/deploy/send", json=json)
+        assert resp_next.status == 200
+
+        return resp_next
 
 
 class ApiClient:

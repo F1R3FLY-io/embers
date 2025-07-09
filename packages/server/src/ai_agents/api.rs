@@ -43,7 +43,7 @@ mod dtos;
 #[derive(Debug, Clone)]
 pub struct AIAgents;
 
-#[allow(unused_variables, clippy::unused_async)]
+#[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/ai-agents", tag = ApiTags::AIAgents)]
 impl AIAgents {
     #[oai(path = "/:address", method = "get")]
