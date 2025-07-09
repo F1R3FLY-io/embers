@@ -23,12 +23,12 @@ pub fn prepare_for_signing(code: String) -> PreparedContract {
         term: code,
         timestamp,
         phlo_price: 1,
-        phlo_limit: 1_000_000,
+        phlo_limit: 500_000,
         valid_after_block_number: 0,
         shard_id: "root".into(),
         ..Default::default()
     }
     .encode_to_vec();
 
-    PreparedContract { contract }
+    PreparedContract(contract)
 }

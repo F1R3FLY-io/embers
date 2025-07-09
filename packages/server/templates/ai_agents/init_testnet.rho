@@ -1,17 +1,28 @@
-new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, log in {
+new
+    rl(`rho:registry:lookup`),
+    treeHashMapCh,
+    stackCh,
+    getValueOr,
+    log
+in {
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-
     for(treeHashMap <- treeHashMapCh) {
         treeHashMap!("init", 3, *treeHashMapCh) |
-        for(map <- treeHashMapCh) {
-            treeHashMapCh!(*treeHashMap, *map)
+
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
         }
+    } |
+
+    rl!(`rho:lang:stack`, *stackCh) |
+    for(@(_, stack) <- stackCh) {
+        stackCh!(stack)
     } |
 
     contract getValueOr(@address, valueCh, nilCh) = {
         new retCh in {
-            for(treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("get", *map, address, *retCh) |
+            for(treeHashMap, @map <<- treeHashMapCh) {
+                treeHashMap!("get", map, address, *retCh) |
 
                 for(@value <- retCh) {
                     match value {
@@ -23,35 +34,54 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, log in {
         }
     } |
 
-    contract log(@level, @deployId, @message) = {
+    contract log(@level, @hex, @message) = {
         new valueCh, nilCh, done in {
-            for(@logs <- valueCh; treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("set", *map, deployId, logs ++ [{"level": level, "message": message}], *done)
+            for(@logs <- valueCh; stack <<- stackCh) {
+                stack!("push", logs, {"level": level, "message": message}, *done)
             } |
 
-            for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("set", *map, deployId, [{"level": level, "message": message}], *done)
+            for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                stack!("init", *done) |
+
+                for(@logs <- done) {
+                    stack!("push", logs, {"level": level, "message": message}, *done) |
+                    treeHashMap!("set", map, hex, logs, *done)
+                }
             } |
 
-            getValueOr!(deployId, *valueCh, *nilCh)
+            getValueOr!(hex, *valueCh, *nilCh)
         }
     } |
 
     contract @"logDebug"(@deployId, @message) = {
-        log!("Debug", deployId, message)
+        match deployId.toByteArray() {
+            hex => log!("Debug", hex.slice(6, hex.length()), message)
+        }
     } |
 
     contract @"logInfo"(@deployId, @message) = {
-        log!("Info", deployId, message)
+        match deployId.toByteArray() {
+            hex => log!("Info", hex.slice(6, hex.length()), message)
+        }
     } |
 
     contract @"logError"(@deployId, @message) = {
-        log!("Error", deployId, message)
+        match deployId.toByteArray() {
+            hex => log!("Error", hex.slice(6, hex.length()), message)
+        }
     } |
 
     contract @"getLogs"(@deployId, ret) = {
-        for(treeHashMap, map <<- treeHashMapCh) {
-            treeHashMap!("get", *map, deployId, *ret)
+        new valueCh, nilCh in {
+            for(@logs <- valueCh; stack <<- stackCh) {
+                stack!("toList", logs, *ret)
+            } |
+
+            for(<- nilCh) {
+                ret!(Nil)
+            } |
+
+            getValueOr!(deployId.hexToBytes(), *valueCh, *nilCh)
         }
     }
 }

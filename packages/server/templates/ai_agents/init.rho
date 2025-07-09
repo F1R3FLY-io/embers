@@ -1,17 +1,34 @@
-new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
+new rl(`rho:registry:lookup`),
+    revAddress(`rho:rev:address`),
+    treeHashMapCh,
+    listOpsCh,
+    stackCh,
+    getValueOr,
+    visit
+in {
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-
     for(treeHashMap <- treeHashMapCh) {
         treeHashMap!("init", 3, *treeHashMapCh) |
-        for(map <- treeHashMapCh) {
-            treeHashMapCh!(*treeHashMap, *map)
+
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
         }
     } |
 
-    contract getValueOr(@address, valueCh, nilCh) = {
+    rl!(`rho:lang:listOps`, *listOpsCh) |
+    for(@(_, listOps) <- listOpsCh) {
+        listOpsCh!(listOps)
+    } |
+
+    rl!(`rho:lang:stack`, *stackCh) |
+    for(@(_, stack) <- stackCh) {
+        stackCh!(stack)
+    } |
+
+    contract getValueOr(@map, @address, valueCh, nilCh) = {
         new retCh in {
-            for(treeHashMap, map <<- treeHashMapCh) {
-                treeHashMap!("get", *map, address, *retCh) |
+            for(treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("get", map, address, *retCh) |
 
                 for(@value <- retCh) {
                     match value {
@@ -23,76 +40,145 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
         }
     } |
 
-    rl!(`rho:lang:listOps`, *listOpsCh) |
+    contract visit(@"agents", @deployerId, f, notFound) = {
+        for(_, @map <<- treeHashMapCh) {
+            getValueOr!(map, deployerId, *f, *notFound)
+        }
+    } |
 
-    for(@(_, listOps) <- listOpsCh) {
-        listOpsCh!(listOps)
+    contract visit(@"agentVersions", @deployerId, @id, f, notFound) = {
+        new foundCh in {
+            visit!("agents", deployerId, *foundCh, *notFound) |
+
+            for(@(agents, _) <- foundCh) {
+                getValueOr!(agents, id, *f, *notFound)
+            }
+        }
+    } |
+
+    contract visit(@"agentVersion", @deployerId, @id, @version, f, notFound) = {
+        new foundCh in {
+            visit!("agentVersions", deployerId, id, *foundCh, *notFound) |
+
+            for(@(agentVersions, _) <- foundCh) {
+                getValueOr!(agentVersions, version, *f, *notFound)
+            }
+        }
     } |
 
     contract @"createAiAgent"(@deployerId, @id, @version, @name, @shard, @code) = {
-        new revAddress(`rho:rev:address`), deployerAddressCh, valueCh, nilCh, errCh, done in {
+        new deployerAddressCh, valueCh, nilCh, errCh, done in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
             for(@address <- deployerAddressCh) {
-                for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
-                    match agents.get(id) {
-                        Nil => treeHashMap!("set", *map, address,
-                                    agents.set(id,
-                                        {
-                                            version: {
-                                                "name": name,
-                                                "shard": shard,
-                                                "code": code,
-                                            },
-                                            "latest": {
-                                                "version": version,
-                                                "name": name,
-                                                "shard": shard,
-                                                "code": code,
-                                            }
-                                        }
-                                    ), *done)
-                        versions => errCh!()
+                for(@(agents, agentsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
+                    new insertAgentCh, agentVersionsCh, agentVersionsIndexCh in {
+                        for(<- insertAgentCh) {
+                            stack!("push", agentsIndex, id, *done) |
+
+                            treeHashMap!("init", 3, *agentVersionsCh) |
+                            stack!("init", *agentVersionsIndexCh) |
+
+                            for(
+                                @agentVersions <- agentVersionsCh &
+                                @agentVersionsIndex <- agentVersionsIndexCh
+                            ) {
+                                treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *done) |
+
+                                treeHashMap!("set", agentVersions, version,
+                                    {
+                                        "name": name,
+                                        "shard": shard,
+                                        "code": code,
+                                    }, *done) |
+
+                                treeHashMap!("set", agentVersions, "latest",
+                                    {
+                                        "version": version,
+                                        "name": name,
+                                        "shard": shard,
+                                        "code": code,
+                                    }, *done) |
+
+                                stack!("push", agentVersionsIndex, version, *done)
+                            }
+                        } |
+
+                        getValueOr!(agents, id, *errCh, *insertAgentCh)
                     }
                 } |
 
-                for(<- nilCh; treeHashMap, map <<- treeHashMapCh) {
-                    treeHashMap!("set", *map, address,
-                        {
-                            id: {
-                                version: {
+                for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                    new agentsCh, agentsIndexCh, agentVersionsCh, agentVersionsIndexCh in {
+                        treeHashMap!("init", 3, *agentsCh) |
+                        stack!("init", *agentsIndexCh) |
+
+                        treeHashMap!("init", 3, *agentVersionsCh) |
+                        stack!("init", *agentVersionsIndexCh) |
+
+                        for(
+                            @agents <- agentsCh &
+                            @agentsIndex <- agentsIndexCh &
+                            @agentVersions <- agentVersionsCh &
+                            @agentVersionsIndex <- agentVersionsIndexCh
+                        ) {
+                            treeHashMap!("set", map, address, (agents, agentsIndex), *done) |
+
+                            treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *done) |
+                            stack!("push", agentsIndex, id, *done) |
+
+                            treeHashMap!("set", agentVersions, version,
+                                {
                                     "name": name,
                                     "shard": shard,
                                     "code": code,
-                                },
-                                "latest": {
+                                }, *done) |
+
+                            treeHashMap!("set", agentVersions, "latest",
+                                {
                                     "version": version,
                                     "name": name,
                                     "shard": shard,
                                     "code": code,
-                                }
-                            }
-                        }, *done)
+                                }, *done) |
+
+                            stack!("push", agentVersionsIndex, version, *done)
+                        }
+                    }
                 } |
 
                 for(<- errCh) {
                     Nil
                 } |
 
-                getValueOr!(address, *valueCh, *nilCh)
+                visit!("agents", address, *valueCh, *nilCh)
             }
         }
     } |
 
     contract @"listAiAgents"(@address, ret) = {
-        new valueCh, nilCh, toAgentHeader in {
-            for(@agents <- valueCh) {
-                contract toAgentHeader(@(id, versions), ret) = {
-                    ret!(versions.get("latest").delete("code").set("id", id))
-                } |
+        new valueCh, nilCh in {
+            for(@(agents, agentsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
+                new toAgentHeader, agentsListCh in {
+                    contract toAgentHeader(@id, ret) = {
+                        new agentContextCh, agentLastVersionCh in {
+                            treeHashMap!("get", agents, id, *agentContextCh) |
 
-                for(listOps <<- listOpsCh) {
-                    listOps!("map", agents.toList(), *toAgentHeader, *ret)
+                            for(@(agentVersions, _) <- agentContextCh) {
+                                treeHashMap!("get", agentVersions, "latest", *agentLastVersionCh) |
+
+                                for(@agentLastVersion <- agentLastVersionCh) {
+                                    ret!(agentLastVersion.delete("code").set("id", id))
+                                }
+                            }
+                        }
+                    } |
+
+                    stack!("toList", agentsIndex, *agentsListCh) |
+
+                    for(@agentsList <- agentsListCh) {
+                        listOps!("parMap", agentsList, *toAgentHeader, *ret)
+                    }
                 }
             } |
 
@@ -100,24 +186,27 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
                 ret!([])
             } |
 
-            getValueOr!(address, *valueCh, *nilCh)
+            visit!("agents", address, *valueCh, *nilCh)
         }
     } |
 
     contract @"listAiAgentVersions"(@address, @id, ret) = {
-        new valueCh, nilCh, toAgentHeader in {
-            for(@agents <- valueCh) {
-                match agents.get(id) {
-                    Nil => nilCh!()
-                    versions => {
-                        contract toAgentHeader(@(version, agent), ret) = {
-                            ret!(agent.delete("code").union({"id": id, "version": version}))
-                        } |
+        new valueCh, nilCh, agentVersionsListCh, toAgentHeader in {
+            for(@(agentVersions, agentVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
+                contract toAgentHeader(@version, ret) = {
+                    new versionCh in {
+                        treeHashMap!("get", agentVersions, version, *versionCh) |
 
-                        for(listOps <<- listOpsCh) {
-                            listOps!("map", versions.delete("latest").toList(), *toAgentHeader, *ret)
+                        for(@agentVersion <- versionCh) {
+                            ret!(agentVersion.delete("code").union({"id": id, "version": version}))
                         }
                     }
+                } |
+
+                stack!("toList", agentVersionsIndex, *agentVersionsListCh) |
+
+                for(@agentVersionsList <- agentVersionsListCh) {
+                    listOps!("parMap", agentVersionsList, *toAgentHeader, *ret)
                 }
             } |
 
@@ -125,59 +214,57 @@ new rl(`rho:registry:lookup`), treeHashMapCh, getValueOr, listOpsCh in {
                 ret!(Nil)
             } |
 
-            getValueOr!(address, *valueCh, *nilCh)
+            visit!("agentVersions", address, id, *valueCh, *nilCh)
         }
     } |
 
     contract @"getAiAgent"(@address, @id, @version, ret) = {
         new valueCh, nilCh in {
-            for(@agents <- valueCh) {
-                match agents.getOrElse(id, {}).get(version) {
-                    Nil => nilCh!()
-                    agent => ret!(agent.union({"id": id, "version": version}))
-                }
+            for(@agentVersion <- valueCh) {
+                ret!(agentVersion.union({"id": id, "version": version}))
             } |
 
             for(<- nilCh) {
                 ret!(Nil)
             } |
 
-            getValueOr!(address, *valueCh, *nilCh)
+            visit!("agentVersion", address, id, version, *valueCh, *nilCh)
         }
     } |
 
     contract @"saveAiAgent"(@deployerId, @id, @version, @name, @shard, @code) = {
-        new revAddress(`rho:rev:address`), deployerAddressCh, valueCh, errCh, done in {
+        new deployerAddressCh, valueCh, errCh, insertAgentVersionCh, done in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
             for(@address <- deployerAddressCh) {
-                for(@agents <- valueCh; treeHashMap, map <<- treeHashMapCh) {
-                    match agents.get(id) {
-                        Nil => errCh!()
-                        versions => treeHashMap!("set", *map, address,
-                                        agents.set(id,
-                                            versions.union({
-                                                version: {
-                                                    "name": name,
-                                                    "shard": shard,
-                                                    "code": code,
-                                                },
-                                                "latest": {
-                                                    "version": version,
-                                                    "name": name,
-                                                    "shard": shard,
-                                                    "code": code,
-                                                }
-                                            })
-                                        ), *done)
-                    }
+                for(@(agentVersions, agentVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
+                    for(<- insertAgentVersionCh) {
+                        stack!("push", agentVersionsIndex, version, *done) |
+
+                        treeHashMap!("set", agentVersions, version,
+                            {
+                                "name": name,
+                                "shard": shard,
+                                "code": code,
+                            }, *done) |
+
+                        treeHashMap!("set", agentVersions, "latest",
+                            {
+                                "version": version,
+                                "name": name,
+                                "shard": shard,
+                                "code": code,
+                            }, *done)
+                    } |
+
+                    getValueOr!(agentVersions, version, *errCh, *insertAgentVersionCh)
                 } |
 
                 for(<- errCh) {
                     Nil
                 } |
 
-                getValueOr!(address, *valueCh, *errCh)
+                visit!("agentVersions", address, id, *valueCh, *errCh)
             }
         }
     }

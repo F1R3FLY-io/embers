@@ -3,6 +3,7 @@ use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
+use firefly_client::helpers::ShortHex;
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
@@ -13,7 +14,7 @@ use poem_openapi::types::{
     ToJSON,
     Type,
 };
-use poem_openapi::{ApiResponse, Object, Tags};
+use poem_openapi::{ApiResponse, NewType, Object, Tags};
 use structural_convert::StructuralConvert;
 
 use crate::common::models;
@@ -236,17 +237,16 @@ where
     }
 }
 
-#[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
+#[derive(derive_more::Debug, Clone, NewType, StructuralConvert)]
+#[oai(to_header = false)]
 #[convert(from(models::PreparedContract))]
-pub struct PreparedContract {
-    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
-    pub contract: Vec<u8>,
-}
+#[debug("{:?}", _0.short_hex(32))]
+pub struct PreparedContract(pub Vec<u8>);
 
 #[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
 #[convert(into(firefly_client::models::SignedCode))]
 pub struct SignedContract {
-    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
+    #[debug("{:?}", contract.short_hex(32))]
     pub contract: Vec<u8>,
     #[debug("{:?}", hex::encode(sig))]
     pub sig: Vec<u8>,

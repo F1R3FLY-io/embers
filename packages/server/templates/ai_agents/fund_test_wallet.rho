@@ -2,6 +2,7 @@ new rl(`rho:registry:lookup`),
     deployerId(`rho:rchain:deployerId`),
     revVaultCh,
     eitherCh,
+    debug(`rho:io:stdout`),
     okOrAbort,
     vaultCh,
     vaultToCh,
@@ -13,21 +14,17 @@ in {
     rl!(`rho:lang:either`, *eitherCh) |
 
     contract okOrAbort(eitherCh, @log) = {
-        new debug(`rho:io:stdout`) in {
-            for(@either <- eitherCh) {
-                match either {
-                    (false, err) => debug!([log, err]),
-                }
-            }
+        for(@(false, err) <- eitherCh) {
+            debug!([log, err])
         }
     } |
 
-    for(revVault <- revVaultCh) {
-        revVault!("findOrCreate", {{ wallet_address_from }}, *vaultCh) |
-        revVault!("findOrCreate", {{ wallet_address_to }}, *vaultToCh) |
-        revVault!("deployerAuthKey", *deployerId, *revVaultkeyCh) |
+    for(@(_, revVault) <- revVaultCh) {
+        @revVault!("findOrCreate", {{ wallet_address_from }}, *vaultCh) |
+        @revVault!("findOrCreate", {{ wallet_address_to }}, *vaultToCh) |
+        @revVault!("deployerAuthKey", *deployerId, *revVaultkeyCh) |
 
-        for(@(_, either) <- eitherCh; key <- revVaultkeyCh; _ <- vaultToCh) {
+        for(@(_, either) <- eitherCh & key <- revVaultkeyCh & _ <- vaultToCh) {
             for(vault, return <- transferOp) {
                 vault!("transfer", {{ wallet_address_to }}, {{ amount }}, *key, *return)
             } |

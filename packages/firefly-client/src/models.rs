@@ -4,6 +4,8 @@ use std::marker::PhantomData;
 use derive_more::{AsRef, Display, From, Into};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
+use crate::helpers::ShortHex;
+
 pub mod servicemodelapi {
     #![allow(warnings)]
     #![allow(clippy::all)]
@@ -70,7 +72,7 @@ pub struct Block {
 
 #[derive(derive_more::Debug, Clone)]
 pub struct SignedCode {
-    #[debug("\"{}...\"", hex::encode(&contract[..32]))]
+    #[debug("{:?}", contract.short_hex(32))]
     pub contract: Vec<u8>,
     #[debug("{:?}", hex::encode(sig))]
     pub sig: Vec<u8>,

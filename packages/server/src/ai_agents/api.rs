@@ -43,7 +43,7 @@ mod dtos;
 #[derive(Debug, Clone)]
 pub struct AIAgents;
 
-#[allow(unused_variables, clippy::unused_async)]
+#[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/ai-agents", tag = ApiTags::AIAgents)]
 impl AIAgents {
     #[oai(path = "/:address", method = "get")]
@@ -98,7 +98,7 @@ impl AIAgents {
             .map_err(Into::into)
     }
 
-    #[oai(path = "/test/account", method = "post")]
+    #[oai(path = "/test/wallet", method = "post")]
     async fn create_test_wallet(
         &self,
         Data(test_client): Data<&TestNet<WriteNodeClient>>,

@@ -81,3 +81,21 @@ impl FromExpr for Vec<u8> {
         }
     }
 }
+
+pub trait ShortHex {
+    fn short_hex(&self, length: usize) -> String;
+}
+
+impl<T> ShortHex for T
+where
+    T: AsRef<[u8]>,
+{
+    fn short_hex(&self, length: usize) -> String {
+        let slice = self.as_ref();
+        if slice.len() > length {
+            format!("{}...", hex::encode(&slice[..length]))
+        } else {
+            hex::encode(slice)
+        }
+    }
+}

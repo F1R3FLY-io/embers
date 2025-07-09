@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import json
 from dataclasses import dataclass
 from functools import cached_property
@@ -13,6 +15,35 @@ from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 FIRECAP_ID = bytes([0, 0, 0])
 FIRECAP_VERSION = bytes([0])
+
+
+@dataclass
+class Responce:
+    status: int
+    body: str
+
+    def __init__(self, r: requests.Response):
+        self.status = r.status_code
+        self.body = r.text
+
+    @cached_property
+    def json(self) -> Any:
+        return json.loads(self.body)
+
+
+class HttpClient:
+    def __init__(self, base_url: str):
+        self._base_url = base_url
+
+    def get(self, url: str) -> Responce:
+        url = self._base_url + url
+        r = requests.get(url, timeout=15)
+        return Responce(r)
+
+    def post(self, url: str, json: Any | None = None) -> Responce:
+        url = self._base_url + url
+        r = requests.post(url, json=json, timeout=15)
+        return Responce(r)
 
 
 @dataclass
@@ -42,35 +73,6 @@ class Wallet:
         return self.private_key.sign(prehashed, ec.ECDSA(utils.Prehashed(hashes.BLAKE2s(digest_size=32))))
 
 
-@dataclass
-class Responce:
-    status: int
-    body: str
-
-    def __init__(self, r: requests.Response):
-        self.status = r.status_code
-        self.body = r.text
-
-    @cached_property
-    def json(self) -> Any:
-        return json.loads(self.body)
-
-
-class HttpClient:
-    def __init__(self, base_url: str):
-        self._base_url = base_url
-
-    def get(self, url: str) -> Responce:
-        url = self._base_url + url
-        r = requests.get(url, timeout=10)
-        return Responce(r)
-
-    def post(self, url: str, json: Any | None = None) -> Responce:
-        url = self._base_url + url
-        r = requests.post(url, json=json, timeout=10)
-        return Responce(r)
-
-
 class WalletsApi:
     def __init__(self, client: HttpClient):
         self._client = client
@@ -85,21 +87,97 @@ class WalletsApi:
         )
         assert resp.status == 200
 
-        contract = bytes(resp.json["contract"])
-        signature = from_wallet.sign(contract)
+        resp_next = self._client.post("/wallets/transfer/send", json=sing_contract(from_wallet, resp.json["contract"]))
+        assert resp_next.status == 200
 
-        return self._client.post(
-            "/wallets/transfer/send",
-            json={
-                "contract": resp.json["contract"],
-                "sig_algorithm": "secp256k1",
-                "sig": list(signature),
-                "deployer": list(from_wallet.public_key_bytes),
-            },
+        return resp
+
+
+@dataclass
+class Agent:
+    id: str
+    version: str
+    name: str
+    shard: str | None = None
+    code: str | None = None
+
+
+class AiAgentsApi:
+    def __init__(self, client: HttpClient):
+        self._client = client
+
+    def list(self, address: str) -> Responce:
+        return self._client.get(f"/ai-agents/{address}")
+
+    def list_versions(self, address: str, agent_id: str) -> Responce:
+        return self._client.get(f"/ai-agents/{address}/{agent_id}/versions")
+
+    def get(self, address: str, agent_id: str, agent_version: str) -> Responce:
+        return self._client.get(f"/ai-agents/{address}/{agent_id}/{agent_version}")
+
+    def create(self, wallet: Wallet, name: str, shard: str | None = None, code: str | None = None) -> Responce:
+        resp = self._client.post("/ai-agents/create/prepare", json={"name": name, "shard": shard, "code": code})
+        assert resp.status == 200
+
+        resp_next = self._client.post("/ai-agents/create/send", json=sing_contract(wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return resp
+
+    def save(
+        self,
+        wallet: Wallet,
+        agent_id: str,
+        name: str,
+        shard: str | None = None,
+        code: str | None = None,
+    ) -> Responce:
+        resp = self._client.post(
+            f"/ai-agents/{agent_id}/save/prepare",
+            json={"name": name, "shard": shard, "code": code},
         )
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/ai-agents/{agent_id}/save/send",
+            json=sing_contract(wallet, resp.json["contract"]),
+        )
+        assert resp_next.status == 200
+
+        return resp
+
+    def test_wallet(self) -> Responce:
+        return self._client.post("/ai-agents/test/wallet")
+
+    def deploy_test(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
+        resp = self._client.post("/ai-agents/test/deploy/prepare", json={"test": test, "env": env})
+        assert resp.status == 200
+
+        json = {
+            "test": sing_contract(wallet, resp.json["test_contract"]),
+            "env": sing_contract(wallet, resp.json["env_contract"])
+            if resp.json.get("env_contract") is not None
+            else None,
+        }
+
+        resp_next = self._client.post("/ai-agents/test/deploy/send", json=json)
+        assert resp_next.status == 200
+
+        return resp_next
 
 
 class ApiClient:
     def __init__(self, backend_url: str):
         self._http_client = HttpClient(backend_url)
         self.wallets = WalletsApi(self._http_client)
+        self.ai_agents = AiAgentsApi(self._http_client)
+
+
+def sing_contract(wallet: Wallet, contract: Any) -> dict:
+    signature = wallet.sign(bytes(contract))
+    return {
+        "contract": contract,
+        "sig_algorithm": "secp256k1",
+        "sig": list(signature),
+        "deployer": list(wallet.public_key_bytes),
+    }
