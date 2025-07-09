@@ -54,21 +54,15 @@ in {
     } |
 
     contract @"logDebug"(@deployId, @message) = {
-        match deployId.toByteArray() {
-            hex => log!("Debug", hex.slice(6, hex.length()), message)
-        }
+        log!("Debug", deployId.toString(), message)
     } |
 
     contract @"logInfo"(@deployId, @message) = {
-        match deployId.toByteArray() {
-            hex => log!("Info", hex.slice(6, hex.length()), message)
-        }
+        log!("Info", deployId.toString(), message)
     } |
 
     contract @"logError"(@deployId, @message) = {
-        match deployId.toByteArray() {
-            hex => log!("Error", hex.slice(6, hex.length()), message)
-        }
+        log!("Error", deployId.toString(), message)
     } |
 
     contract @"getLogs"(@deployId, ret) = {
@@ -81,7 +75,7 @@ in {
                 ret!(Nil)
             } |
 
-            getValueOr!(deployId.hexToBytes(), *valueCh, *nilCh)
+            getValueOr!(deployId, *valueCh, *nilCh)
         }
     }
 }
