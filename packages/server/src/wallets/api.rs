@@ -22,10 +22,10 @@ impl WalletsApi {
     #[oai(path = "/:address/state", method = "get")]
     async fn wallet_state_and_history(
         &self,
-        Path(wallet_address): Path<ParseFromString<WalletAddress>>,
+        Path(address): Path<ParseFromString<WalletAddress>>,
         Data(read_client): Data<&ReadNodeClient>,
     ) -> poem::Result<Json<WalletStateAndHistory>> {
-        let wallet_state_and_history = get_wallet_state_and_history(read_client, wallet_address.0)
+        let wallet_state_and_history = get_wallet_state_and_history(read_client, address.0)
             .await
             .map(Into::into)?;
 
