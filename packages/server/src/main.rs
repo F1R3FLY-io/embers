@@ -67,11 +67,13 @@ async fn main() -> anyhow::Result<()> {
 
     let ui = api.swagger_ui();
     let spec = api.spec_endpoint();
+    let spec_yaml = api.spec_endpoint_yaml();
 
     let routes = Route::new()
         .nest("/api", api)
         .nest("/swagger-ui/index.html", ui)
         .nest("/swagger-ui/openapi.json", spec)
+        .nest("/swagger-ui/openapi.yaml", spec_yaml)
         .data(read_client)
         .data(write_client)
         .data(TestNet(testnet_read_client))

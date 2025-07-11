@@ -142,6 +142,7 @@ impl AIAgents {
     #[oai(path = "/:id/save/send", method = "post")]
     async fn save(
         &self,
+        #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
         Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<()> {
@@ -154,19 +155,21 @@ impl AIAgents {
     #[oai(path = "/:address/:id/:version/deploy/prepare", method = "post")]
     async fn prepare_deploy_agent(
         &self,
-        Path(wallet_address): Path<ParseFromString<WalletAddress>>,
+        Path(address): Path<ParseFromString<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
         Data(read_client): Data<&ReadNodeClient>,
     ) -> poem::Result<Json<DeployAgentResp>> {
-        let contract =
-            prepare_deploy_agent_contract(wallet_address.0, id, version, read_client).await?;
+        let contract = prepare_deploy_agent_contract(address.0, id, version, read_client).await?;
         Ok(Json(contract.into()))
     }
 
     #[oai(path = "/:address/:id/:version/deploy/send", method = "post")]
     async fn deploy_agent(
         &self,
+        #[allow(unused_variables)] Path(address): Path<ParseFromString<WalletAddress>>,
+        #[allow(unused_variables)] Path(id): Path<String>,
+        #[allow(unused_variables)] Path(version): Path<String>,
         Json(body): Json<SignedContract>,
         Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<()> {
