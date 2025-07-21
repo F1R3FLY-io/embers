@@ -5,6 +5,7 @@ new rl(`rho:registry:lookup`),
     eitherCh,
     stackCh,
     debug(`rho:io:stdout`),
+    devNull(`rho:io:devNull`),
     okOrAbort,
     doTransfer,
     updateTransferHistory,
@@ -59,26 +60,26 @@ in {
         }
     } |
 
-    contract doTransfer(@deployerId, @walletAddressFrom, @walletAddressTo, @amount, ret) = {
+    contract doTransfer(@deployerId, @walletAddressFrom, @walletAddressTo, @amount, @ret) = {
         new vaultCh, vaultToCh, revVaultkeyCh, transferOp in {
             for(revVault <<- revVaultCh) {
                 revVault!("findOrCreate", walletAddressFrom, *vaultCh) |
                 revVault!("findOrCreate", walletAddressTo, *vaultToCh) |
                 revVault!("deployerAuthKey", deployerId, *revVaultkeyCh) |
 
-                for(key <- revVaultkeyCh; _ <- vaultToCh; either <<- eitherCh) {
-                    for(vault, return <- transferOp) {
-                        vault!("transfer", walletAddressTo, amount, *key, *return)
+                for(@key <- revVaultkeyCh; _ <- vaultToCh; either <<- eitherCh) {
+                    for(vault, @return <- transferOp) {
+                        vault!("transfer", walletAddressTo, amount, key, return)
                     } |
 
-                    either!("flatMap <-", *vaultCh, *transferOp, *ret)
+                    either!("flatMap <-", *vaultCh, *transferOp, ret)
                 }
             }
         }
     } |
 
     contract updateTransferHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
-        new valueCh, nilCh, done in {
+        new valueCh, nilCh in {
             getValueOr!(walletOwner, *valueCh, *nilCh) |
 
             for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
@@ -93,8 +94,8 @@ in {
                             "to": walletAddressTo,
                             "amount": amount,
                             "description": description,
-                        }, *done) |
-                        treeHashMap!("set", map, walletOwner, history, *done)
+                        }, *devNull) |
+                        treeHashMap!("set", map, walletOwner, history, *devNull)
                     }
                 }
             } |
@@ -107,7 +108,7 @@ in {
                     "to": walletAddressTo,
                     "amount": amount,
                     "description": description,
-                }, *done)
+                }, *devNull)
             }
         }
     } |

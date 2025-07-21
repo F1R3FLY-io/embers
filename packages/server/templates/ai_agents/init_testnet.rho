@@ -1,5 +1,6 @@
 new
     rl(`rho:registry:lookup`),
+    devNull(`rho:io:devNull`),
     treeHashMapCh,
     stackCh,
     getValueOr,
@@ -35,17 +36,17 @@ in {
     } |
 
     contract log(@level, @hex, @message) = {
-        new valueCh, nilCh, done in {
+        new valueCh, nilCh, logsCh in {
             for(@logs <- valueCh; stack <<- stackCh) {
-                stack!("push", logs, {"level": level, "message": message}, *done)
+                stack!("push", logs, {"level": level, "message": message}, *devNull)
             } |
 
             for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
-                stack!("init", *done) |
+                stack!("init", *logsCh) |
 
-                for(@logs <- done) {
-                    stack!("push", logs, {"level": level, "message": message}, *done) |
-                    treeHashMap!("set", map, hex, logs, *done)
+                for(@logs <- logsCh) {
+                    stack!("push", logs, {"level": level, "message": message}, *devNull) |
+                    treeHashMap!("set", map, hex, logs, *devNull)
                 }
             } |
 
