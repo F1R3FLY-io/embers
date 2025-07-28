@@ -39,10 +39,7 @@ where
     }
 
     fn schema_ref() -> MetaSchemaRef {
-        MetaSchemaRef::Inline(Box::new(MetaSchema::new_with_format(
-            "string",
-            T::format().into(),
-        )))
+        MetaSchemaRef::Inline(Box::new(MetaSchema::new_with_format("string", T::format())))
     }
 
     fn register(registry: &mut Registry) {
