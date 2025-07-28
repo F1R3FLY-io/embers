@@ -39,10 +39,10 @@ where
     }
 
     fn schema_ref() -> MetaSchemaRef {
-        T::schema_ref().merge(MetaSchema {
-            format: T::format().into(),
-            ..MetaSchema::ANY
-        })
+        MetaSchemaRef::Inline(Box::new(MetaSchema::new_with_format(
+            "string",
+            T::format().into(),
+        )))
     }
 
     fn register(registry: &mut Registry) {
@@ -66,7 +66,7 @@ trait Format {
 
 impl Format for DateTime<Utc> {
     fn format() -> &'static str {
-        "datetime"
+        "unix-timestamp"
     }
 }
 
