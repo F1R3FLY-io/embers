@@ -4,6 +4,16 @@ name    = "server"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "generate_schema"
+path = "src/generate_schema.rs"
+
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+
 [dependencies]
 anyhow             = { version = "1.0", features = ["std"] }
 askama             = { version = "0.14" }
@@ -14,9 +24,10 @@ derive_more        = { version = "2.0", features = ["full"] }
 figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }
 hex                = { version = "0.4" }
-poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
+poem               = { version = "3.1", features = ["anyhow", "compression", "requestid", "test"] }
 poem-openapi       = { version = "5.1", features = ["chrono", "swagger-ui"] }
 prost              = { version = "0.13" }
+reqwest            = "0.12.22"
 secp256k1          = { version = "0.31", features = ["hashes", "rand", "serde"] }
 serde              = { version = "1.0", features = ["derive"] }
 serde_json         = { version = "1.0" }

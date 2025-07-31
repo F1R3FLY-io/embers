@@ -1,0 +1,1076 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Embers API",
+    "version": "0.1.0"
+  },
+  "servers": [],
+  "tags": [
+    {
+      "name": "AIAgents"
+    },
+    {
+      "name": "Wallets"
+    }
+  ],
+  "paths": {
+    "/wallets/{address}/state": {
+      "get": {
+        "tags": [
+          "Wallets"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletStateAndHistory"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/transfer/prepare": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/TransferReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallets/transfer/send": {
+      "post": {
+        "tags": [
+          "Wallets"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedContract"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/ai-agents/{address}": {
+      "get": {
+        "tags": [
+          "AIAgents"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agents"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/{address}/{id}/versions": {
+      "get": {
+        "tags": [
+          "AIAgents"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agents"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/{address}/{id}/{version}": {
+      "get": {
+        "tags": [
+          "AIAgents"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "version",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/Agent"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": ""
+          },
+          "500": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/create/prepare": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAgentResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/create/send": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedContract"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/ai-agents/test/wallet": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateTestwalletResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/test/deploy/prepare": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/DeployTestReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployTestResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/test/deploy/send": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploySignedTestReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeploySignedTestResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/{id}/save/prepare": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAgentReq"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/SaveAgentResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/{id}/save/send": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedContract"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/ai-agents/{address}/{id}/{version}/deploy/prepare": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "version",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json; charset=utf-8": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeployAgentResp"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai-agents/{address}/{id}/{version}/deploy/send": {
+      "post": {
+        "tags": [
+          "AIAgents"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "id",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          },
+          {
+            "name": "version",
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "required": true,
+            "deprecated": false,
+            "explode": true
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json; charset=utf-8": {
+              "schema": {
+                "$ref": "#/components/schemas/SignedContract"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Agent": {
+        "type": "object",
+        "title": "Agent",
+        "required": [
+          "id",
+          "version",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shard": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentHeader": {
+        "type": "object",
+        "title": "AgentHeader",
+        "required": [
+          "id",
+          "version",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "shard": {
+            "type": "string"
+          }
+        }
+      },
+      "Agents": {
+        "type": "object",
+        "title": "Agents",
+        "required": [
+          "agents"
+        ],
+        "properties": {
+          "agents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentHeader"
+            }
+          }
+        }
+      },
+      "Boost": {
+        "type": "object",
+        "title": "Boost",
+        "required": [
+          "id",
+          "username",
+          "direction",
+          "date",
+          "amount",
+          "post"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "post": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateAgentReq": {
+        "type": "object",
+        "title": "CreateAgentReq",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "shard": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateAgentResp": {
+        "type": "object",
+        "title": "CreateAgentResp",
+        "required": [
+          "id",
+          "version",
+          "contract"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "contract": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          }
+        }
+      },
+      "CreateTestwalletResp": {
+        "type": "object",
+        "title": "CreateTestwalletResp",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          }
+        }
+      },
+      "DeployAgentResp": {
+        "type": "object",
+        "title": "DeployAgentResp",
+        "required": [
+          "contract"
+        ],
+        "properties": {
+          "contract": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          }
+        }
+      },
+      "DeploySignedTestReq": {
+        "type": "object",
+        "title": "DeploySignedTestReq",
+        "required": [
+          "test"
+        ],
+        "properties": {
+          "env": {
+            "$ref": "#/components/schemas/SignedContract"
+          },
+          "test": {
+            "$ref": "#/components/schemas/SignedContract"
+          }
+        }
+      },
+      "DeploySignedTestResp": {
+        "type": "object",
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/SignedTestDeplotError"
+          },
+          {
+            "$ref": "#/components/schemas/SignedTestDeplotError"
+          },
+          {
+            "$ref": "#/components/schemas/SignedTestDeplotLogs"
+          }
+        ]
+      },
+      "DeployTestReq": {
+        "type": "object",
+        "title": "DeployTestReq",
+        "required": [
+          "test"
+        ],
+        "properties": {
+          "env": {
+            "type": "string"
+          },
+          "test": {
+            "type": "string"
+          }
+        }
+      },
+      "DeployTestResp": {
+        "type": "object",
+        "title": "DeployTestResp",
+        "required": [
+          "test_contract"
+        ],
+        "properties": {
+          "env_contract": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          },
+          "test_contract": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          }
+        }
+      },
+      "Direction": {
+        "type": "string",
+        "enum": [
+          "incoming",
+          "outgoing"
+        ]
+      },
+      "Exchange": {
+        "type": "object",
+        "title": "Exchange"
+      },
+      "InternalError": {
+        "type": "object",
+        "title": "InternalError",
+        "required": [
+          "description"
+        ],
+        "properties": {
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "Log": {
+        "type": "object",
+        "title": "Log",
+        "required": [
+          "level",
+          "message"
+        ],
+        "properties": {
+          "level": {
+            "$ref": "#/components/schemas/LogLevel"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "LogLevel": {
+        "type": "string",
+        "enum": [
+          "debug",
+          "info",
+          "error"
+        ]
+      },
+      "Request": {
+        "type": "object",
+        "title": "Request",
+        "required": [
+          "id",
+          "date",
+          "amount",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RequestStatus"
+          }
+        }
+      },
+      "RequestStatus": {
+        "type": "string",
+        "enum": [
+          "done",
+          "ongoing",
+          "cancelled"
+        ]
+      },
+      "SaveAgentResp": {
+        "type": "object",
+        "title": "SaveAgentResp",
+        "required": [
+          "version",
+          "contract"
+        ],
+        "properties": {
+          "version": {
+            "type": "string"
+          },
+          "contract": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          }
+        }
+      },
+      "SignedContract": {
+        "type": "object",
+        "title": "SignedContract",
+        "required": [
+          "contract",
+          "sig",
+          "sig_algorithm",
+          "deployer"
+        ],
+        "properties": {
+          "contract": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          },
+          "sig": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          },
+          "sig_algorithm": {
+            "type": "string"
+          },
+          "deployer": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          }
+        }
+      },
+      "SignedTestDeplotError": {
+        "type": "object",
+        "title": "SignedTestDeplotError",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "SignedTestDeplotLogs": {
+        "type": "object",
+        "title": "SignedTestDeplotLogs",
+        "required": [
+          "logs"
+        ],
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Log"
+            }
+          }
+        }
+      },
+      "Transfer": {
+        "type": "object",
+        "title": "Transfer",
+        "required": [
+          "id",
+          "direction",
+          "date",
+          "amount",
+          "to_address",
+          "cost"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "direction": {
+            "$ref": "#/components/schemas/Direction"
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "to_address": {
+            "type": "string"
+          },
+          "cost": {
+            "type": "integer",
+            "format": "uint64"
+          }
+        }
+      },
+      "TransferReq": {
+        "type": "object",
+        "title": "TransferReq",
+        "required": [
+          "from",
+          "to",
+          "amount"
+        ],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "TransferResp": {
+        "type": "object",
+        "title": "TransferResp",
+        "required": [
+          "contract"
+        ],
+        "properties": {
+          "contract": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "uint8"
+            }
+          }
+        }
+      },
+      "WalletStateAndHistory": {
+        "type": "object",
+        "title": "WalletStateAndHistory",
+        "required": [
+          "balance",
+          "requests",
+          "exchanges",
+          "boosts",
+          "transfers"
+        ],
+        "properties": {
+          "balance": {
+            "type": "integer",
+            "format": "uint64"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Request"
+            }
+          },
+          "exchanges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Exchange"
+            }
+          },
+          "boosts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Boost"
+            }
+          },
+          "transfers": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transfer"
+            }
+          }
+        }
+      }
+    }
+  }
+}
