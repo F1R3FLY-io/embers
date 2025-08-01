@@ -4,6 +4,11 @@ command       = "cargo"
 install_crate = "clippy"
 toolchain     = "nightly"
 
+[tasks.generate-schema]
+args      = ["run", "--bin", "generate_schema"]
+command   = "cargo"
+workspace = false
+
 [tasks.audit]
 args          = ["audit", "--deny", "warnings"]
 command       = "cargo"
@@ -43,6 +48,18 @@ args = [
 command = "docker"
 workspace = false
 
+[tasks.docker-down]
+args = [
+    "compose",
+    "--file",
+    "docker/docker-compose.yaml",
+    "--project-name",
+    "embers",
+    "down",
+]
+command = "docker"
+workspace = false
+
 [tasks.run]
 script = '''
 cd packages/${1}
@@ -54,5 +71,12 @@ workspace = false
 script = '''
 cd packages/server
 cargo make ${1}
+'''
+workspace = false
+
+[tasks.install-nix]
+script = '''
+curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install | sh -s -- --no-daemon && \
+. /home/vscode/.nix-profile/etc/profile.d/nix.sh
 '''
 workspace = false

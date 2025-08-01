@@ -4,6 +4,16 @@ name    = "server"
 publish = false
 version = "0.1.0"
 
+[[bin]]
+name = "generate_schema"
+path = "src/generate_schema.rs"
+
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+
 [dependencies]
 anyhow             = { version = "1.0", features = ["std"] }
 askama             = { version = "0.14" }
