@@ -9,7 +9,7 @@ use wallets::api::WalletsApi;
 
 #[tokio::main]
 async fn main() {
-    let api = OpenApiService::new((WalletsApi, AIAgents), "Embers API", "0.1.0");
+    let api = OpenApiService::new((WalletsApi, AIAgents), "Embers API", "0.1.0").url_prefix("/api");
 
     std::fs::write("schema.json", spec.spec())
 }
