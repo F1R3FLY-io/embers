@@ -5,7 +5,7 @@ install_crate = "clippy"
 toolchain     = "nightly"
 
 [tasks.audit]
-args          = ["audit"]
+args          = ["audit", "--deny", "warnings"]
 command       = "cargo"
 install_crate = "cargo-audit"
 workspace     = false
