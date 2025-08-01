@@ -9,6 +9,7 @@ pub use positive_non_zero::*;
 
 use crate::common::models::WalletAddress;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Template)]
 #[template(path = "wallets/init.rho", escape = "none")]
 pub struct InitWalletsEnv;
