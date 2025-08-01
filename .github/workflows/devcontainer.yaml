@@ -3,10 +3,10 @@ name: Rebuild Dev Container
 on:
   push:
     paths:
-      - ".devcontainer/devcontainer.json"
+      - ".devcontainer/**"
   pull_request:
     paths:
-      - ".devcontainer/devcontainer.json"
+      - ".devcontainer/**"
 
 jobs:
   build:
@@ -16,7 +16,7 @@ jobs:
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set lower case repository name
         env:
