@@ -32,8 +32,6 @@ jobs:
           components: rustfmt, clippy
           cache: true
 
-      - run: echo "Version is ${{ steps.setup-rust.outputs.rustc-version }}  ${{ steps.setup-rust.outputs.cargo-version }}  ${{ steps.setup-rust.outputs.rustup-version }}"
-
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
@@ -46,7 +44,7 @@ jobs:
           path: |
             ~/.cargo/bin/cargo-make
             ~/.cargo/bin/cargo-audit
-          key: cargo-tools-${{ runner.os }}
+          key: cargo-tools-${{ runner.os }}-${{ steps.setup-rust.outputs.cargo-version }}
 
       - name: Install cargo tools
         if: steps.cache-cargo-tools.outputs.cache-hit != 'true'
