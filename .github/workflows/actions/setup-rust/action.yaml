@@ -1,0 +1,24 @@
+name: Setup Rust with tools
+runs:
+  using: composite
+  steps:
+    - name: Set up Rust
+      id: setup-rust
+      uses: actions-rust-lang/setup-rust-toolchain@v1
+      with:
+        toolchain: stable, nightly
+        components: rustfmt, clippy
+        cache: true
+
+    - name: Cache cargo tools
+      id: cache-cargo-tools
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/bin/cargo-make
+          ~/.cargo/bin/cargo-audit
+        key: cargo-tools-${{ runner.os }}-${{ steps.setup-rust.outputs.cargo-version }}
+
+    - name: Install cargo tools
+      if: steps.cache-cargo-tools.outputs.cache-hit != 'true'
+      run: cargo install cargo-make

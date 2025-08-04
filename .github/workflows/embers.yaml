@@ -17,30 +17,6 @@ on:
       - "docs/**"
       - "*.md"
 
-setup-rust: &setup-rust
-  - name: Set up Rust
-    id: setup-rust
-    uses: actions-rust-lang/setup-rust-toolchain@v1
-    with:
-      toolchain: stable, nightly
-      components: rustfmt, clippy
-      cache: true
-
-cache-cargo-tools: &cache-cargo-tools
-  - name: Cache cargo tools
-    id: cache-cargo-tools
-    uses: actions/cache@v4
-    with:
-      path: |
-        ~/.cargo/bin/cargo-make
-        ~/.cargo/bin/cargo-audit
-      key: cargo-tools-${{ runner.os }}-${{ steps.setup-rust.outputs.cargo-version }}
-
-install-cargo-tools: &install-cargo-tools
-  - name: Install cargo tools
-    if: steps.cache-cargo-tools.outputs.cache-hit != 'true'
-    run: cargo install cargo-make
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -53,9 +29,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - *setup-rust
-      - *cache-cargo-tools
-      - *install-cargo-tools
+      - uses: ./.github/actions/setup-rust
 
       - name: Check formatting
         run: cargo make format-check
@@ -104,9 +78,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - *setup-rust
-      - *cache-cargo-tools
-      - *install-cargo-tools
+      - uses: ./.github/actions/setup-rust
 
       - name: Generate schema
         run: cargo make server generate-schema
