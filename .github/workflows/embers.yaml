@@ -16,7 +16,6 @@ on:
       - "docker/**"
       - "docs/**"
       - "*.md"
-      
 
 jobs:
   build:
