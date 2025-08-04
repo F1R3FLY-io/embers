@@ -29,7 +29,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - uses: ./.github/actions/setup-rust
+      - uses: ./.github/workflows/actions/setup-rust
 
       - name: Check formatting
         run: cargo make format-check
@@ -78,7 +78,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - uses: ./.github/actions/setup-rust
+      - uses: ./.github/workflows/actions/setup-rust
 
       - name: Generate schema
         run: cargo make server generate-schema
