@@ -24,7 +24,7 @@ thiserror    = { version = "2.0" }
 tonic        = { version = "0.13" }
 
 [build-dependencies]
-tonic-build = { version = "0.13" }
+tonic-build = { version = "0.14" }
 
 [lints.clippy]
 default_trait_access  = "allow"
