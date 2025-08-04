@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: schema.json
-          path: schema.json
+          path: packages/server/schema.json
 
       - name: Update frontend with new schema.json
         uses: peter-evans/repository-dispatch@v2
