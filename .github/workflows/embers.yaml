@@ -24,31 +24,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Rust
-        id: setup-rust
-        uses: actions-rust-lang/setup-rust-toolchain@v1
-        with:
-          toolchain: stable, nightly
-          components: rustfmt, clippy
-          cache: true
-
       - name: Install Protoc
         uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Cache cargo tools
-        id: cache-cargo-tools
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/cargo-make
-            ~/.cargo/bin/cargo-audit
-          key: cargo-tools-${{ runner.os }}-${{ steps.setup-rust.outputs.cargo-version }}
-
-      - name: Install cargo tools
-        if: steps.cache-cargo-tools.outputs.cache-hit != 'true'
-        run: cargo install cargo-make
+      - uses: ./.github/workflows/actions/setup-rust
 
       - name: Check formatting
         run: cargo make format-check
@@ -90,3 +71,38 @@ jobs:
       - name: Lint tests
         working-directory: ./packages/server/tests
         run: poetry run ruff check
+
+  generate-schema:
+    runs-on: ubuntu-latest
+
+    if: github.ref == 'refs/heads/main'
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: ./.github/workflows/actions/setup-rust
+
+      - name: Generate schema
+        run: cargo make server generate-schema
+
+      - name: Upload build artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema.json
+          path: packages/server/schema.json
+
+      - name: Update frontend with new schema.json
+        uses: peter-evans/repository-dispatch@v2
+        with:
+          token: ${{ secrets.EMBERS_TOKEN }}
+          repository: F1R3FLY-io/embers-frontend
+          event-type: update-schema
+          client-payload: '{"schema_url": "https://api.github.com/repos/F1R3FLY-io/embers/actions/artifacts/${{ steps.upload-artifact.outputs.artifact-id }}/zip"}'
