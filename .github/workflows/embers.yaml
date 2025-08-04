@@ -66,7 +66,7 @@ jobs:
         run: cargo make test
 
       - name: Generate schema
-        run: cargo r -r --bin generate_schema
+        run: cargo make server generate-schema
 
       - name: Upload build artifact
         id: upload-artifact
