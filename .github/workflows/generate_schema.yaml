@@ -34,4 +34,4 @@ jobs:
           name: schema.json
           path: schema.json
 
-      - uses: echo "${{ steps.upload-artifact.output.artifact-url }}"
+      - uses: echo "${{ steps.upload-artifact.outputs.artifact-url }}"
