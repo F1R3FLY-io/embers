@@ -1,5 +1,5 @@
 [tasks.run]
-args                                     = ["run"]
+args                                     = ["run", "--bin", "server"]
 command                                  = "cargo"
 env.EMBERS__LOG_LEVEL                    = "info,server=trace"
 env.EMBERS__MAINNET__DEPLOY_SERVICE_URL  = "http://localhost:14401"
