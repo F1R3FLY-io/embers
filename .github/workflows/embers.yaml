@@ -125,7 +125,7 @@ jobs:
       - name: Update frontend with new schema.json
         uses: peter-evans/repository-dispatch@v2
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.EMBERS_TOKEN }}
           repository: F1R3FLY-io/embers-frontend
           event-type: update-schema
           client-payload: '{"schema_url": "${{ steps.upload-artifact.outputs.artifact-url }}"}'
