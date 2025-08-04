@@ -22,3 +22,4 @@ runs:
     - name: Install cargo tools
       if: steps.cache-cargo-tools.outputs.cache-hit != 'true'
       run: cargo install cargo-make
+      shell: bash
