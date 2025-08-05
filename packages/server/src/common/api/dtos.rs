@@ -7,6 +7,7 @@ use firefly_client::helpers::ShortHex;
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
+    Base64,
     ParseError,
     ParseFromJSON,
     ParseFromParameter,
@@ -15,7 +16,6 @@ use poem_openapi::types::{
     Type,
 };
 use poem_openapi::{ApiResponse, NewType, Object, Tags};
-use structural_convert::StructuralConvert;
 
 use crate::common::models;
 use crate::wallets::models::PositiveNonZero;
@@ -234,20 +234,35 @@ where
     }
 }
 
-#[derive(derive_more::Debug, Clone, NewType, StructuralConvert)]
-#[oai(to_header = false)]
-#[convert(from(models::PreparedContract))]
-#[debug("{:?}", _0.short_hex(32))]
-pub struct PreparedContract(pub Vec<u8>);
+#[derive(derive_more::Debug, Clone, NewType)]
+#[oai(to_header = false, from_multipart = false)]
+#[debug("{:?}", _0.0.short_hex(32))]
+pub struct PreparedContract(pub Base64<Vec<u8>>);
 
-#[derive(derive_more::Debug, Clone, Object, StructuralConvert)]
-#[convert(into(firefly_client::models::SignedCode))]
+impl From<models::PreparedContract> for PreparedContract {
+    fn from(value: models::PreparedContract) -> Self {
+        Self(Base64(value.0))
+    }
+}
+
+#[derive(derive_more::Debug, Clone, Object)]
 pub struct SignedContract {
-    #[debug("{:?}", contract.short_hex(32))]
-    pub contract: Vec<u8>,
-    #[debug("{:?}", hex::encode(sig))]
-    pub sig: Vec<u8>,
+    #[debug("{:?}", contract.0.short_hex(32))]
+    pub contract: Base64<Vec<u8>>,
+    #[debug("{:?}", hex::encode(&sig.0))]
+    pub sig: Base64<Vec<u8>>,
     pub sig_algorithm: String,
-    #[debug("{:?}", hex::encode(deployer))]
-    pub deployer: Vec<u8>,
+    #[debug("{:?}", hex::encode(&deployer.0))]
+    pub deployer: Base64<Vec<u8>>,
+}
+
+impl From<SignedContract> for firefly_client::models::SignedCode {
+    fn from(value: SignedContract) -> Self {
+        Self {
+            contract: value.contract.0,
+            sig: value.sig.0,
+            sig_algorithm: value.sig_algorithm,
+            deployer: value.deployer.0,
+        }
+    }
 }

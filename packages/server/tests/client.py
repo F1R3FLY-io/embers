@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from dataclasses import dataclass
 from functools import cached_property
@@ -174,10 +175,11 @@ class ApiClient:
 
 
 def sing_contract(wallet: Wallet, contract: Any) -> dict:
-    signature = wallet.sign(bytes(contract))
+    signature = wallet.sign(base64.b64decode(contract, validate=True))
+
     return {
         "contract": contract,
         "sig_algorithm": "secp256k1",
-        "sig": list(signature),
-        "deployer": list(wallet.public_key_bytes),
+        "sig": base64.b64encode(signature).decode(),
+        "deployer": base64.b64encode(wallet.public_key_bytes).decode(),
     }
