@@ -30,6 +30,7 @@ pub struct SignedTestDeplotLogs {
 }
 
 #[derive(Debug, Clone, Union)]
+#[oai(one_of = true)]
 pub enum DeploySignedTestResp {
     EnvDeployFailed(SignedTestDeplotError),
     TestDeployFailed(SignedTestDeplotError),
