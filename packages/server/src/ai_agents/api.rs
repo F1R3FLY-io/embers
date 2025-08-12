@@ -7,13 +7,30 @@ use secp256k1::SecretKey;
 
 use crate::ai_agents::api::deploy_signed_test_resp::DeploySignedTestResp;
 use crate::ai_agents::api::dtos::{
-    Agent, Agents, CreateAgentReq, CreateAgentResp, CreateTestwalletResp, DeployAgentResp,
-    DeploySignedTestReq, DeployTestReq, DeployTestResp, SaveAgentReq, SaveAgentResp,
+    Agent,
+    Agents,
+    CreateAgentReq,
+    CreateAgentResp,
+    CreateTestwalletResp,
+    DeployAgentResp,
+    DeploySignedTestReq,
+    DeployTestReq,
+    DeployTestResp,
+    SaveAgentReq,
+    SaveAgentResp,
 };
 use crate::ai_agents::handlers::{
-    create_test_wallet, deploy_signed_create_agent, deploy_signed_deploy_agent,
-    deploy_signed_save_agent, deploy_test_contract, get_agent, list_agent_versions, list_agents,
-    prepare_create_agent_contract, prepare_deploy_agent_contract, prepare_save_agent_contract,
+    create_test_wallet,
+    deploy_signed_create_agent,
+    deploy_signed_deploy_agent,
+    deploy_signed_save_agent,
+    deploy_test_contract,
+    get_agent,
+    list_agent_versions,
+    list_agents,
+    prepare_create_agent_contract,
+    prepare_deploy_agent_contract,
+    prepare_save_agent_contract,
     prepare_test_contract,
 };
 use crate::common::api::TestNet;
