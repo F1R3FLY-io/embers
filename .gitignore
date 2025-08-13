@@ -3,3 +3,5 @@ index.scip
 .DS_Store
 *.pyc
 schema.json
+
+docker/.env

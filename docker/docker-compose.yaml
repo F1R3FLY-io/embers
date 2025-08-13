@@ -5,6 +5,8 @@ services:
       dockerfile: firefly.dockerfile
       args:
         CHAIN_ID: mainnet
+    env_file:
+      - .env
     ports:
       - 14401:40401 # deploy service
       - 14402:40402 # propose service

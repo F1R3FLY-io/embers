@@ -1,4 +1,4 @@
 pub mod api;
 mod blockchain;
-pub mod handlers;
+mod handlers;
 pub mod models;

@@ -4,7 +4,12 @@ use structural_convert::StructuralConvert;
 use crate::ai_agents::models;
 
 #[derive(Debug, Clone, Object)]
-pub struct SignedTestDeplotError {
+pub struct EnvDeployFailed {
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct TestDeployFailed {
     pub error: String,
 }
 
@@ -30,10 +35,10 @@ pub struct SignedTestDeplotLogs {
 }
 
 #[derive(Debug, Clone, Union)]
-#[oai(one_of = true)]
+#[oai(one_of = true, discriminator_name = "type")]
 pub enum DeploySignedTestResp {
-    EnvDeployFailed(SignedTestDeplotError),
-    TestDeployFailed(SignedTestDeplotError),
+    EnvDeployFailed(EnvDeployFailed),
+    TestDeployFailed(TestDeployFailed),
     Ok(SignedTestDeplotLogs),
 }
 
@@ -41,10 +46,10 @@ impl From<models::DeploySignedTestResp> for DeploySignedTestResp {
     fn from(value: models::DeploySignedTestResp) -> Self {
         match value {
             models::DeploySignedTestResp::EnvDeployFailed { error } => {
-                Self::EnvDeployFailed(SignedTestDeplotError { error })
+                Self::EnvDeployFailed(EnvDeployFailed { error })
             }
             models::DeploySignedTestResp::TestDeployFailed { error } => {
-                Self::TestDeployFailed(SignedTestDeplotError { error })
+                Self::TestDeployFailed(TestDeployFailed { error })
             }
             models::DeploySignedTestResp::Ok { logs } => Self::Ok(SignedTestDeplotLogs {
                 logs: logs.into_iter().map(Into::into).collect(),

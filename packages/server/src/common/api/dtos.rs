@@ -185,6 +185,7 @@ where
 pub enum ApiTags {
     Wallets,
     AIAgents,
+    AIAgentsTeams,
 }
 
 #[derive(Debug, Clone, Object)]
