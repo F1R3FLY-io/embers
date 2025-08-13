@@ -11,7 +11,7 @@ use crate::models::casper::v1::{deploy_response, propose_response, rho_data_resp
 use crate::models::casper::{DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
-use crate::models::{BlockId, DeployId, SignedCode};
+use crate::models::{BlockId, DeployData, DeployId, SignedCode};
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -38,14 +38,18 @@ impl WriteNodeClient {
         })
     }
 
-    pub async fn deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<DeployId> {
+    pub async fn deploy(
+        &mut self,
+        key: &SecretKey,
+        deploy_data: DeployData,
+    ) -> anyhow::Result<DeployId> {
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
-                term,
+                term: deploy_data.term,
                 timestamp,
                 phlo_price: 1,
-                phlo_limit: 500_000_000,
+                phlo_limit: deploy_data.phlo_limit,
                 valid_after_block_number: 0,
                 shard_id: "root".into(),
                 ..Default::default()
@@ -145,8 +149,12 @@ impl WriteNodeClient {
             .context("failed to extract block hash")
     }
 
-    pub async fn full_deploy(&mut self, key: &SecretKey, term: String) -> anyhow::Result<BlockId> {
-        self.deploy(key, term).await?;
+    pub async fn full_deploy(
+        &mut self,
+        key: &SecretKey,
+        deploy_data: DeployData,
+    ) -> anyhow::Result<BlockId> {
+        self.deploy(key, deploy_data).await?;
         self.propose().await
     }
 

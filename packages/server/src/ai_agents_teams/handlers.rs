@@ -25,8 +25,8 @@ pub async fn deploy_demo(client: &mut WriteNodeClient, name: String) -> anyhow::
         SecretKey::from_str("6a786ec387aff99fcce1bd6faa35916bfad3686d5c98e90a89f77670f535607c")
             .unwrap();
 
-    let contract = DeployAiAgentsTeamsDemo { name }.render()?;
-    client.deploy(&key, contract).await?;
+    let deploy_data = DeployAiAgentsTeamsDemo { name }.builder()?.build();
+    client.deploy(&key, deploy_data).await?;
     client.propose().await?;
     Ok(())
 }
@@ -65,12 +65,15 @@ pub async fn run_demo(
         SecretKey::from_str("6a786ec387aff99fcce1bd6faa35916bfad3686d5c98e90a89f77670f535607c")
             .unwrap();
 
-    let contract = RunAiAgentsTeamsDemo {
+    let deploy_data = RunAiAgentsTeamsDemo {
         name,
         prompt: prompt.clone(),
     }
-    .render()?;
-    client.deploy(&key, contract).await?;
+    .builder()?
+    .phlo_limit(500_000_000)
+    .build();
+
+    client.deploy(&key, deploy_data).await?;
     let block_hash = client.propose().await?;
 
     let finalized = read_client

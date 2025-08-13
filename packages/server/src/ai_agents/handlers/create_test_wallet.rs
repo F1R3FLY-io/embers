@@ -25,14 +25,15 @@ pub async fn create_test_wallet(
     let (test_account_secret_key, test_account_public_key) = sk.generate_keypair(&mut rand::rng());
     let service_address_public_key = PublicKey::from_secret_key(&sk, service_key);
 
-    let code = FundTestWallet {
+    let deploy_data = FundTestWallet {
         wallet_address_from: service_address_public_key.into(),
         wallet_address_to: test_account_public_key.into(),
         amount: TEST_WALLET_BALANCE,
     }
-    .render()?;
+    .builder()?
+    .build();
 
-    client.deploy(service_key, code).await?;
+    client.deploy(service_key, deploy_data).await?;
     client.propose().await?;
 
     Ok(CreateTestwalletResp {
