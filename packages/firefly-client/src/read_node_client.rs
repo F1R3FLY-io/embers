@@ -84,7 +84,11 @@ impl ReadNodeClient {
                 Err(Either::Left(finalized))
             }
         })
-        .retry(ExponentialBuilder::default().with_total_delay(Some(total_delay)))
+        .retry(
+            ExponentialBuilder::default()
+                .without_max_times()
+                .with_total_delay(Some(total_delay)),
+        )
         .await;
 
         match result {

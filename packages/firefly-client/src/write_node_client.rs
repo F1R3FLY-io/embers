@@ -45,7 +45,7 @@ impl WriteNodeClient {
                 term,
                 timestamp,
                 phlo_price: 1,
-                phlo_limit: 500_000,
+                phlo_limit: 500_000_000,
                 valid_after_block_number: 0,
                 shard_id: "root".into(),
                 ..Default::default()
