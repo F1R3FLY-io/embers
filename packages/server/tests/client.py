@@ -114,7 +114,7 @@ class AiAgentsApi:
         return self._client.get(f"/ai-agents/{address}/{agent_id}/versions")
 
     def get(self, address: str, agent_id: str, agent_version: str) -> Responce:
-        return self._client.get(f"/ai-agents/{address}/{agent_id}/{agent_version}")
+        return self._client.get(f"/ai-agents/{address}/{agent_id}/versions/{agent_version}")
 
     def create(self, wallet: Wallet, name: str, shard: str | None = None, code: str | None = None) -> Responce:
         resp = self._client.post("/ai-agents/create/prepare", json={"name": name, "shard": shard, "code": code})

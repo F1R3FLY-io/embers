@@ -66,7 +66,7 @@ impl AIAgents {
         list_agent_versions(address.0, id, read_client).await.into()
     }
 
-    #[oai(path = "/:address/:id/:version", method = "get")]
+    #[oai(path = "/:address/:id/versions/:version", method = "get")]
     async fn get(
         &self,
         Path(address): Path<ParseFromString<WalletAddress>>,
@@ -152,7 +152,10 @@ impl AIAgents {
             .map_err(Into::into)
     }
 
-    #[oai(path = "/:address/:id/:version/deploy/prepare", method = "post")]
+    #[oai(
+        path = "/:address/:id/versions/:version/deploy/prepare",
+        method = "post"
+    )]
     async fn prepare_deploy_agent(
         &self,
         Path(address): Path<ParseFromString<WalletAddress>>,
@@ -164,7 +167,7 @@ impl AIAgents {
         Ok(Json(contract.into()))
     }
 
-    #[oai(path = "/:address/:id/:version/deploy/send", method = "post")]
+    #[oai(path = "/:address/:id/versions/:version/deploy/send", method = "post")]
     async fn deploy_agent(
         &self,
         #[allow(unused_variables)] Path(address): Path<ParseFromString<WalletAddress>>,
