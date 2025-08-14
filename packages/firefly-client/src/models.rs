@@ -109,6 +109,7 @@ pub enum ReadNodeExpr {
     ExprBool { data: bool },
     ExprInt { data: serde_json::Number },
     ExprString { data: String },
+    ExprBytes { data: String },
     ExprUri { data: String },
     ExprUnforg { data: ReadNodeExprUnforg },
 }
@@ -132,6 +133,7 @@ impl From<ReadNodeExpr> for serde_json::Value {
             ReadNodeExpr::ExprBool { data } => Self::Bool(data),
             ReadNodeExpr::ExprInt { data } => Self::Number(data),
             ReadNodeExpr::ExprString { data } => Self::String(data),
+            ReadNodeExpr::ExprBytes { data } => Self::String(data),
             ReadNodeExpr::ExprUri { data } => Self::String(data),
             ReadNodeExpr::ExprUnforg { data } => data.into(),
         }
