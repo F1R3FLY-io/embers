@@ -30,7 +30,7 @@ pub struct Log {
 }
 
 #[derive(Debug, Clone, Object)]
-pub struct SignedTestDeplotLogs {
+pub struct SignedTestDeployLogs {
     pub logs: Vec<Log>,
 }
 
@@ -39,7 +39,7 @@ pub struct SignedTestDeplotLogs {
 pub enum DeploySignedTestResp {
     EnvDeployFailed(EnvDeployFailed),
     TestDeployFailed(TestDeployFailed),
-    Ok(SignedTestDeplotLogs),
+    Ok(SignedTestDeployLogs),
 }
 
 impl From<models::DeploySignedTestResp> for DeploySignedTestResp {
@@ -51,7 +51,7 @@ impl From<models::DeploySignedTestResp> for DeploySignedTestResp {
             models::DeploySignedTestResp::TestDeployFailed { error } => {
                 Self::TestDeployFailed(TestDeployFailed { error })
             }
-            models::DeploySignedTestResp::Ok { logs } => Self::Ok(SignedTestDeplotLogs {
+            models::DeploySignedTestResp::Ok { logs } => Self::Ok(SignedTestDeployLogs {
                 logs: logs.into_iter().map(Into::into).collect(),
             }),
         }
