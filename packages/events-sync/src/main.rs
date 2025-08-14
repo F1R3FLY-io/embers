@@ -11,7 +11,7 @@ use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use contracts::{rho_init_events_channels, rho_subscribe_to_service, rho_unsubscribe_from_service};
 use firefly_client::CommunicationService;
-use firefly_client::models::BlockId;
+use firefly_client::models::{BlockId, DeployData};
 use futures::stream::select_all;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, future};
 use secp256k1::SecretKey;
@@ -178,8 +178,9 @@ async fn main() -> anyhow::Result<()> {
                     let channel_name = Uuid::new_v4();
                     println!("events: {}", events.len());
                     let rho_code = rho_save_events(channel_name, &events)?;
+                    let deploy_data = DeployData::builder(rho_code).build();
                     let hash = client
-                        .full_deploy(&args.wallet_key, rho_code)
+                        .full_deploy(&args.wallet_key, deploy_data)
                         .await
                         .context("failed save events")?;
                     println!("events deployed");
@@ -191,8 +192,9 @@ async fn main() -> anyhow::Result<()> {
                             channel_name: channel_name.to_string(),
                         },
                     );
+                    let deploy_data = DeployData::builder(rho_code).build();
                     client
-                        .full_deploy(&args.wallet_key, rho_code)
+                        .full_deploy(&args.wallet_key, deploy_data)
                         .await
                         .context("failed to notify listeners")?;
                     println!("notified");
@@ -208,8 +210,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Init => {
             let rho_code = rho_init_events_channels(&args.service_id);
+            let deploy_data = DeployData::builder(rho_code).build();
             let hash = client
-                .full_deploy(&args.wallet_key, rho_code)
+                .full_deploy(&args.wallet_key, deploy_data)
                 .await
                 .context("failed to init channels")?;
             println!("{hash}");
@@ -346,8 +349,9 @@ async fn subscribe_to_firefly(
     let self_id = Uuid::new_v4();
 
     let rho_code = rho_subscribe_to_service(&service_id, self_id, external_hostname, grpc_port);
+    let deploy_data = DeployData::builder(rho_code).build();
     client
-        .full_deploy(key, rho_code)
+        .full_deploy(key, deploy_data)
         .await
         .context("failed subscribe to service failed")?;
 
@@ -355,8 +359,9 @@ async fn subscribe_to_firefly(
     let mut client = scopeguard::guard(client, move |mut client| {
         tokio::spawn(async move {
             let rho_code = rho_unsubscribe_from_service(&service_id, self_id);
+            let deploy_data = DeployData::builder(rho_code).build();
             client
-                .full_deploy(&key, rho_code)
+                .full_deploy(&key, deploy_data)
                 .await
                 .context("failed to unsubscribe from service")?;
             println!("unsubscribed");

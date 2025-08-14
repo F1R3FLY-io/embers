@@ -207,3 +207,12 @@ where
         .ok_or_else(|| de::Error::invalid_length(1, &self))
     }
 }
+
+#[derive(Debug, Clone, bon::Builder)]
+pub struct DeployData {
+    #[builder(start_fn)]
+    pub term: String,
+
+    #[builder(default = 500_000)]
+    pub phlo_limit: i64,
+}

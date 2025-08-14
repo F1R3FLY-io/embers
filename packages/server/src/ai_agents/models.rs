@@ -1,15 +1,15 @@
-#![allow(dead_code)]
-
 use askama::Template;
 use firefly_client::models::SignedCode;
 use secp256k1::SecretKey;
 
 use crate::common::models::PreparedContract;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Template)]
 #[template(path = "ai_agents/init.rho", escape = "none")]
 pub struct InitAgentsEnv;
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Template)]
 #[template(path = "ai_agents/init_testnet.rho", escape = "none")]
 pub struct InitAgentsTestnetEnv;

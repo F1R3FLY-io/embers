@@ -481,6 +481,10 @@ macro_rules! template {
                 $crate::rendering::_dependencies::askama::Template::render(&template)
                     .map_err($crate::rendering::_dependencies::serde::ser::Error::custom)
             }
+
+            pub fn builder(self) -> Result<$crate::models::DeployDataBuilder, $crate::rendering::Error> {
+                self.render().map($crate::models::DeployData::builder)
+            }
         }
     };
 }

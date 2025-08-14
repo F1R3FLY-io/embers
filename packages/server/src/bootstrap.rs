@@ -1,7 +1,7 @@
 use anyhow::Context;
 use askama::Template;
 use firefly_client::WriteNodeClient;
-use firefly_client::models::BlockId;
+use firefly_client::models::{BlockId, DeployData};
 use secp256k1::SecretKey;
 
 use crate::ai_agents::models::{InitAgentsEnv, InitAgentsTestnetEnv};
@@ -13,14 +13,16 @@ pub async fn bootstrap_mainnet_contracts(
     key: &SecretKey,
 ) -> anyhow::Result<BlockId> {
     let code = InitAgentsEnv.render()?;
+    let deploy_data = DeployData::builder(code).build();
     client
-        .deploy(key, code)
+        .deploy(key, deploy_data)
         .await
         .context("failed to deploy agents env")?;
 
     let code = InitWalletsEnv.render()?;
+    let deploy_data = DeployData::builder(code).build();
     client
-        .deploy(key, code)
+        .deploy(key, deploy_data)
         .await
         .context("failed to deploy wallets env")?;
 
@@ -33,9 +35,10 @@ pub async fn bootstrap_testnet_contracts(
     key: &SecretKey,
 ) -> anyhow::Result<BlockId> {
     let code = InitAgentsTestnetEnv.render()?;
+    let deploy_data = DeployData::builder(code).build();
 
     client
-        .deploy(key, code)
+        .deploy(key, deploy_data)
         .await
         .context("failed to deploy agents env")?;
 

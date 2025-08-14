@@ -8,8 +8,8 @@ use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use firefly_client::helpers::FromExpr;
-use firefly_client::models::BlockId;
 use firefly_client::models::rhoapi::expr::ExprInstance;
+use firefly_client::models::{BlockId, DeployData};
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 use tokio::select;
@@ -85,7 +85,8 @@ async fn main() -> anyhow::Result<()> {
                 let sql = run_pg_dump(&db_url)?;
 
                 let rho_code = rho_sql_dump_template(channel_name, sql);
-                let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
+                let deploy_data = DeployData::builder(rho_code).build();
+                let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
                 println!("dump hash: {hash}");
 
                 let rho_code = rho_save_hash_template(
@@ -95,7 +96,8 @@ async fn main() -> anyhow::Result<()> {
                         channel_name,
                     },
                 );
-                let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
+                let deploy_data = DeployData::builder(rho_code).build();
+                let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
                 println!("save hash: {hash}");
             }
         }
@@ -117,7 +119,8 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Init => {
             let rho_code = rho_save_hash_contract(&args.service_id);
-            let hash = client.full_deploy(&args.wallet_key, rho_code).await?;
+            let deploy_data = DeployData::builder(rho_code).build();
+            let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
             println!("{hash}");
         }
     }

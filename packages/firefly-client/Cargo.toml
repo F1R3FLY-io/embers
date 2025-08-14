@@ -11,6 +11,7 @@ async-stream = { version = "0.3" }
 backon       = { version = "1.5" }
 base64       = { version = "0.22" }
 blake2       = { version = "0.10" }
+bon          = { version = "3.7" }
 chrono       = { version = "0.4" }
 derive_more  = { version = "2.0", features = ["full"] }
 futures      = { version = "0.3" }

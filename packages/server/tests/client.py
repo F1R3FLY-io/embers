@@ -36,14 +36,14 @@ class HttpClient:
     def __init__(self, base_url: str):
         self._base_url = base_url
 
-    def get(self, url: str) -> Responce:
+    def get(self, url: str, timeout: int = 15) -> Responce:
         url = self._base_url + url
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=timeout)
         return Responce(r)
 
-    def post(self, url: str, json: Any | None = None) -> Responce:
+    def post(self, url: str, json: Any | None = None, timeout: int = 15) -> Responce:
         url = self._base_url + url
-        r = requests.post(url, json=json, timeout=15)
+        r = requests.post(url, json=json, timeout=timeout)
         return Responce(r)
 
 

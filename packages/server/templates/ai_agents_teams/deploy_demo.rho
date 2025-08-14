@@ -1,0 +1,28 @@
+contract @{{ name }}(@prompt, ret) = {
+    new gpt4(`rho:ai:gpt4`),
+        gpt4Answer,
+        dalle3(`rho:ai:dalle3`),
+        dalle3Answer,
+        textToAudio(`rho:ai:textToAudio`),
+        textToAudioAnswer,
+        stdout(`rho:io:stdout`)
+    in {
+        gpt4!(prompt, *gpt4Answer) |
+        for(@gpt4Answer <- gpt4Answer) {
+            stdout!("GTP4 created a prompt") |
+
+            dalle3!(gpt4Answer, *dalle3Answer) |
+            textToAudio!(gpt4Answer, *textToAudioAnswer) |
+
+            for(@dalle3Answer <- dalle3Answer & @textToAudioAnswer <- textToAudioAnswer) {
+                stdout!("Dalle-3 created an image") |
+                stdout!("textToAudio created an audio") |
+                ret!({
+                    "gpt4Answer": gpt4Answer,
+                    "dalle3Answer": dalle3Answer,
+                    "textToAudioAnswer": textToAudioAnswer,
+                })
+            }
+        }
+    }
+}
