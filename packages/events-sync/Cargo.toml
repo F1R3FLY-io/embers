@@ -22,7 +22,7 @@ tokio-stream      = { version = "0.1" }
 tokio-tungstenite = { version = "0.27" }
 tonic             = { version = "0.14" }
 uuid              = { version = "1.17", features = ["v4"] }
-warp              = { version = "0.3" }
+warp              = { version = "0.4" }
 
 [lints.clippy]
 default_trait_access  = "allow"
