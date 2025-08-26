@@ -1,0 +1,272 @@
+new rl(`rho:registry:lookup`),
+    revAddress(`rho:rev:address`),
+    devNull(`rho:io:devNull`),
+    treeHashMapCh,
+    listOpsCh,
+    stackCh,
+    getValueOr,
+    visit
+in {
+    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
+    for(treeHashMap <- treeHashMapCh) {
+        treeHashMap!("init", 3, *treeHashMapCh) |
+
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
+        }
+    } |
+
+    rl!(`rho:lang:listOps`, *listOpsCh) |
+    for(@(_, listOps) <- listOpsCh) {
+        listOpsCh!(listOps)
+    } |
+
+    rl!(`rho:lang:stack`, *stackCh) |
+    for(@(_, stack) <- stackCh) {
+        stackCh!(stack)
+    } |
+
+    contract getValueOr(@map, @address, valueCh, nilCh) = {
+        new retCh in {
+            for(treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("get", map, address, *retCh) |
+
+                for(@value <- retCh) {
+                    match value {
+                        Nil => nilCh!()
+                        value => valueCh!(value)
+                    }
+                }
+            }
+        }
+    } |
+
+    contract visit(@"agentsTeams", @deployerId, f, notFound) = {
+        for(_, @map <<- treeHashMapCh) {
+            getValueOr!(map, deployerId, *f, *notFound)
+        }
+    } |
+
+    contract visit(@"agentsTeamVersions", @deployerId, @id, f, notFound) = {
+        new foundCh in {
+            visit!("agentsTeams", deployerId, *foundCh, *notFound) |
+
+            for(@(agentsTeams, _) <- foundCh) {
+                getValueOr!(agentsTeams, id, *f, *notFound)
+            }
+        }
+    } |
+
+    contract visit(@"agentsTeamVersion", @deployerId, @id, @version, f, notFound) = {
+        new foundCh in {
+            visit!("agentsTeamVersions", deployerId, id, *foundCh, *notFound) |
+
+            for(@(agentsTeamVersions, _) <- foundCh) {
+                getValueOr!(agentsTeamVersions, version, *f, *notFound)
+            }
+        }
+    } |
+
+    contract @"createAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+        new deployerAddressCh, valueCh, nilCh, errCh in {
+            revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+
+            for(@address <- deployerAddressCh) {
+                for(@(agentsTeams, agentsTeamsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
+                    new insertAgentsTeamCh, agentsTeamVersionsCh, agentsTeamVersionsIndexCh in {
+                        for(<- insertAgentsTeamCh) {
+                            stack!("push", agentsTeamsIndex, id, *devNull) |
+
+                            treeHashMap!("init", 3, *agentsTeamVersionsCh) |
+                            stack!("init", *agentsTeamVersionsIndexCh) |
+
+                            for(
+                                @agentsTeamVersions <- agentsTeamVersionsCh &
+                                @agentsTeamVersionsIndex <- agentsTeamVersionsIndexCh
+                            ) {
+                                treeHashMap!("set", agentsTeams, id, (agentsTeamVersions, agentsTeamVersionsIndex), *devNull) |
+
+                                treeHashMap!("set", agentsTeamVersions, version,
+                                    {
+                                        "name": name,
+                                        "shard": shard,
+                                        "graph": graph,
+                                    }, *devNull) |
+
+                                treeHashMap!("set", agentsTeamVersions, "latest",
+                                    {
+                                        "version": version,
+                                        "name": name,
+                                        "shard": shard,
+                                        "graph": graph,
+                                    }, *devNull) |
+
+                                stack!("push", agentsTeamVersionsIndex, version, *devNull)
+                            }
+                        } |
+
+                        getValueOr!(agentsTeams, id, *errCh, *insertAgentsTeamCh)
+                    }
+                } |
+
+                for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                    new agentsTeamsCh, agentsTeamsIndexCh, agentsTeamVersionsCh, agentsTeamVersionsIndexCh in {
+                        treeHashMap!("init", 3, *agentsTeamsCh) |
+                        stack!("init", *agentsTeamsIndexCh) |
+
+                        treeHashMap!("init", 3, *agentsTeamVersionsCh) |
+                        stack!("init", *agentsTeamVersionsIndexCh) |
+
+                        for(
+                            @agentsTeams <- agentsTeamsCh &
+                            @agentsTeamsIndex <- agentsTeamsIndexCh &
+                            @agentsTeamVersions <- agentsTeamVersionsCh &
+                            @agentsTeamVersionsIndex <- agentsTeamVersionsIndexCh
+                        ) {
+                            treeHashMap!("set", map, address, (agentsTeams, agentsTeamsIndex), *devNull) |
+
+                            treeHashMap!("set", agentsTeams, id, (agentsTeamVersions, agentsTeamVersionsIndex), *devNull) |
+                            stack!("push", agentsTeamsIndex, id, *devNull) |
+
+                            treeHashMap!("set", agentsTeamVersions, version,
+                                {
+                                    "name": name,
+                                    "shard": shard,
+                                    "graph": graph,
+                                }, *devNull) |
+
+                            treeHashMap!("set", agentsTeamVersions, "latest",
+                                {
+                                    "version": version,
+                                    "name": name,
+                                    "shard": shard,
+                                    "graph": graph,
+                                }, *devNull) |
+
+                            stack!("push", agentsTeamVersionsIndex, version, *devNull)
+                        }
+                    }
+                } |
+
+                for(<- errCh) {
+                    Nil
+                } |
+
+                visit!("agentsTeams", address, *valueCh, *nilCh)
+            }
+        }
+    } |
+
+    contract @"listAiAgentsTeams"(@address, ret) = {
+        new valueCh, nilCh in {
+            for(@(agentsTeams, agentsTeamsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
+                new toAgentsTeamHeader, agentsTeamsListCh in {
+                    contract toAgentsTeamHeader(@id, ret) = {
+                        new agentsTeamContextCh, agentsTeamLastVersionCh in {
+                            treeHashMap!("get", agentsTeams, id, *agentsTeamContextCh) |
+
+                            for(@(agentsTeamVersions, _) <- agentsTeamContextCh) {
+                                treeHashMap!("get", agentsTeamVersions, "latest", *agentsTeamLastVersionCh) |
+
+                                for(@agentsTeamLastVersion <- agentsTeamLastVersionCh) {
+                                    ret!(agentsTeamLastVersion.delete("graph").set("id", id))
+                                }
+                            }
+                        }
+                    } |
+
+                    stack!("toList", agentsTeamsIndex, *agentsTeamsListCh) |
+
+                    for(@agentsTeamsList <- agentsTeamsListCh) {
+                        listOps!("parMap", agentsTeamsList, *toAgentsTeamHeader, *ret)
+                    }
+                }
+            } |
+
+            for(<- nilCh) {
+                ret!([])
+            } |
+
+            visit!("agentsTeams", address, *valueCh, *nilCh)
+        }
+    } |
+
+    contract @"listAiAgentsTeamVersions"(@address, @id, ret) = {
+        new valueCh, nilCh, agentsTeamVersionsListCh, toAgentsTeamHeader in {
+            for(@(agentsTeamVersions, agentsTeamVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
+                contract toAgentsTeamHeader(@version, ret) = {
+                    new versionCh in {
+                        treeHashMap!("get", agentsTeamVersions, version, *versionCh) |
+
+                        for(@agentsTeamVersion <- versionCh) {
+                            ret!(agentsTeamVersion.delete("graph").union({"id": id, "version": version}))
+                        }
+                    }
+                } |
+
+                stack!("toList", agentsTeamVersionsIndex, *agentsTeamVersionsListCh) |
+
+                for(@agentsTeamVersionsList <- agentsTeamVersionsListCh) {
+                    listOps!("parMap", agentsTeamVersionsList, *toAgentsTeamHeader, *ret)
+                }
+            } |
+
+            for(<- nilCh) {
+                ret!(Nil)
+            } |
+
+            visit!("agentsTeamVersions", address, id, *valueCh, *nilCh)
+        }
+    } |
+
+    contract @"getAiAgentsTeam"(@address, @id, @version, ret) = {
+        new valueCh, nilCh in {
+            for(@agentsTeamVersion <- valueCh) {
+                ret!(agentsTeamVersion.union({"id": id, "version": version}))
+            } |
+
+            for(<- nilCh) {
+                ret!(Nil)
+            } |
+
+            visit!("agentsTeamVersion", address, id, version, *valueCh, *nilCh)
+        }
+    } |
+
+    contract @"saveAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+        new deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
+            revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+
+            for(@address <- deployerAddressCh) {
+                for(@(agentsTeamVersions, agentsTeamVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
+                    for(<- insertAgentsTeamVersionCh) {
+                        stack!("push", agentsTeamVersionsIndex, version, *devNull) |
+
+                        treeHashMap!("set", agentsTeamVersions, version,
+                            {
+                                "name": name,
+                                "shard": shard,
+                                "graph": graph,
+                            }, *devNull) |
+
+                        treeHashMap!("set", agentsTeamVersions, "latest",
+                            {
+                                "version": version,
+                                "name": name,
+                                "shard": shard,
+                                "graph": graph,
+                            }, *devNull)
+                    } |
+
+                    getValueOr!(agentsTeamVersions, version, *errCh, *insertAgentsTeamVersionCh)
+                } |
+
+                for(<- errCh) {
+                    Nil
+                } |
+
+                visit!("agentsTeamVersions", address, id, *valueCh, *errCh)
+            }
+        }
+    }
+}

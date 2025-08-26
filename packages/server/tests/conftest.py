@@ -4,7 +4,7 @@ import pytest
 import requests
 from cryptography.hazmat.primitives.asymmetric import ec
 
-from tests.client import Agent, ApiClient, Wallet
+from tests.client import Agent, AgentsTeam, ApiClient, Wallet
 
 
 @pytest.fixture
@@ -87,3 +87,21 @@ def assert_match_agent(agent: dict, match: Agent):
     assert agent["name"] == match.name
     assert agent.get("shard") == match.shard
     assert agent.get("code") == match.code
+
+
+@pytest.fixture
+def agents_team(client: ApiClient, funded_wallet: Wallet) -> AgentsTeam:
+    resp = client.ai_agents_teams.create(funded_wallet, name="my_agent")
+    assert resp.status == 200
+
+    wait_for_read_node_sync()
+
+    return AgentsTeam(id=resp.json["id"], version=resp.json["version"], name="my_agent")
+
+
+def assert_match_agents_team(agent: dict, match: AgentsTeam):
+    assert agent["id"] == match.id
+    assert agent["version"] == match.version
+    assert agent["name"] == match.name
+    assert agent.get("shard") == match.shard
+    assert agent.get("graph") == match.graph

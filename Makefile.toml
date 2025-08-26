@@ -39,6 +39,7 @@ args = [
     "docker/docker-compose.yaml",
     "--project-name",
     "embers",
+    "${@}",
     "up",
     "--build",
     "--force-recreate",
@@ -55,6 +56,7 @@ args = [
     "docker/docker-compose.yaml",
     "--project-name",
     "embers",
+    "${@}",
     "down",
 ]
 command = "docker"
