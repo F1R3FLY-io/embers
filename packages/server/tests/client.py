@@ -167,11 +167,66 @@ class AiAgentsApi:
         return resp_next
 
 
+@dataclass
+class AgentsTeam:
+    id: str
+    version: str
+    name: str
+    shard: str | None = None
+    graph: str | None = None
+
+
+class AiAgentsTeamsApi:
+    def __init__(self, client: HttpClient):
+        self._client = client
+
+    def list(self, address: str) -> Responce:
+        return self._client.get(f"/ai-agents-teams/{address}")
+
+    def list_versions(self, address: str, agent_id: str) -> Responce:
+        return self._client.get(f"/ai-agents-teams/{address}/{agent_id}/versions")
+
+    def get(self, address: str, agent_id: str, agent_version: str) -> Responce:
+        return self._client.get(f"/ai-agents-teams/{address}/{agent_id}/versions/{agent_version}")
+
+    def create(self, wallet: Wallet, name: str, shard: str | None = None, graph: str | None = None) -> Responce:
+        resp = self._client.post("/ai-agents-teams/create/prepare", json={"name": name, "shard": shard, "graph": graph})
+        assert resp.status == 200
+
+        resp_next = self._client.post("/ai-agents-teams/create/send", json=sing_contract(wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return resp
+
+    def save(
+        self,
+        wallet: Wallet,
+        agent_id: str,
+        name: str,
+        shard: str | None = None,
+        graph: str | None = None,
+    ) -> Responce:
+        resp = self._client.post(
+            f"/ai-agents-teams/{agent_id}/save/prepare",
+            json={"name": name, "shard": shard, "graph": graph},
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/ai-agents-teams/{agent_id}/save/send",
+            json=sing_contract(wallet, resp.json["contract"]),
+        )
+        assert resp_next.status == 200
+
+        return resp
+
+
 class ApiClient:
     def __init__(self, backend_url: str):
         self._http_client = HttpClient(backend_url)
         self.wallets = WalletsApi(self._http_client)
         self.ai_agents = AiAgentsApi(self._http_client)
+        self.ai_agents_teams = AiAgentsTeamsApi(self._http_client)
 
 
 def sing_contract(wallet: Wallet, contract: Any) -> dict:
