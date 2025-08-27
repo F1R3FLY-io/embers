@@ -2,6 +2,7 @@ use firefly_client::models::SignedCode;
 use firefly_client::{WriteNodeClient, template};
 use uuid::Uuid;
 
+use crate::ai_agents_teams::blockchain::dtos::Graph;
 use crate::ai_agents_teams::models::{SaveAgentsTeamReq, SaveAgentsTeamResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
@@ -15,6 +16,7 @@ template! {
         name: String,
         shard: Option<String>,
         graph: Option<String>,
+        graph_ast: Option<Graph>,
     }
 }
 
@@ -39,6 +41,7 @@ pub fn prepare_save_agents_team_contract(
         name: request.name,
         shard: request.shard,
         graph: request.graph,
+        graph_ast: request.graph_ast.map(Into::into),
     }
     .render()?;
 

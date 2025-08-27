@@ -67,7 +67,7 @@ in {
         }
     } |
 
-    contract @"createAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+    contract @"createAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph, @graph_ast) = {
         new deployerAddressCh, valueCh, nilCh, errCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
@@ -91,6 +91,7 @@ in {
                                         "name": name,
                                         "shard": shard,
                                         "graph": graph,
+                                        "graph_ast": graph_ast,
                                     }, *devNull) |
 
                                 treeHashMap!("set", agentsTeamVersions, "latest",
@@ -99,6 +100,7 @@ in {
                                         "name": name,
                                         "shard": shard,
                                         "graph": graph,
+                                        "graph_ast": graph_ast,
                                     }, *devNull) |
 
                                 stack!("push", agentsTeamVersionsIndex, version, *devNull)
@@ -133,6 +135,7 @@ in {
                                     "name": name,
                                     "shard": shard,
                                     "graph": graph,
+                                    "graph_ast": graph_ast,
                                 }, *devNull) |
 
                             treeHashMap!("set", agentsTeamVersions, "latest",
@@ -141,6 +144,7 @@ in {
                                     "name": name,
                                     "shard": shard,
                                     "graph": graph,
+                                    "graph_ast": graph_ast,
                                 }, *devNull) |
 
                             stack!("push", agentsTeamVersionsIndex, version, *devNull)
@@ -169,7 +173,7 @@ in {
                                 treeHashMap!("get", agentsTeamVersions, "latest", *agentsTeamLastVersionCh) |
 
                                 for(@agentsTeamLastVersion <- agentsTeamLastVersionCh) {
-                                    ret!(agentsTeamLastVersion.delete("graph").set("id", id))
+                                    ret!(agentsTeamLastVersion.delete("graph").delete("graph_ast").set("id", id))
                                 }
                             }
                         }
@@ -199,7 +203,7 @@ in {
                         treeHashMap!("get", agentsTeamVersions, version, *versionCh) |
 
                         for(@agentsTeamVersion <- versionCh) {
-                            ret!(agentsTeamVersion.delete("graph").union({"id": id, "version": version}))
+                            ret!(agentsTeamVersion.delete("graph").delete("graph_ast").union({"id": id, "version": version}))
                         }
                     }
                 } |
@@ -233,7 +237,7 @@ in {
         }
     } |
 
-    contract @"saveAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+    contract @"saveAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph, @graph_ast) = {
         new deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
@@ -247,6 +251,7 @@ in {
                                 "name": name,
                                 "shard": shard,
                                 "graph": graph,
+                                "graph_ast": graph_ast,
                             }, *devNull) |
 
                         treeHashMap!("set", agentsTeamVersions, "latest",
@@ -255,6 +260,7 @@ in {
                                 "name": name,
                                 "shard": shard,
                                 "graph": graph,
+                                "graph_ast": graph_ast,
                             }, *devNull)
                     } |
 

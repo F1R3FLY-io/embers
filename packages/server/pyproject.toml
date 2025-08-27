@@ -27,6 +27,7 @@ target-version = "py313"
 ignore = [
     "ANN401",  # typing.Any
     "D",       # docstrings
+    "PLR0913", # Too many arguments
     "PLR2004", # magic value
     "S101",    # assert
 ]
