@@ -34,6 +34,8 @@ services:
       dockerfile: firefly.dockerfile
       args:
         CHAIN_ID: mainnet
+    env_file:
+      - .env
     ports:
       - 14413:40403 # rest api
     command:
