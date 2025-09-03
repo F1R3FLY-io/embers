@@ -174,7 +174,6 @@ class AgentsTeam:
     name: str
     shard: str | None = None
     graph: str | None = None
-    graph_ast: dict | None = None
 
 
 class AiAgentsTeamsApi:
@@ -190,17 +189,10 @@ class AiAgentsTeamsApi:
     def get(self, address: str, agent_id: str, agent_version: str) -> Responce:
         return self._client.get(f"/ai-agents-teams/{address}/{agent_id}/versions/{agent_version}")
 
-    def create(
-        self,
-        wallet: Wallet,
-        name: str,
-        shard: str | None = None,
-        graph: str | None = None,
-        graph_ast: dict | None = None,
-    ) -> Responce:
+    def create(self, wallet: Wallet, name: str, shard: str | None = None, graph: str | None = None) -> Responce:
         resp = self._client.post(
             "/ai-agents-teams/create/prepare",
-            json={"name": name, "shard": shard, "graph": graph, "graph_ast": graph_ast},
+            json={"name": name, "shard": shard, "graph": graph},
         )
         assert resp.status == 200
 
@@ -216,11 +208,10 @@ class AiAgentsTeamsApi:
         name: str,
         shard: str | None = None,
         graph: str | None = None,
-        graph_ast: dict | None = None,
     ) -> Responce:
         resp = self._client.post(
             f"/ai-agents-teams/{agent_id}/save/prepare",
-            json={"name": name, "shard": shard, "graph": graph, "graph_ast": graph_ast},
+            json={"name": name, "shard": shard, "graph": graph},
         )
         assert resp.status == 200
 
