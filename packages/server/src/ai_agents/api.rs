@@ -43,7 +43,6 @@ mod dtos;
 #[derive(Debug, Clone)]
 pub struct AIAgents;
 
-#[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/ai-agents", tag = ApiTags::AIAgents)]
 impl AIAgents {
     #[oai(path = "/:address", method = "get")]
@@ -81,8 +80,10 @@ impl AIAgents {
     async fn prepare_create(
         &self,
         Json(input): Json<CreateAgentReq>,
+        Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<Json<CreateAgentResp>> {
-        let contract = prepare_create_agent_contract(input.into())?;
+        let mut client = client.to_owned();
+        let contract = prepare_create_agent_contract(input.into(), &mut client).await?;
         Ok(Json(contract.into()))
     }
 
@@ -105,15 +106,19 @@ impl AIAgents {
         Data(test_service_key): Data<&TestNet<SecretKey>>,
     ) -> poem::Result<Json<CreateTestwalletResp>> {
         let mut test_client = test_client.0.clone();
-
         let test_client = create_test_wallet(&mut test_client, &test_service_key.0).await?;
         Ok(Json(test_client.into()))
     }
 
     #[oai(path = "/test/deploy/prepare", method = "post")]
-    async fn prepare_test(&self, Json(input): Json<DeployTestReq>) -> Json<DeployTestResp> {
-        let contracts = prepare_test_contract(input.into());
-        Json(contracts.into())
+    async fn prepare_test(
+        &self,
+        Json(input): Json<DeployTestReq>,
+        Data(test_client): Data<&TestNet<WriteNodeClient>>,
+    ) -> poem::Result<Json<DeployTestResp>> {
+        let mut test_client = test_client.0.clone();
+        let contracts = prepare_test_contract(input.into(), &mut test_client).await?;
+        Ok(Json(contracts.into()))
     }
 
     #[oai(path = "/test/deploy/send", method = "post")]
@@ -134,8 +139,10 @@ impl AIAgents {
         &self,
         Path(id): Path<String>,
         Json(input): Json<SaveAgentReq>,
+        Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<Json<SaveAgentResp>> {
-        let contract = prepare_save_agent_contract(id, input.into())?;
+        let mut client = client.to_owned();
+        let contract = prepare_save_agent_contract(id, input.into(), &mut client).await?;
         Ok(Json(contract.into()))
     }
 
@@ -161,9 +168,12 @@ impl AIAgents {
         Path(address): Path<ParseFromString<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
+        Data(client): Data<&WriteNodeClient>,
         Data(read_client): Data<&ReadNodeClient>,
     ) -> poem::Result<Json<DeployAgentResp>> {
-        let contract = prepare_deploy_agent_contract(address.0, id, version, read_client).await?;
+        let mut client = client.to_owned();
+        let contract =
+            prepare_deploy_agent_contract(address.0, id, version, &mut client, read_client).await?;
         Ok(Json(contract.into()))
     }
 

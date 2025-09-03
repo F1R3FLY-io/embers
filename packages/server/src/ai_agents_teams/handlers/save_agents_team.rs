@@ -25,9 +25,10 @@ template! {
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub fn prepare_save_agents_team_contract(
+pub async fn prepare_save_agents_team_contract(
     id: String,
     request: SaveAgentsTeamReq,
+    client: &mut WriteNodeClient,
 ) -> anyhow::Result<SaveAgentsTeamResp> {
     record_trace!(id, request);
 
@@ -42,9 +43,10 @@ pub fn prepare_save_agents_team_contract(
     }
     .render()?;
 
+    let valid_after = client.get_head_block_index().await?;
     Ok(SaveAgentsTeamResp {
         version: version.into(),
-        contract: prepare_for_signing(contract),
+        contract: prepare_for_signing(contract, valid_after),
     })
 }
 

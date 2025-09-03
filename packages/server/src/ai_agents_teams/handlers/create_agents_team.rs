@@ -25,8 +25,9 @@ template! {
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub fn prepare_create_agents_team_contract(
+pub async fn prepare_create_agents_team_contract(
     request: CreateAgentsTeamReq,
+    client: &mut WriteNodeClient,
 ) -> anyhow::Result<CreateAgentsTeamResp> {
     record_trace!(request);
 
@@ -42,10 +43,11 @@ pub fn prepare_create_agents_team_contract(
     }
     .render()?;
 
+    let valid_after = client.get_head_block_index().await?;
     Ok(CreateAgentsTeamResp {
         id: id.into(),
         version: version.into(),
-        contract: prepare_for_signing(contract),
+        contract: prepare_for_signing(contract, valid_after),
     })
 }
 

@@ -111,7 +111,6 @@ impl From<NonZero<u64>> for Stringified<u64> {
 
 impl From<PositiveNonZero<i64>> for Stringified<u64> {
     fn from(value: PositiveNonZero<i64>) -> Self {
-        #[allow(clippy::cast_sign_loss)]
         Self(value.0 as u64)
     }
 }

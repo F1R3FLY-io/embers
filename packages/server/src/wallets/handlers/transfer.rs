@@ -26,7 +26,10 @@ template! {
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub fn prepare_transfer_contract(value: PrepareTransferInput) -> anyhow::Result<PreparedContract> {
+pub async fn prepare_transfer_contract(
+    value: PrepareTransferInput,
+    client: &mut WriteNodeClient,
+) -> anyhow::Result<PreparedContract> {
     record_trace!(value);
 
     let contract = TransferContract {
@@ -38,7 +41,8 @@ pub fn prepare_transfer_contract(value: PrepareTransferInput) -> anyhow::Result<
     }
     .render()?;
 
-    Ok(prepare_for_signing(contract))
+    let valid_after = client.get_head_block_index().await?;
+    Ok(prepare_for_signing(contract, valid_after))
 }
 
 #[tracing::instrument(

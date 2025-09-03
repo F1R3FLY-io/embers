@@ -1,17 +1,23 @@
 use anyhow::{Context, anyhow};
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
+use futures::TryStreamExt;
 use prost::Message as _;
 use secp256k1::{Message, Secp256k1, SecretKey};
 
 use crate::helpers::FromExpr;
 use crate::models::casper::v1::deploy_service_client::DeployServiceClient;
 use crate::models::casper::v1::propose_service_client::ProposeServiceClient;
-use crate::models::casper::v1::{deploy_response, propose_response, rho_data_response};
-use crate::models::casper::{DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
+use crate::models::casper::v1::{
+    block_info_response,
+    deploy_response,
+    propose_response,
+    rho_data_response,
+};
+use crate::models::casper::{BlocksQuery, DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
-use crate::models::{BlockId, DeployData, DeployId, SignedCode};
+use crate::models::{BlockId, DeployData, DeployId, SignedCode, ValidAfter};
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -43,14 +49,19 @@ impl WriteNodeClient {
         key: &SecretKey,
         deploy_data: DeployData,
     ) -> anyhow::Result<DeployId> {
+        let valid_after_block_number = match deploy_data.valid_after_block_number {
+            ValidAfter::Head => self.get_head_block_index().await?,
+            ValidAfter::Index(i) => i,
+        };
+
         let msg = {
             let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
                 term: deploy_data.term,
                 timestamp,
                 phlo_price: 1,
-                phlo_limit: deploy_data.phlo_limit,
-                valid_after_block_number: 0,
+                phlo_limit: deploy_data.phlo_limit as _,
+                valid_after_block_number: valid_after_block_number as _,
                 shard_id: "root".into(),
                 ..Default::default()
             };
@@ -156,6 +167,27 @@ impl WriteNodeClient {
     ) -> anyhow::Result<BlockId> {
         self.deploy(key, deploy_data).await?;
         self.propose().await
+    }
+
+    pub async fn get_head_block_index(&mut self) -> anyhow::Result<u64> {
+        let mut stream = self
+            .deploy_client
+            .show_main_chain(BlocksQuery { depth: 1 })
+            .await?
+            .into_inner();
+
+        stream
+            .try_next()
+            .await?
+            .and_then(|block| block.message)
+            .map_or(Ok(0), |m| match m {
+                block_info_response::Message::Error(err) => {
+                    Err(anyhow!("show_main_chain error: {err:?}"))
+                }
+                block_info_response::Message::BlockInfo(light_block_info) => {
+                    Ok(light_block_info.block_number as _)
+                }
+            })
     }
 
     pub async fn get_channel_value<T>(

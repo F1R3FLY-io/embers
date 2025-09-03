@@ -25,7 +25,10 @@ template! {
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub fn prepare_create_agent_contract(request: CreateAgentReq) -> anyhow::Result<CreateAgentResp> {
+pub async fn prepare_create_agent_contract(
+    request: CreateAgentReq,
+    client: &mut WriteNodeClient,
+) -> anyhow::Result<CreateAgentResp> {
     record_trace!(request);
 
     let id = Uuid::new_v4();
@@ -40,10 +43,11 @@ pub fn prepare_create_agent_contract(request: CreateAgentReq) -> anyhow::Result<
     }
     .render()?;
 
+    let valid_after = client.get_head_block_index().await?;
     Ok(CreateAgentResp {
         id: id.into(),
         version: version.into(),
-        contract: prepare_for_signing(contract),
+        contract: prepare_for_signing(contract, valid_after),
     })
 }
 

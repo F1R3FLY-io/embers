@@ -210,11 +210,20 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
+pub enum ValidAfter {
+    Head,
+    Index(u64),
+}
+
 #[derive(Debug, Clone, bon::Builder)]
 pub struct DeployData {
     #[builder(start_fn)]
     pub term: String,
 
     #[builder(default = 500_000)]
-    pub phlo_limit: i64,
+    pub phlo_limit: u64,
+
+    #[builder(default = ValidAfter::Head)]
+    pub valid_after_block_number: ValidAfter,
 }
