@@ -33,7 +33,6 @@ mod dtos;
 #[derive(Debug, Clone)]
 pub struct AIAgentsTeams;
 
-#[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/ai-agents-teams", tag = ApiTags::AIAgentsTeams)]
 impl AIAgentsTeams {
     #[oai(path = "/deploy-demo", method = "post")]
@@ -99,8 +98,10 @@ impl AIAgentsTeams {
     async fn prepare_create(
         &self,
         Json(input): Json<CreateAgentsTeamReq>,
+        Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<Json<CreateAgentsTeamResp>> {
-        let contract = prepare_create_agents_team_contract(input.into())?;
+        let mut client = client.to_owned();
+        let contract = prepare_create_agents_team_contract(input.into(), &mut client).await?;
         Ok(Json(contract.into()))
     }
 
@@ -121,8 +122,10 @@ impl AIAgentsTeams {
         &self,
         Path(id): Path<String>,
         Json(input): Json<SaveAgentsTeamReq>,
+        Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<Json<SaveAgentsTeamResp>> {
-        let contract = prepare_save_agents_team_contract(id, input.into())?;
+        let mut client = client.to_owned();
+        let contract = prepare_save_agents_team_contract(id, input.into(), &mut client).await?;
         Ok(Json(contract.into()))
     }
 

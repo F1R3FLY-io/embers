@@ -19,18 +19,19 @@ pub async fn prepare_deploy_agent_contract(
     address: WalletAddress,
     id: String,
     version: String,
-    client: &ReadNodeClient,
+    client: &mut WriteNodeClient,
+    read_client: &ReadNodeClient,
 ) -> anyhow::Result<DeployAgentResp> {
     record_trace!(address, id, version);
 
-    let agent = get_agent(address, id, version, client)
+    let agent = get_agent(address, id, version, read_client)
         .await?
         .context("agent not found")?;
 
     let code = agent.code.context("agent has no code")?;
-
+    let valid_after = client.get_head_block_index().await?;
     Ok(DeployAgentResp {
-        contract: prepare_for_signing(code),
+        contract: prepare_for_signing(code, valid_after),
     })
 }
 

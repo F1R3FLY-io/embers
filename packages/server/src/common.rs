@@ -17,14 +17,14 @@ pub async fn deploy_signed_contract(
     client.propose().await
 }
 
-pub fn prepare_for_signing(code: String) -> PreparedContract {
+pub fn prepare_for_signing(code: String, valid_after_block_number: u64) -> PreparedContract {
     let timestamp = chrono::Utc::now().timestamp_millis();
     let contract = DeployDataProto {
         term: code,
         timestamp,
         phlo_price: 1,
         phlo_limit: 500_000,
-        valid_after_block_number: 0,
+        valid_after_block_number: valid_after_block_number as _,
         shard_id: "root".into(),
         ..Default::default()
     }

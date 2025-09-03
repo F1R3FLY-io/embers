@@ -23,13 +23,17 @@ template! {
 }
 
 #[tracing::instrument(level = "info", skip_all, fields(request), ret(Debug, level = "trace"))]
-pub fn prepare_test_contract(request: DeployTestReq) -> DeployTestResp {
+pub async fn prepare_test_contract(
+    request: DeployTestReq,
+    client: &mut WriteNodeClient,
+) -> anyhow::Result<DeployTestResp> {
     record_trace!(request);
 
-    DeployTestResp {
-        env_contract: request.env.map(prepare_for_signing),
-        test_contract: prepare_for_signing(request.test),
-    }
+    let valid_after = client.get_head_block_index().await?;
+    Ok(DeployTestResp {
+        env_contract: request.env.map(|env| prepare_for_signing(env, valid_after)),
+        test_contract: prepare_for_signing(request.test, valid_after),
+    })
 }
 
 #[tracing::instrument(

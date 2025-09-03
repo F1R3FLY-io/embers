@@ -16,7 +16,6 @@ mod dtos;
 #[derive(Debug, Clone)]
 pub struct WalletsApi;
 
-#[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/wallets", tag = ApiTags::Wallets)]
 impl WalletsApi {
     #[oai(path = "/:address/state", method = "get")]
@@ -36,9 +35,11 @@ impl WalletsApi {
     async fn prepare_transfer(
         &self,
         Json(input): Json<TransferReq>,
+        Data(client): Data<&WriteNodeClient>,
     ) -> poem::Result<Json<TransferResp>> {
+        let mut client = client.to_owned();
         let input = input.try_into()?;
-        let result = prepare_transfer_contract(input)?;
+        let result = prepare_transfer_contract(input, &mut client).await?;
 
         Ok(Json(TransferResp {
             contract: result.into(),
