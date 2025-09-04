@@ -14,7 +14,8 @@ pub struct Nodes {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Config {
-    pub port: u32,
+    pub address: String,
+    pub port: u16,
     pub log_level: String,
     pub mainnet: Nodes,
     pub testnet: Nodes,

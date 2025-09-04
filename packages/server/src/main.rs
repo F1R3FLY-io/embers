@@ -88,10 +88,7 @@ async fn main() -> anyhow::Result<()> {
         .with(Compression::default())
         .with(NormalizePath::new(TrailingSlash::Trim));
 
-    let port = config.port;
-    let address = format!("::1:{port}");
-
-    Server::new(TcpListener::bind(address))
+    Server::new(TcpListener::bind((config.address, config.port)))
         .run_with_graceful_shutdown(
             routes,
             async move {
