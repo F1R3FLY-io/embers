@@ -1,0 +1,142 @@
+services:
+  firefly:
+    build:
+      context: .
+      dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: mainnet
+    env_file:
+      - .env
+    ports:
+      - 14401:40401 # deploy service
+      - 14402:40402 # propose service
+      - 14403:40403 # rest api
+    volumes:
+      - ./mainnet/ssl:/data/ssl
+    command:
+      - run
+      - -s
+      - --validator-private-key=6a786ec387aff99fcce1bd6faa35916bfad3686d5c98e90a89f77670f535607c
+      - --host=firefly
+      - --no-upnp
+      - --allow-private-addresses
+      - --synchrony-constraint-threshold=0.0
+      - --approve-duration=10seconds
+      - --approve-interval=10seconds
+      - --protocol-port=40400
+      - --discovery-port=40404
+      - --tls-certificate-path=/data/ssl/node.certificate.pem
+      - --tls-key-path=/data/ssl/node.key.pem
+    networks:
+      - mainnet
+
+  firefly-read:
+    build:
+      context: .
+      dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: mainnet
+    env_file:
+      - .env
+    ports:
+      - 14413:40403 # rest api
+    command:
+      - run
+      - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly?protocol=40400&discovery=40404
+      - --host=firefly-read
+      - --no-upnp
+      - --allow-private-addresses
+      - --protocol-port=40410
+      - --discovery-port=40414
+      - --approve-duration=10seconds
+      - --approve-interval=10seconds
+      - --fork-choice-check-if-stale-interval=30seconds
+      - --fork-choice-stale-threshold=30seconds
+    networks:
+      - mainnet
+
+  firefly-testnet:
+    build:
+      context: .
+      dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: testnet
+    ports:
+      - 15401:40401 # deploy service
+      - 15402:40402 # propose service
+      - 15403:40403 # rest api
+    volumes:
+      - ./testnet/ssl:/data/ssl
+    command:
+      - run
+      - -s
+      - --validator-private-key=6a786ec387aff99fcce1bd6faa35916bfad3686d5c98e90a89f77670f535607c
+      - --host=firefly-testnet
+      - --no-upnp
+      - --allow-private-addresses
+      - --synchrony-constraint-threshold=0.0
+      - --approve-duration=10seconds
+      - --approve-interval=10seconds
+      - --protocol-port=40400
+      - --discovery-port=40404
+      - --tls-certificate-path=/data/ssl/node.certificate.pem
+      - --tls-key-path=/data/ssl/node.key.pem
+    networks:
+      - testnet
+
+  firefly-read-testnet:
+    build:
+      context: .
+      dockerfile: firefly.dockerfile
+      args:
+        CHAIN_ID: testnet
+    ports:
+      - 15413:40403 # rest api
+    command:
+      - run
+      - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly-testnet?protocol=40400&discovery=40404
+      - --host=firefly-read-testnet
+      - --no-upnp
+      - --allow-private-addresses
+      - --protocol-port=40410
+      - --discovery-port=40414
+      - --approve-duration=10seconds
+      - --approve-interval=10seconds
+      - --fork-choice-check-if-stale-interval=30seconds
+      - --fork-choice-stale-threshold=30seconds
+    networks:
+      - testnet
+
+  embers:
+    build:
+      context: ..
+      dockerfile: docker/embers.dockerfile
+    ports:
+      - 3000:3000
+    environment:
+      EMBERS__MAINNET__DEPLOY_SERVICE_URL: http://firefly:40401
+      EMBERS__MAINNET__PROPOSE_SERVICE_URL: http://firefly:40402
+      EMBERS__MAINNET__READ_NODE_URL: http://firefly-read:40403
+      EMBERS__MAINNET__SERVICE_KEY: 232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
+      EMBERS__TESTNET__DEPLOY_SERVICE_URL: http://firefly-testnet:40401
+      EMBERS__TESTNET__PROPOSE_SERVICE_URL: http://firefly-testnet:40402
+      EMBERS__TESTNET__READ_NODE_URL: http://firefly-read-testnet:40403
+      EMBERS__TESTNET__SERVICE_KEY: 732240A471E12931D858F147165BA1B52C011B92B9E8CD7959AADF06D7ACE622
+    networks:
+      - mainnet
+      - testnet
+    depends_on:
+      firefly:
+        condition: service_healthy
+      firefly-read:
+        condition: service_healthy
+      firefly-testnet:
+        condition: service_healthy
+      firefly-read-testnet:
+        condition: service_healthy
+
+networks:
+  mainnet:
+    driver: bridge
+  testnet:
+    driver: bridge
