@@ -7,10 +7,6 @@ services:
         CHAIN_ID: mainnet
     env_file:
       - .env
-    ports:
-      - 14401:40401 # deploy service
-      - 14402:40402 # propose service
-      - 14403:40403 # rest api
     volumes:
       - ./mainnet/ssl:/data/ssl
     command:
@@ -38,8 +34,6 @@ services:
         CHAIN_ID: mainnet
     env_file:
       - .env
-    ports:
-      - 14413:40403 # rest api
     command:
       - run
       - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly?protocol=40400&discovery=40404
@@ -61,10 +55,6 @@ services:
       dockerfile: firefly.dockerfile
       args:
         CHAIN_ID: testnet
-    ports:
-      - 15401:40401 # deploy service
-      - 15402:40402 # propose service
-      - 15403:40403 # rest api
     volumes:
       - ./testnet/ssl:/data/ssl
     command:
@@ -90,8 +80,6 @@ services:
       dockerfile: firefly.dockerfile
       args:
         CHAIN_ID: testnet
-    ports:
-      - 15413:40403 # rest api
     command:
       - run
       - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly-testnet?protocol=40400&discovery=40404
