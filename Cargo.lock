@@ -1145,7 +1145,7 @@ dependencies = [
 [[package]]
 name = "graph-to-rholang-parser"
 version = "0.0.1"
-source = "git+https://github.com/F1R3FLY-io/graph-to-rholang-parser?tag=0.0.5#f1edd0cfdf96ad52f94971d91a832fe0a6b6d5ed"
+source = "git+https://github.com/F1R3FLY-io/graph-to-rholang-parser?tag=arm-v0#fd7d5b426ea4a46f72636b38ce21208396b1d181"
 dependencies = [
  "bindgen",
  "cc",

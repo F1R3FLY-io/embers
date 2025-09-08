@@ -4,6 +4,8 @@ name    = "firefly-client"
 publish = false
 version = "0.1.0"
 
+[lib]
+
 [dependencies]
 anyhow       = { version = "1.0" }
 askama       = { version = "0.14" }
