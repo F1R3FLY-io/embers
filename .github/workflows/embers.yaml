@@ -1,5 +1,9 @@
 name: Embers
-run-name: Embers ${{ github.event_name == 'push' && 'main' || format('MR {0}', github.event.pull_request.title) }}
+run-name: Embers ${{
+  github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && github.ref_name ||
+  github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' ||
+  github.event_name == 'pull_request' && format('MR {0}', github.event.pull_request.title)
+}}
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -38,7 +42,7 @@ jobs:
         run: cargo make audit
 
       - name: Build
-        run: cargo build --all-targets
+        run: cargo make build --all-targets
 
       - name: Run clippy
         run: cargo make clippy
@@ -106,3 +110,46 @@ jobs:
           repository: F1R3FLY-io/embers-frontend
           event-type: update-schema
           client-payload: '{"schema_url": "https://api.github.com/repos/F1R3FLY-io/embers/actions/artifacts/${{ steps.upload-artifact.outputs.artifact-id }}/zip"}'
+
+  publish-docker:
+    runs-on: ubuntu-latest
+
+    if: github.ref == 'refs/heads/main'
+    needs: build
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: f1r3flyindustries/embers
+          tags: |
+            type=ref,event=tag
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: linux/amd64, linux/arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          file: docker/embers.dockerfile
+          context: .
+          platforms: linux/amd64, linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}

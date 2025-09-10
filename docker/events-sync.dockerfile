@@ -2,8 +2,8 @@ FROM rust:1.89-slim-bookworm AS builder
 
 WORKDIR /app
 RUN apt-get update && \
-    apt-get install -y pkg-config libssl-dev protobuf-compiler && \
-    apt clean && \
+    apt-get install -y --no-install-recommends pkg-config protobuf-compiler && \
+    apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 COPY packages/firefly-client firefly-client
@@ -15,10 +15,6 @@ RUN cargo build --release
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
-RUN apt-get update && \
-    apt-get install -y libssl3 && \
-    apt clean && \
-    rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/events-sync/target/release/events-sync ./
 
