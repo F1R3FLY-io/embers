@@ -36,7 +36,7 @@ COPY --from=builder /app/server-release ./server
 EXPOSE 3000
 
 ENV EMBERS__PORT="3000"
-ENV EMBERS__ADDRESS="::1"
+ENV EMBERS__ADDRESS="::"
 ENV EMBERS__LOG_LEVEL="info"
 
 STOPSIGNAL SIGINT
