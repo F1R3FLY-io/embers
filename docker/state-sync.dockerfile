@@ -2,7 +2,7 @@ FROM rust:1.89-slim-bookworm AS builder
 
 WORKDIR /app
 RUN apt-get update && \
-    apt-get install -y pkg-config protobuf-compiler && \
+    apt-get install -y --no-install-recommends pkg-config protobuf-compiler && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

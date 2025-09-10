@@ -137,7 +137,7 @@ jobs:
           file: docker/embers.dockerfile
           context: .
           platforms: linux/amd64, linux/arm64
-          push: false
+          push: true
           tags: |
             f1r3flyindustries/embers:latest
             f1r3flyindustries/embers:${{ github.sha }}
