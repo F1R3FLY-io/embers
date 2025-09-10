@@ -279,8 +279,10 @@ fn spawn_atproto_server(
             });
 
         warp::serve(routes)
-            .bind_with_graceful_shutdown(sync_api_addr, ctrl_c().map(|_| ()))
-            .1
+            .bind(sync_api_addr)
+            .await
+            .graceful(ctrl_c().map(|_| ()))
+            .run()
             .await;
 
         println!("warp ended");
