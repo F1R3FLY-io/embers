@@ -1,4 +1,4 @@
-FROM rust:1.89-slim-bookworm AS builder
+FROM --platform=$BUILDPLATFORM rust:1.89-slim-bookworm AS builder
 
 WORKDIR /app
 RUN apt-get update && \
@@ -12,7 +12,7 @@ COPY packages/server server
 WORKDIR /app/server
 RUN cargo build --release
 
-FROM debian:bookworm-slim AS runtime
+FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 RUN apt-get update && \
