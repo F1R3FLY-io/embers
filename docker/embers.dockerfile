@@ -25,9 +25,9 @@ RUN \
     cargo build --release --target x86_64-unknown-linux-gnu && \
     mv target/x86_64-unknown-linux-gnu/release/server /app/server-release \
     ) || \
-    { echo "Error: Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" > &2; exit 1; }
+    { echo "Error: Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" >&2; exit 1; }
 
-FROM --platform=$TARGETPLATFORM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 RUN apt-get update && \
