@@ -1,5 +1,5 @@
 FROM --platform=$BUILDPLATFORM rust:1.89-slim-bookworm AS builder
-ARG TARGETPLATFORM="linux/amd64"
+ARG TARGETPLATFORM
 
 WORKDIR /app
 
