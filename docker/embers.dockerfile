@@ -1,10 +1,9 @@
 FROM --platform=$BUILDPLATFORM rust:1.89-slim-bookworm AS builder
-ARG TARGETPLATFORM
 
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends pkg-config libssl-dev protobuf-compiler clang gcc-aarch64-linux-gnu && \
+    apt-get install -y --no-install-recommends pkg-config libssl-dev libssl-dev:arm64 protobuf-compiler clang gcc-aarch64-linux-gnu && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rustup target add x86_64-unknown-linux-gnu && \
@@ -16,6 +15,7 @@ COPY .cargo server/.cargo
 
 WORKDIR /app/server
 
+ARG TARGETPLATFORM
 RUN \
     ( [ "$TARGETPLATFORM" = "linux/arm64" ] && \
     cargo build --release --target aarch64-unknown-linux-gnu && \
