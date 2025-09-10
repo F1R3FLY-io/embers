@@ -1,9 +1,11 @@
 name: Embers
-run-name: Embers ${{
-  github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && github.ref_name ||
-  github.event_name == 'push' && github.ref == 'refs/heads/main' && 'main' ||
-  github.event_name == 'pull_request' && format('MR {0}', github.event.pull_request.title)
-}}
+run-name: >-
+  Embers ${{
+    github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && github.ref_name ||
+    github.event_name == 'push' && github.ref_name == 'main' && 'main' ||
+    github.event_name == 'pull_request' && format('MR {0}', github.event.pull_request.title) ||
+    github.ref_name
+  }}
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -11,6 +13,7 @@ concurrency:
 on:
   push:
     branches: [main]
+    tags: ["*"]
     paths-ignore:
       - "docker/**"
       - "docs/**"
@@ -114,7 +117,7 @@ jobs:
   publish-docker:
     runs-on: ubuntu-latest
 
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' || github.ref_type == 'tag'
     needs: build
 
     steps:
