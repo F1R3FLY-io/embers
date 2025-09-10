@@ -2,7 +2,8 @@ FROM --platform=$BUILDPLATFORM rust:1.89-slim-bookworm AS builder
 
 WORKDIR /app
 
-RUN apt-get update && \
+RUN dpkg --add-architecture arm64 && \
+    apt-get update && \
     apt-get install -y --no-install-recommends pkg-config libssl-dev libssl-dev:arm64 protobuf-compiler clang gcc-aarch64-linux-gnu && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
