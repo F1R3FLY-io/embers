@@ -2,9 +2,8 @@ FROM --platform=$BUILDPLATFORM rust:1.89-slim-bookworm AS builder
 
 WORKDIR /app
 
-RUN dpkg --add-architecture arm64 && \
-    apt-get update && \
-    apt-get install -y --no-install-recommends pkg-config libssl-dev libssl-dev:arm64 protobuf-compiler clang gcc-aarch64-linux-gnu && \
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends pkg-config protobuf-compiler clang gcc-aarch64-linux-gnu && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rustup target add x86_64-unknown-linux-gnu && \
@@ -31,10 +30,6 @@ RUN \
 FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libssl3 && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/server-release ./server
 
