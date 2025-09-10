@@ -96,9 +96,7 @@ services:
       - testnet
 
   embers:
-    build:
-      context: ..
-      dockerfile: docker/embers.dockerfile
+    image: f1r3flyindustries/embers
     ports:
       - 3000:3000
     environment:
