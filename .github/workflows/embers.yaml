@@ -18,100 +18,100 @@ on:
       - "*.md"
 
 jobs:
-  # build:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v5
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-  #     - name: Install Protoc
-  #       uses: arduino/setup-protoc@v3
-  #       with:
-  #         repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - uses: ./.github/workflows/actions/setup-rust
+      - uses: ./.github/workflows/actions/setup-rust
 
-  #     - name: Check formatting
-  #       run: cargo make format-check
+      - name: Check formatting
+        run: cargo make format-check
 
-  #     - name: Run security audit
-  #       run: cargo make audit
+      - name: Run security audit
+        run: cargo make audit
 
-  #     - name: Build
-  #       run: cargo make build --all-targets
+      - name: Build
+        run: cargo make build --all-targets
 
-  #     - name: Run clippy
-  #       run: cargo make clippy
+      - name: Run clippy
+        run: cargo make clippy
 
-  #     - name: Run tests
-  #       run: cargo make test
+      - name: Run tests
+        run: cargo make test
 
-  # lint-python:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v5
+  lint-python:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-  #     - name: Install python
-  #       uses: actions/setup-python@v6
-  #       with:
-  #         python-version: 3.13
+      - name: Install python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.13
 
-  #     - name: Install and configure Poetry
-  #       uses: snok/install-poetry@v1
+      - name: Install and configure Poetry
+        uses: snok/install-poetry@v1
 
-  #     - name: Install dependencies
-  #       working-directory: ./packages/server/tests
-  #       run: poetry install
+      - name: Install dependencies
+        working-directory: ./packages/server/tests
+        run: poetry install
 
-  #     - name: Format tests
-  #       working-directory: ./packages/server/tests
-  #       run: poetry run ruff format --check
+      - name: Format tests
+        working-directory: ./packages/server/tests
+        run: poetry run ruff format --check
 
-  #     - name: Lint tests
-  #       working-directory: ./packages/server/tests
-  #       run: poetry run ruff check
+      - name: Lint tests
+        working-directory: ./packages/server/tests
+        run: poetry run ruff check
 
-  # generate-schema:
-  #   runs-on: ubuntu-latest
+  generate-schema:
+    runs-on: ubuntu-latest
 
-  #   if: github.ref == 'refs/heads/main'
-  #   needs: build
+    if: github.ref == 'refs/heads/main'
+    needs: build
 
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-  #     - name: Install Protoc
-  #       uses: arduino/setup-protoc@v3
-  #       with:
-  #         repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
-  #     - uses: ./.github/workflows/actions/setup-rust
+      - uses: ./.github/workflows/actions/setup-rust
 
-  #     - name: Generate schema
-  #       run: cargo make server generate-schema
+      - name: Generate schema
+        run: cargo make server generate-schema
 
-  #     - name: Upload build artifact
-  #       id: upload-artifact
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: schema.json
-  #         path: packages/server/schema.json
+      - name: Upload build artifact
+        id: upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema.json
+          path: packages/server/schema.json
 
-  #     - name: Update frontend with new schema.json
-  #       uses: peter-evans/repository-dispatch@v3
-  #       with:
-  #         token: ${{ secrets.EMBERS_TOKEN }}
-  #         repository: F1R3FLY-io/embers-frontend
-  #         event-type: update-schema
-  #         client-payload: '{"schema_url": "https://api.github.com/repos/F1R3FLY-io/embers/actions/artifacts/${{ steps.upload-artifact.outputs.artifact-id }}/zip"}'
+      - name: Update frontend with new schema.json
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.EMBERS_TOKEN }}
+          repository: F1R3FLY-io/embers-frontend
+          event-type: update-schema
+          client-payload: '{"schema_url": "https://api.github.com/repos/F1R3FLY-io/embers/actions/artifacts/${{ steps.upload-artifact.outputs.artifact-id }}/zip"}'
 
   publish-docker:
     runs-on: ubuntu-latest
 
     # if: github.ref == 'refs/heads/main'
-    # needs: build
+    needs: build
 
     steps:
       - name: Checkout code
@@ -136,8 +136,7 @@ jobs:
         with:
           file: docker/embers.dockerfile
           context: .
-          # platforms: linux/amd64,linux/arm64
-          platforms: linux/arm64
+          platforms: linux/amd64, linux/arm64
           push: false
           tags: |
             f1r3flyindustries/embers:latest
