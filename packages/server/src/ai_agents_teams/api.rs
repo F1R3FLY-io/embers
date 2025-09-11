@@ -9,19 +9,21 @@ use crate::ai_agents_teams::api::dtos::{
     AgentsTeams,
     CreateAgentsTeamReq,
     CreateAgentsTeamResp,
-    DeployDemoReq,
+    DeployAgentsTeamReq,
+    DeployAgentsTeamResp,
     RunDemoReq,
     SaveAgentsTeamReq,
     SaveAgentsTeamResp,
 };
 use crate::ai_agents_teams::handlers::{
-    deploy_demo,
     deploy_signed_create_agents_team,
+    deploy_signed_deploy_agents_team,
     deploy_signed_save_agents_team,
     get_agents_team,
     list_agents_team_versions,
     list_agents_teams,
     prepare_create_agents_team_contract,
+    prepare_deploy_agents_team_contract,
     prepare_save_agents_team_contract,
     run_demo,
 };
@@ -35,18 +37,6 @@ pub struct AIAgentsTeams;
 
 #[OpenApi(prefix_path = "/ai-agents-teams", tag = ApiTags::AIAgentsTeams)]
 impl AIAgentsTeams {
-    #[oai(path = "/deploy-demo", method = "post")]
-    async fn deploy_demo(
-        &self,
-        Json(body): Json<DeployDemoReq>,
-        Data(client): Data<&WriteNodeClient>,
-    ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_demo(&mut client, body.name)
-            .await
-            .map_err(Into::into)
-    }
-
     #[oai(path = "/run-demo", method = "post")]
     async fn run_demo(
         &self,
@@ -113,6 +103,31 @@ impl AIAgentsTeams {
     ) -> poem::Result<()> {
         let mut client = client.to_owned();
         deploy_signed_create_agents_team(&mut client, body.into())
+            .await
+            .map_err(Into::into)
+    }
+
+    #[oai(path = "/deploy/prepare", method = "post")]
+    async fn prepare_deploy_agents_team(
+        &self,
+        Json(body): Json<DeployAgentsTeamReq>,
+        Data(client): Data<&WriteNodeClient>,
+        Data(read_client): Data<&ReadNodeClient>,
+    ) -> poem::Result<Json<DeployAgentsTeamResp>> {
+        let mut client = client.to_owned();
+        let contract =
+            prepare_deploy_agents_team_contract(body.into(), &mut client, read_client).await?;
+        Ok(Json(contract.into()))
+    }
+
+    #[oai(path = "/deploy/send", method = "post")]
+    async fn deploy_agents_team(
+        &self,
+        Json(body): Json<SignedContract>,
+        Data(client): Data<&WriteNodeClient>,
+    ) -> poem::Result<()> {
+        let mut client = client.to_owned();
+        deploy_signed_deploy_agents_team(&mut client, body.into())
             .await
             .map_err(Into::into)
     }

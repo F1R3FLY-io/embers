@@ -1,8 +1,9 @@
-use poem_openapi::Object;
+use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents::models;
-use crate::common::api::dtos::PreparedContract;
+use crate::common::api::dtos::{ParseFromString, PreparedContract, Stringified};
+use crate::common::models::{PositiveNonZero, WalletAddress};
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::Agents))]
@@ -52,6 +53,44 @@ pub type SaveAgentReq = CreateAgentReq;
 pub struct SaveAgentResp {
     pub version: String,
     pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct DeployAgent {
+    id: String,
+    version: String,
+    address: ParseFromString<WalletAddress>,
+    phlo_limit: Stringified<PositiveNonZero<i64>>,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct DeployCode {
+    code: String,
+    phlo_limit: Stringified<PositiveNonZero<i64>>,
+}
+
+#[derive(Debug, Clone, Union)]
+#[oai(one_of = true, discriminator_name = "type")]
+pub enum DeployAgentReq {
+    Agent(DeployAgent),
+    Code(DeployCode),
+}
+
+impl From<DeployAgentReq> for models::DeployAgentReq {
+    fn from(value: DeployAgentReq) -> Self {
+        match value {
+            DeployAgentReq::Agent(deploy) => Self::Agent {
+                id: deploy.id,
+                version: deploy.version,
+                address: deploy.address.0,
+                phlo_limit: deploy.phlo_limit.0,
+            },
+            DeployAgentReq::Code(deploy) => Self::Code {
+                code: deploy.code,
+                phlo_limit: deploy.phlo_limit.0,
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]

@@ -7,7 +7,7 @@ use crate::testnet::models::CreateTestwalletResp;
 const TEST_WALLET_BALANCE: i64 = 1_000_000_000;
 
 template! {
-    #[template(path = "ai_agents/fund_test_wallet.rho")]
+    #[template(path = "testnet/fund_test_wallet.rho")]
     #[derive(Debug, Clone)]
     struct FundTestWallet {
         wallet_address_from: WalletAddress,

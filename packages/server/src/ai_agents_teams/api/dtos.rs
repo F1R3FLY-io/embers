@@ -1,13 +1,9 @@
-use poem_openapi::Object;
+use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents_teams::models;
-use crate::common::api::dtos::PreparedContract;
-
-#[derive(Debug, Clone, Object)]
-pub struct DeployDemoReq {
-    pub name: String,
-}
+use crate::common::api::dtos::{ParseFromString, PreparedContract, Stringified};
+use crate::common::models::{PositiveNonZero, WalletAddress};
 
 #[derive(Debug, Clone, Object)]
 pub struct RunDemoReq {
@@ -62,5 +58,49 @@ pub type SaveAgentsTeamReq = CreateAgentsTeamReq;
 #[convert(from(models::SaveAgentsTeamResp))]
 pub struct SaveAgentsTeamResp {
     pub version: String,
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct DeployAgentsTeam {
+    id: String,
+    version: String,
+    address: ParseFromString<WalletAddress>,
+    phlo_limit: Stringified<PositiveNonZero<i64>>,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct DeployGraph {
+    graph: String,
+    phlo_limit: Stringified<PositiveNonZero<i64>>,
+}
+
+#[derive(Debug, Clone, Union)]
+#[oai(one_of = true, discriminator_name = "type")]
+pub enum DeployAgentsTeamReq {
+    AgentsTeam(DeployAgentsTeam),
+    Graph(DeployGraph),
+}
+
+impl From<DeployAgentsTeamReq> for models::DeployAgentsTeamReq {
+    fn from(value: DeployAgentsTeamReq) -> Self {
+        match value {
+            DeployAgentsTeamReq::AgentsTeam(deploy) => Self::AgentsTeam {
+                id: deploy.id,
+                version: deploy.version,
+                address: deploy.address.0,
+                phlo_limit: deploy.phlo_limit.0,
+            },
+            DeployAgentsTeamReq::Graph(deploy) => Self::Graph {
+                graph: deploy.graph,
+                phlo_limit: deploy.phlo_limit.0,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::DeployAgentsTeamResp))]
+pub struct DeployAgentsTeamResp {
     pub contract: PreparedContract,
 }

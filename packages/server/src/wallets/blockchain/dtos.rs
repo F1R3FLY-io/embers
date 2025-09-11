@@ -2,14 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::common::models::{ParseWalletAddressError, WalletAddress};
-use crate::wallets::models::{
-    Amount,
-    Description,
-    DescriptionError,
-    Id,
-    PositiveNonZeroParsingError,
-};
+use crate::common::models::{ParseWalletAddressError, PositiveNonZeroParsingError, WalletAddress};
+use crate::wallets::models::{Amount, Description, DescriptionError, Id};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BlockChainTransactionRecord {

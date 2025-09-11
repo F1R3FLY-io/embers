@@ -2486,6 +2486,7 @@ dependencies = [
  "anyhow",
  "askama",
  "blake2",
+ "bon",
  "bs58",
  "chrono",
  "derive_more",

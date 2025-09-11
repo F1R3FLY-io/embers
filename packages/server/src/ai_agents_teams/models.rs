@@ -1,6 +1,6 @@
 use askama::Template;
 
-use crate::common::models::PreparedContract;
+use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Template)]
@@ -48,5 +48,24 @@ pub type SaveAgentsTeamReq = CreateAgentsTeamReq;
 #[derive(Debug, Clone)]
 pub struct SaveAgentsTeamResp {
     pub version: String,
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
+pub enum DeployAgentsTeamReq {
+    AgentsTeam {
+        id: String,
+        version: String,
+        address: WalletAddress,
+        phlo_limit: PositiveNonZero<i64>,
+    },
+    Graph {
+        graph: String,
+        phlo_limit: PositiveNonZero<i64>,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct DeployAgentsTeamResp {
     pub contract: PreparedContract,
 }

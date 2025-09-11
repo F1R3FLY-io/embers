@@ -2,12 +2,10 @@ use askama::Template;
 use chrono::{DateTime, Utc};
 
 mod description;
-mod positive_non_zero;
 
 pub use description::*;
-pub use positive_non_zero::*;
 
-use crate::common::models::WalletAddress;
+use crate::common::models::{PositiveNonZero, WalletAddress};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Template)]

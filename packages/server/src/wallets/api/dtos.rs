@@ -6,8 +6,8 @@ use structural_convert::StructuralConvert;
 use thiserror::Error;
 
 use crate::common::api::dtos::{PreparedContract, Stringified};
-use crate::common::models::ParseWalletAddressError;
-use crate::wallets::models::{self, DescriptionError, PositiveNonZeroParsingError};
+use crate::common::models::{ParseWalletAddressError, PositiveNonZero};
+use crate::wallets::models::{self, DescriptionError};
 
 #[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
 #[convert(from(models::Direction))]
@@ -24,7 +24,7 @@ pub struct Boost {
     pub username: String,
     pub direction: Direction,
     pub date: Stringified<DateTime<Utc>>,
-    pub amount: Stringified<u64>,
+    pub amount: Stringified<PositiveNonZero<i64>>,
     pub post: String,
 }
 
@@ -46,7 +46,7 @@ pub enum RequestStatus {
 pub struct Request {
     pub id: String,
     pub date: Stringified<DateTime<Utc>>,
-    pub amount: Stringified<u64>,
+    pub amount: Stringified<PositiveNonZero<i64>>,
     pub status: RequestStatus,
 }
 
@@ -75,7 +75,7 @@ pub struct WalletStateAndHistory {
 pub struct TransferReq {
     from: String,
     to: String,
-    amount: Stringified<i64>,
+    amount: Stringified<PositiveNonZero<i64>>,
     description: Option<String>,
 }
 
@@ -86,8 +86,6 @@ pub struct TransferResp {
 
 #[derive(Debug, Clone, Error)]
 pub enum TransferValidationError {
-    #[error("description format error: {0}")]
-    AmountError(#[from] PositiveNonZeroParsingError),
     #[error("receiver wallet adress has wrong format: {0}")]
     WrongReceiverAddressFormat(ParseWalletAddressError),
     #[error("sender wallet adress has wrong format: {0}")]
@@ -116,13 +114,12 @@ impl TryFrom<TransferReq> for models::PrepareTransferInput {
             .try_into()
             .map_err(Self::Error::WrongSenderAddressFormat)?;
 
-        let amount = value.amount.0.try_into()?;
         let description = value.description.map(TryFrom::try_from).transpose()?;
 
         Ok(Self {
             from,
             to,
-            amount,
+            amount: value.amount.0,
             description,
         })
     }

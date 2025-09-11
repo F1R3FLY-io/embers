@@ -16,6 +16,7 @@ path = "src/main.rs"
 anyhow             = { version = "1.0", features = ["std"] }
 askama             = { version = "0.14" }
 blake2             = { version = "0.10" }
+bon                = { version = "3.7" }
 bs58               = { version = "0.5" }
 chrono             = { version = "0.4", features = ["serde"] }
 derive_more        = { version = "2.0", features = ["full"] }

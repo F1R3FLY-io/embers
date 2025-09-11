@@ -46,7 +46,10 @@ pub async fn prepare_save_agent_contract(
     let valid_after = client.get_head_block_index().await?;
     Ok(SaveAgentResp {
         version: version.into(),
-        contract: prepare_for_signing(contract, valid_after),
+        contract: prepare_for_signing()
+            .code(contract)
+            .valid_after_block_number(valid_after)
+            .call(),
     })
 }
 

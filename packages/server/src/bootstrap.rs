@@ -6,7 +6,7 @@ use secp256k1::SecretKey;
 
 use crate::ai_agents::models::InitAgentsEnv;
 use crate::ai_agents_teams::models::InitAgentsTeamsEnv;
-use crate::testnet::models::InitAgentsTestnetEnv;
+use crate::testnet::models::InitTestnetEnv;
 use crate::wallets::models::InitWalletsEnv;
 
 #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
@@ -43,7 +43,7 @@ pub async fn bootstrap_testnet_contracts(
     client: &mut WriteNodeClient,
     key: &SecretKey,
 ) -> anyhow::Result<BlockId> {
-    let code = InitAgentsTestnetEnv.render()?;
+    let code = InitTestnetEnv.render()?;
     let deploy_data = DeployData::builder(code).build();
 
     client
