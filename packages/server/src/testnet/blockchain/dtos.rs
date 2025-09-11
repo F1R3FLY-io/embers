@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use structural_convert::StructuralConvert;
 
-use crate::ai_agents::models;
+use crate::testnet::models;
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::LogLevel))]

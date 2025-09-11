@@ -1,8 +1,8 @@
 use firefly_client::{WriteNodeClient, template};
 use secp256k1::{PublicKey, Secp256k1, SecretKey, rand};
 
-use crate::ai_agents::models::CreateTestwalletResp;
 use crate::common::models::WalletAddress;
+use crate::testnet::models::CreateTestwalletResp;
 
 const TEST_WALLET_BALANCE: i64 = 1_000_000_000;
 

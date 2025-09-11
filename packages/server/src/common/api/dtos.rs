@@ -182,6 +182,7 @@ where
 
 #[derive(Debug, Clone, Eq, PartialEq, Tags)]
 pub enum ApiTags {
+    Testnet,
     Wallets,
     AIAgents,
     AIAgentsTeams,

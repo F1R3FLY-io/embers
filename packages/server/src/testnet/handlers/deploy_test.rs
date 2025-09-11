@@ -4,15 +4,15 @@ use anyhow::anyhow;
 use firefly_client::models::DeployId;
 use firefly_client::{ReadNodeClient, WriteNodeClient, template};
 
-use crate::ai_agents::blockchain;
-use crate::ai_agents::models::{
+use crate::common::prepare_for_signing;
+use crate::common::tracing::record_trace;
+use crate::testnet::blockchain;
+use crate::testnet::models::{
     DeploySignedTestReq,
     DeploySignedTestResp,
     DeployTestReq,
     DeployTestResp,
 };
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
 
 template! {
     #[template(path = "ai_agents/get_logs.rho")]
@@ -83,7 +83,7 @@ pub async fn deploy_test_contract(
 
     let code = GetLogs { deploy_id }.render()?;
 
-    let logs: Option<Vec<blockchain::log::Log>> = read_client.get_data(code).await?;
+    let logs: Option<Vec<blockchain::dtos::Log>> = read_client.get_data(code).await?;
 
     Ok(DeploySignedTestResp::Ok {
         logs: logs

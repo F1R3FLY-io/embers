@@ -4,8 +4,9 @@ use firefly_client::WriteNodeClient;
 use firefly_client::models::{BlockId, DeployData};
 use secp256k1::SecretKey;
 
-use crate::ai_agents::models::{InitAgentsEnv, InitAgentsTestnetEnv};
+use crate::ai_agents::models::InitAgentsEnv;
 use crate::ai_agents_teams::models::InitAgentsTeamsEnv;
+use crate::testnet::models::InitAgentsTestnetEnv;
 use crate::wallets::models::InitWalletsEnv;
 
 #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
