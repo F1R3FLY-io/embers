@@ -96,9 +96,7 @@ services:
       - testnet
 
   embers:
-    image: f1r3flyindustries/embers:0.0.1
-    ports:
-      - 5172:3000
+    image: f1r3flyindustries/embers:0.0.2
     environment:
       EMBERS__MAINNET__DEPLOY_SERVICE_URL: http://firefly:40401
       EMBERS__MAINNET__PROPOSE_SERVICE_URL: http://firefly:40402
@@ -122,17 +120,32 @@ services:
         condition: service_healthy
 
   embers-frontend:
-    image: f1r3flyindustries/embers-frontend:0.0.1
-    ports:
-      - 5173:80
+    image: f1r3flyindustries/embers-frontend:0.0.2
     environment:
-      API_URL: http://localhost:5172
+      API_URL: https://localhost
     networks:
       - mainnet
       - testnet
     depends_on:
       embers:
         condition: service_started
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_proxy
+    restart: always
+    ports:
+      - 443:443
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./certificate.crt:/etc/nginx/certs/certificate.crt
+      - ./private.key:/etc/nginx/certs/private.key
+    networks:
+      - mainnet
+      - testnet
+    depends_on:
+      - embers
+      - embers-frontend
 
 networks:
   mainnet:
