@@ -11,6 +11,7 @@ use crate::ai_agents_teams::api::AIAgentsTeams;
 use crate::bootstrap::{bootstrap_mainnet_contracts, bootstrap_testnet_contracts};
 use crate::common::api::TestNet;
 use crate::configuration::collect_config;
+use crate::testnet::api::Testnet;
 use crate::wallets::api::WalletsApi;
 
 mod ai_agents;
@@ -18,6 +19,7 @@ mod ai_agents_teams;
 mod bootstrap;
 mod common;
 mod configuration;
+mod testnet;
 mod wallets;
 
 #[tokio::main]
@@ -65,8 +67,12 @@ async fn main() -> anyhow::Result<()> {
         },
     )?;
 
-    let api = OpenApiService::new((WalletsApi, AIAgents, AIAgentsTeams), "Embers API", "0.1.0")
-        .url_prefix("/api");
+    let api = OpenApiService::new(
+        (Testnet, WalletsApi, AIAgents, AIAgentsTeams),
+        "Embers API",
+        "0.1.0",
+    )
+    .url_prefix("/api");
 
     let ui = api.swagger_ui();
     let spec = api.spec_endpoint();

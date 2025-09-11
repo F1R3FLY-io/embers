@@ -45,7 +45,7 @@ jobs:
         run: cargo make audit
 
       - name: Build
-        run: cargo make build --all-targets
+        run: cargo make check --all-targets
 
       - name: Run clippy
         run: cargo make clippy
@@ -55,6 +55,11 @@ jobs:
 
   lint-python:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: packages/server
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -68,15 +73,12 @@ jobs:
         uses: snok/install-poetry@v1
 
       - name: Install dependencies
-        working-directory: ./packages/server/tests
         run: poetry install
 
       - name: Format tests
-        working-directory: ./packages/server/tests
         run: poetry run ruff format --check
 
       - name: Lint tests
-        working-directory: ./packages/server/tests
         run: poetry run ruff check
 
   generate-schema:
@@ -130,8 +132,8 @@ jobs:
         with:
           images: f1r3flyindustries/embers
           tags: |
-            type=ref,event=tag
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref, event=tag
+            type=raw, value=latest, enable={{is_default_branch}}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
