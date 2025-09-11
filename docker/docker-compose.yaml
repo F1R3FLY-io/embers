@@ -108,7 +108,7 @@ services:
     depends_on:
       firefly:
         condition: service_healthy
-    restart: no
+    restart: "no"
     profiles:
       - state-sync
     command:
@@ -147,7 +147,7 @@ services:
     depends_on:
       firefly:
         condition: service_healthy
-    restart: no
+    restart: "no"
     profiles:
       - multiple-networks
     command:

@@ -98,7 +98,7 @@ services:
   embers:
     image: f1r3flyindustries/embers:0.0.1
     ports:
-      - 8081:3000
+      - 5172:3000
     environment:
       EMBERS__MAINNET__DEPLOY_SERVICE_URL: http://firefly:40401
       EMBERS__MAINNET__PROPOSE_SERVICE_URL: http://firefly:40402
@@ -126,7 +126,7 @@ services:
     ports:
       - 5173:80
     environment:
-      API_URL: http://localhost:8081
+      API_URL: http://localhost:5172
     networks:
       - mainnet
       - testnet
