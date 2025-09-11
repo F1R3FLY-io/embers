@@ -56,7 +56,7 @@ pub struct Transfer {
     pub id: String,
     pub direction: Direction,
     pub date: Stringified<DateTime<Utc>>,
-    pub amount: Stringified<u64>,
+    pub amount: Stringified<PositiveNonZero<i64>>,
     pub to_address: String,
     pub cost: Stringified<u64>,
 }

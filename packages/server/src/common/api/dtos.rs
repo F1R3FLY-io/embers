@@ -162,12 +162,6 @@ impl ToJSON for Stringified<PositiveNonZero<i64>> {
     }
 }
 
-impl From<PositiveNonZero<i64>> for Stringified<u64> {
-    fn from(value: PositiveNonZero<i64>) -> Self {
-        Self(value.0 as u64)
-    }
-}
-
 /// Parses [`String`] path parameter into T using [`TryFrom::try_from`].
 #[derive(Debug, Clone, From)]
 pub struct ParseFromString<T>(pub T);

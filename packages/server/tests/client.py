@@ -47,6 +47,30 @@ class HttpClient:
         return Responce(r)
 
 
+class TestnetApi:
+    def __init__(self, client: HttpClient):
+        self._client = client
+
+    def test_wallet(self) -> Responce:
+        return self._client.post("/testnet/wallet")
+
+    def deploy(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
+        resp = self._client.post("/testnet/deploy/prepare", json={"test": test, "env": env})
+        assert resp.status == 200
+
+        json = {
+            "test": sing_contract(wallet, resp.json["test_contract"]),
+            "env": sing_contract(wallet, resp.json["env_contract"])
+            if resp.json.get("env_contract") is not None
+            else None,
+        }
+
+        resp_next = self._client.post("/testnet/deploy/send", json=json)
+        assert resp_next.status == 200
+
+        return resp_next
+
+
 @dataclass
 class Wallet:
     private_key: ec.EllipticCurvePrivateKey
@@ -147,25 +171,6 @@ class AiAgentsApi:
 
         return resp
 
-    def test_wallet(self) -> Responce:
-        return self._client.post("/ai-agents/test/wallet")
-
-    def deploy_test(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
-        resp = self._client.post("/ai-agents/test/deploy/prepare", json={"test": test, "env": env})
-        assert resp.status == 200
-
-        json = {
-            "test": sing_contract(wallet, resp.json["test_contract"]),
-            "env": sing_contract(wallet, resp.json["env_contract"])
-            if resp.json.get("env_contract") is not None
-            else None,
-        }
-
-        resp_next = self._client.post("/ai-agents/test/deploy/send", json=json)
-        assert resp_next.status == 200
-
-        return resp_next
-
 
 @dataclass
 class AgentsTeam:
@@ -201,6 +206,18 @@ class AiAgentsTeamsApi:
 
         return resp
 
+    def deploy(self, wallet: Wallet, graph: str, phlo_limit: int) -> Responce:
+        resp = self._client.post(
+            "/ai-agents-teams/deploy/prepare",
+            json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit},
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post("/ai-agents-teams/deploy/send", json=sing_contract(wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return resp
+
     def save(
         self,
         wallet: Wallet,
@@ -227,6 +244,7 @@ class AiAgentsTeamsApi:
 class ApiClient:
     def __init__(self, backend_url: str):
         self._http_client = HttpClient(backend_url)
+        self.testnet = TestnetApi(self._http_client)
         self.wallets = WalletsApi(self._http_client)
         self.ai_agents = AiAgentsApi(self._http_client)
         self.ai_agents_teams = AiAgentsTeamsApi(self._http_client)

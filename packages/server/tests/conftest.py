@@ -56,7 +56,7 @@ def funded_wallet(client: ApiClient, prepopulated_wallet: Wallet, request: pytes
 
 @pytest.fixture
 def test_wallet(client: ApiClient) -> Wallet:
-    resp = client.ai_agents.test_wallet()
+    resp = client.testnet.test_wallet()
     assert resp.status == 200
 
     wait_for_test_read_node_sync()
