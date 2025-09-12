@@ -15,7 +15,7 @@ use crate::testnet::models::{
 };
 
 template! {
-    #[template(path = "ai_agents/get_logs.rho")]
+    #[template(path = "testnet/get_logs.rho")]
     #[derive(Debug, Clone)]
     struct GetLogs {
         deploy_id: DeployId,
@@ -31,8 +31,16 @@ pub async fn prepare_test_contract(
 
     let valid_after = client.get_head_block_index().await?;
     Ok(DeployTestResp {
-        env_contract: request.env.map(|env| prepare_for_signing(env, valid_after)),
-        test_contract: prepare_for_signing(request.test, valid_after),
+        env_contract: request.env.map(|env| {
+            prepare_for_signing()
+                .code(env)
+                .valid_after_block_number(valid_after)
+                .call()
+        }),
+        test_contract: prepare_for_signing()
+            .code(request.test)
+            .valid_after_block_number(valid_after)
+            .call(),
     })
 }
 

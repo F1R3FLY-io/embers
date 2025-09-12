@@ -42,7 +42,10 @@ pub async fn prepare_transfer_contract(
     .render()?;
 
     let valid_after = client.get_head_block_index().await?;
-    Ok(prepare_for_signing(contract, valid_after))
+    Ok(prepare_for_signing()
+        .code(contract)
+        .valid_after_block_number(valid_after)
+        .call())
 }
 
 #[tracing::instrument(

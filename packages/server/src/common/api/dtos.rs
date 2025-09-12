@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::num::NonZero;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
@@ -17,8 +16,39 @@ use poem_openapi::types::{
 };
 use poem_openapi::{ApiResponse, NewType, Object, Tags};
 
-use crate::common::models;
-use crate::wallets::models::PositiveNonZero;
+use crate::common::models::{self, PositiveNonZero};
+
+impl<T> Type for PositiveNonZero<T>
+where
+    T: Type + Format,
+{
+    const IS_REQUIRED: bool = T::IS_REQUIRED;
+
+    type RawValueType = T::RawValueType;
+    type RawElementValueType = T::RawElementValueType;
+
+    fn name() -> Cow<'static, str> {
+        format!("PositiveNonZero_{}", T::name()).into()
+    }
+
+    fn schema_ref() -> MetaSchemaRef {
+        T::schema_ref()
+    }
+
+    fn register(registry: &mut Registry) {
+        T::register(registry);
+    }
+
+    fn as_raw_value(&self) -> Option<&Self::RawValueType> {
+        T::as_raw_value(&self.0)
+    }
+
+    fn raw_element_iter<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
+        T::raw_element_iter(&self.0)
+    }
+}
 
 /// Transforms T to [`String`] before serialization/deserialization
 /// and keeps original format in `OpenApi` model.
@@ -103,34 +133,32 @@ impl ToJSON for Stringified<u64> {
     }
 }
 
-impl From<NonZero<u64>> for Stringified<u64> {
-    fn from(value: NonZero<u64>) -> Self {
-        Self(value.get())
-    }
-}
-
-impl From<PositiveNonZero<i64>> for Stringified<u64> {
-    fn from(value: PositiveNonZero<i64>) -> Self {
-        Self(value.0 as u64)
-    }
-}
-
 impl Format for i64 {
     fn format() -> &'static str {
         "int64"
     }
 }
 
-impl ParseFromJSON for Stringified<i64> {
-    fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
-        let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
-        value.parse::<i64>().map(Self).map_err(ParseError::custom)
+impl<T> Format for PositiveNonZero<T>
+where
+    T: Format,
+{
+    fn format() -> &'static str {
+        T::format()
     }
 }
 
-impl ToJSON for Stringified<i64> {
+impl ParseFromJSON for Stringified<PositiveNonZero<i64>> {
+    fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
+        let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
+        let number = value.parse::<i64>().map_err(ParseError::custom)?;
+        number.try_into().map(Self).map_err(ParseError::custom)
+    }
+}
+
+impl ToJSON for Stringified<PositiveNonZero<i64>> {
     fn to_json(&self) -> Option<serde_json::Value> {
-        self.0.to_string().to_json()
+        self.0.0.to_string().to_json()
     }
 }
 
@@ -177,6 +205,26 @@ where
 {
     fn parse_from_parameter(value: &str) -> ParseResult<Self> {
         value.to_owned().try_into().map(Self).map_err(Into::into)
+    }
+}
+
+impl<T> ParseFromJSON for ParseFromString<T>
+where
+    T: TryFrom<String> + Send + Sync,
+    T::Error: std::fmt::Display,
+{
+    fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
+        let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
+        value.try_into().map(Self).map_err(Into::into)
+    }
+}
+
+impl<T> ToJSON for ParseFromString<T>
+where
+    T: AsRef<String> + Send + Sync,
+{
+    fn to_json(&self) -> Option<serde_json::Value> {
+        self.0.as_ref().to_json()
     }
 }
 

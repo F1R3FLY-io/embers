@@ -3,7 +3,7 @@ use firefly_client::models::casper::DeployDataProto;
 use firefly_client::models::{BlockId, SignedCode};
 use prost::Message;
 
-use crate::common::models::PreparedContract;
+use crate::common::models::{PositiveNonZero, PreparedContract};
 
 pub mod api;
 pub mod models;
@@ -17,13 +17,18 @@ pub async fn deploy_signed_contract(
     client.propose().await
 }
 
-pub fn prepare_for_signing(code: String, valid_after_block_number: u64) -> PreparedContract {
+#[bon::builder]
+pub fn prepare_for_signing(
+    code: String,
+    valid_after_block_number: u64,
+    phlo_limit: Option<PositiveNonZero<i64>>,
+) -> PreparedContract {
     let timestamp = chrono::Utc::now().timestamp_millis();
     let contract = DeployDataProto {
         term: code,
         timestamp,
         phlo_price: 1,
-        phlo_limit: 500_000,
+        phlo_limit: phlo_limit.map_or(500_000, |v| v.0),
         valid_after_block_number: valid_after_block_number as _,
         shard_id: "root".into(),
         ..Default::default()

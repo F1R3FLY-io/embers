@@ -47,7 +47,10 @@ pub async fn prepare_create_agents_team_contract(
     Ok(CreateAgentsTeamResp {
         id: id.into(),
         version: version.into(),
-        contract: prepare_for_signing(contract, valid_after),
+        contract: prepare_for_signing()
+            .code(contract)
+            .valid_after_block_number(valid_after)
+            .call(),
     })
 }
 

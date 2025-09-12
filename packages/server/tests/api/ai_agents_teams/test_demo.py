@@ -1,13 +1,16 @@
-from tests.client import ApiClient
+import pytest
+
+from tests.client import ApiClient, Wallet
 
 
-def test_demo(client: ApiClient):
-    resp = client._http_client.post("/ai-agents-teams/deploy-demo", json={"name": "test_name"})  # noqa: SLF001
+@pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
+def test_demo(client: ApiClient, funded_wallet: Wallet):
+    resp = client.ai_agents_teams.deploy(funded_wallet, graph="", phlo_limit=500_000)
     assert resp.status == 200
 
     resp = client._http_client.post(  # noqa: SLF001
         "/ai-agents-teams/run-demo",
-        json={"name": "test_name", "prompt": "Describe an appearance of human-like robot"},
+        json={"name": "demo_agents_team", "prompt": "Describe an appearance of human-like robot"},
         timeout=150,
     )
     assert resp.status == 200

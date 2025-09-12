@@ -1,6 +1,6 @@
 use askama::Template;
 
-use crate::common::models::PreparedContract;
+use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Template)]
@@ -49,6 +49,20 @@ pub type SaveAgentReq = CreateAgentReq;
 pub struct SaveAgentResp {
     pub version: String,
     pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
+pub enum DeployAgentReq {
+    Agent {
+        id: String,
+        version: String,
+        address: WalletAddress,
+        phlo_limit: PositiveNonZero<i64>,
+    },
+    Code {
+        code: String,
+        phlo_limit: PositiveNonZero<i64>,
+    },
 }
 
 #[derive(Debug, Clone)]

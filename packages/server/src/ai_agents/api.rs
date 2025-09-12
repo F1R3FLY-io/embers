@@ -9,6 +9,7 @@ use crate::ai_agents::api::dtos::{
     Agents,
     CreateAgentReq,
     CreateAgentResp,
+    DeployAgentReq,
     DeployAgentResp,
     SaveAgentReq,
     SaveAgentResp,
@@ -88,6 +89,30 @@ impl AIAgents {
             .map_err(Into::into)
     }
 
+    #[oai(path = "/deploy/prepare", method = "post")]
+    async fn prepare_deploy_agent(
+        &self,
+        Json(body): Json<DeployAgentReq>,
+        Data(client): Data<&WriteNodeClient>,
+        Data(read_client): Data<&ReadNodeClient>,
+    ) -> poem::Result<Json<DeployAgentResp>> {
+        let mut client = client.to_owned();
+        let contract = prepare_deploy_agent_contract(body.into(), &mut client, read_client).await?;
+        Ok(Json(contract.into()))
+    }
+
+    #[oai(path = "/deploy/send", method = "post")]
+    async fn deploy_agent(
+        &self,
+        Json(body): Json<SignedContract>,
+        Data(client): Data<&WriteNodeClient>,
+    ) -> poem::Result<()> {
+        let mut client = client.to_owned();
+        deploy_signed_deploy_agent(&mut client, body.into())
+            .await
+            .map_err(Into::into)
+    }
+
     #[oai(path = "/:id/save/prepare", method = "post")]
     async fn prepare_save(
         &self,
@@ -109,39 +134,6 @@ impl AIAgents {
     ) -> poem::Result<()> {
         let mut client = client.to_owned();
         deploy_signed_save_agent(&mut client, body.into())
-            .await
-            .map_err(Into::into)
-    }
-
-    #[oai(
-        path = "/:address/:id/versions/:version/deploy/prepare",
-        method = "post"
-    )]
-    async fn prepare_deploy_agent(
-        &self,
-        Path(address): Path<ParseFromString<WalletAddress>>,
-        Path(id): Path<String>,
-        Path(version): Path<String>,
-        Data(client): Data<&WriteNodeClient>,
-        Data(read_client): Data<&ReadNodeClient>,
-    ) -> poem::Result<Json<DeployAgentResp>> {
-        let mut client = client.to_owned();
-        let contract =
-            prepare_deploy_agent_contract(address.0, id, version, &mut client, read_client).await?;
-        Ok(Json(contract.into()))
-    }
-
-    #[oai(path = "/:address/:id/versions/:version/deploy/send", method = "post")]
-    async fn deploy_agent(
-        &self,
-        #[allow(unused_variables)] Path(address): Path<ParseFromString<WalletAddress>>,
-        #[allow(unused_variables)] Path(id): Path<String>,
-        #[allow(unused_variables)] Path(version): Path<String>,
-        Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
-    ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_signed_deploy_agent(&mut client, body.into())
             .await
             .map_err(Into::into)
     }

@@ -6,8 +6,8 @@ use crate::common::models::PreparedContract;
 
 #[allow(dead_code)]
 #[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents/init_testnet.rho", escape = "none")]
-pub struct InitAgentsTestnetEnv;
+#[template(path = "testnet/init.rho", escape = "none")]
+pub struct InitTestnetEnv;
 
 #[derive(Debug, Clone)]
 pub struct CreateTestwalletResp {
