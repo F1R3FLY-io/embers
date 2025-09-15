@@ -10,7 +10,7 @@ struct Args {
     path: String,
 }
 
-pub(crate) fn render_derive(input: TokenStream) -> TokenStream {
+pub fn render_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
     let args = match Args::from_derive_input(&input) {

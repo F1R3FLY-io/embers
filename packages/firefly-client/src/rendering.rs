@@ -75,19 +75,19 @@ impl IntoRhoValue for bool {
 
 impl IntoRhoValue for i8 {
     fn into_rho_value(self) -> Value {
-        Value::Int(self as _)
+        Value::Int(self.into())
     }
 }
 
 impl IntoRhoValue for i16 {
     fn into_rho_value(self) -> Value {
-        Value::Int(self as _)
+        Value::Int(self.into())
     }
 }
 
 impl IntoRhoValue for i32 {
     fn into_rho_value(self) -> Value {
-        Value::Int(self as _)
+        Value::Int(self.into())
     }
 }
 
@@ -132,13 +132,13 @@ impl IntoRhoValue for Uri {
 
 impl<T: IntoRhoValue> IntoRhoValue for Vec<T> {
     fn into_rho_value(self) -> Value {
-        Value::List(self.into_iter().map(|item| item.into_rho_value()).collect())
+        Value::List(self.into_iter().map(IntoRhoValue::into_rho_value).collect())
     }
 }
 
 impl<T: IntoRhoValue> IntoRhoValue for BTreeSet<T> {
     fn into_rho_value(self) -> Value {
-        Value::Set(self.into_iter().map(|item| item.into_rho_value()).collect())
+        Value::Set(self.into_iter().map(IntoRhoValue::into_rho_value).collect())
     }
 }
 
@@ -152,7 +152,7 @@ impl<T: IntoRhoValue> IntoRhoValue for BTreeMap<String, T> {
     }
 }
 
-impl<'a, T: IntoRhoValue> IntoRhoValue for BTreeMap<&'a str, T> {
+impl<T: IntoRhoValue> IntoRhoValue for BTreeMap<&str, T> {
     fn into_rho_value(self) -> Value {
         Value::Map(
             self.into_iter()
@@ -164,10 +164,7 @@ impl<'a, T: IntoRhoValue> IntoRhoValue for BTreeMap<&'a str, T> {
 
 impl<T: IntoRhoValue> IntoRhoValue for Option<T> {
     fn into_rho_value(self) -> Value {
-        match self {
-            Some(item) => item.into_rho_value(),
-            None => Value::Nil,
-        }
+        self.map_or(Value::Nil, IntoRhoValue::into_rho_value)
     }
 }
 

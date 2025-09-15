@@ -3,13 +3,11 @@ use proc_macro2::Literal;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, parse_macro_input};
 
-pub(crate) fn into_rho_value_derive(input: TokenStream) -> TokenStream {
+pub fn into_rho_value_derive(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
 
-    let name = input.ident;
-
     let expanded = match input.data {
-        Data::Struct(data) => impl_for_struct(name, data.fields),
+        Data::Struct(data) => impl_for_struct(&input.ident, data.fields),
         Data::Enum(_) => panic!("`IntoRhoValue` cannot be derived for enum"),
         Data::Union(_) => panic!("`IntoRhoValue` cannot be derived for unions"),
     };
@@ -17,7 +15,7 @@ pub(crate) fn into_rho_value_derive(input: TokenStream) -> TokenStream {
     TokenStream::from(expanded)
 }
 
-fn impl_for_struct(name: syn::Ident, fields: Fields) -> proc_macro2::TokenStream {
+fn impl_for_struct(name: &syn::Ident, fields: Fields) -> proc_macro2::TokenStream {
     let into_rho_value_impl = match fields {
         Fields::Named(fields) => {
             let field_initializers = fields.named.into_iter().map(|f| {
