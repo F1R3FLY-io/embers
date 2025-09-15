@@ -4,7 +4,7 @@ new rl(`rho:registry:lookup`),
     revVaultCh,
     eitherCh,
     stackCh,
-    debug(`rho:io:stdout`),
+    abort(`rho:execution:abort`),
     devNull(`rho:io:devNull`),
     okOrAbort,
     doTransfer,
@@ -55,7 +55,7 @@ in {
         for(@either <- eitherCh) {
             match either {
                 (true, v) => f!(v)
-                (false, err) => debug!([log, err])
+                (false, err) => abort!([log, err])
             }
         }
     } |
