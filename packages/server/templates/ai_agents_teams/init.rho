@@ -1,6 +1,7 @@
 new rl(`rho:registry:lookup`),
     revAddress(`rho:rev:address`),
     devNull(`rho:io:devNull`),
+    abort(`rho:execution:abort`),
     treeHashMapCh,
     listOpsCh,
     stackCh,
@@ -149,7 +150,7 @@ in {
                 } |
 
                 for(<- errCh) {
-                    Nil
+                    abort!("in createAiAgentsTeam")
                 } |
 
                 visit!("agentsTeams", address, *valueCh, *nilCh)
@@ -262,7 +263,7 @@ in {
                 } |
 
                 for(<- errCh) {
-                    Nil
+                    abort!("in saveAiAgentsTeam")
                 } |
 
                 visit!("agentsTeamVersions", address, id, *valueCh, *errCh)
