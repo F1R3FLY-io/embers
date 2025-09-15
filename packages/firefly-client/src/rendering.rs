@@ -32,6 +32,41 @@ impl IntoRhoValue for Value {
     }
 }
 
+impl IntoRhoValue for () {
+    fn into_rho_value(self) -> Value {
+        Value::Tuple(Default::default())
+    }
+}
+
+macro_rules! impl_into_rho_value {
+    ($($ty:ident),+) => {
+        #[allow(non_snake_case)]
+        impl<$($ty),+> IntoRhoValue for ($($ty,)+)
+        where
+            $($ty: IntoRhoValue,)+
+        {
+            fn into_rho_value(self) -> Value {
+                let ($($ty,)+) = self;
+                Value::Tuple(vec![
+                    $(
+                        $ty.into_rho_value()
+                    ),+
+                ])
+            }
+        }
+    };
+}
+
+impl_into_rho_value!(R1);
+impl_into_rho_value!(R1, R2);
+impl_into_rho_value!(R1, R2, R3);
+impl_into_rho_value!(R1, R2, R3, R4);
+impl_into_rho_value!(R1, R2, R3, R4, R5);
+impl_into_rho_value!(R1, R2, R3, R4, R5, R6);
+impl_into_rho_value!(R1, R2, R3, R4, R5, R6, R7);
+impl_into_rho_value!(R1, R2, R3, R4, R5, R6, R7, R8);
+impl_into_rho_value!(R1, R2, R3, R4, R5, R6, R7, R8, R9);
+
 impl IntoRhoValue for bool {
     fn into_rho_value(self) -> Value {
         Value::Bool(self)
@@ -112,6 +147,16 @@ impl<T: IntoRhoValue> IntoRhoValue for BTreeMap<String, T> {
         Value::Map(
             self.into_iter()
                 .map(|(k, v)| (k, v.into_rho_value()))
+                .collect(),
+        )
+    }
+}
+
+impl<'a, T: IntoRhoValue> IntoRhoValue for BTreeMap<&'a str, T> {
+    fn into_rho_value(self) -> Value {
+        Value::Map(
+            self.into_iter()
+                .map(|(k, v)| (k.to_owned(), v.into_rho_value()))
                 .collect(),
         )
     }

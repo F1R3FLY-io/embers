@@ -1,4 +1,5 @@
 use proc_macro::TokenStream;
+use proc_macro2::Literal;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, parse_macro_input};
 
@@ -42,8 +43,9 @@ fn impl_for_struct(name: syn::Ident, fields: Fields) -> proc_macro2::TokenStream
         }
         Fields::Unnamed(fields) => {
             let field_initializers = fields.unnamed.into_iter().enumerate().map(|(i, _)| {
+                let lit = Literal::u64_unsuffixed(i as _);
                 quote! {
-                    ::firefly_client::rendering::IntoRhoValue::into_rho_value(self.#i)
+                    ::firefly_client::rendering::IntoRhoValue::into_rho_value(self.#lit)
                 }
             });
             quote! {
