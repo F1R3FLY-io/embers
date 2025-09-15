@@ -2,24 +2,21 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::anyhow;
-use firefly_client::{ReadNodeClient, WriteNodeClient, template};
+use firefly_client::rendering::Render;
+use firefly_client::{ReadNodeClient, WriteNodeClient};
 use secp256k1::SecretKey;
 
-template! {
-    #[template(path = "ai_agents_teams/run_demo.rho")]
-    #[derive(Debug, Clone)]
-    struct RunAiAgentsTeamsDemo {
-        name: String,
-        prompt: String,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents_teams/run_demo.rho")]
+struct RunAiAgentsTeamsDemo {
+    name: String,
+    prompt: String,
 }
 
-template! {
-    #[template(path = "ai_agents_teams/get_demo_result.rho")]
-    #[derive(Debug, Clone)]
-    struct GetAiAgentsTeamsDemoResult {
-        prompt: String,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents_teams/get_demo_result.rho")]
+struct GetAiAgentsTeamsDemoResult {
+    prompt: String,
 }
 
 #[tracing::instrument(

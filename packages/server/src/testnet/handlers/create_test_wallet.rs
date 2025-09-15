@@ -1,4 +1,5 @@
-use firefly_client::{WriteNodeClient, template};
+use firefly_client::WriteNodeClient;
+use firefly_client::rendering::Render;
 use secp256k1::{PublicKey, Secp256k1, SecretKey, rand};
 
 use crate::common::models::WalletAddress;
@@ -6,14 +7,12 @@ use crate::testnet::models::CreateTestwalletResp;
 
 const TEST_WALLET_BALANCE: i64 = 1_000_000_000;
 
-template! {
-    #[template(path = "testnet/fund_test_wallet.rho")]
-    #[derive(Debug, Clone)]
-    struct FundTestWallet {
-        wallet_address_from: WalletAddress,
-        wallet_address_to: WalletAddress,
-        amount: i64,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "testnet/fund_test_wallet.rho")]
+struct FundTestWallet {
+    wallet_address_from: WalletAddress,
+    wallet_address_to: WalletAddress,
+    amount: i64,
 }
 
 #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]

@@ -1,22 +1,21 @@
 use chrono::{DateTime, Utc};
+use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
-use firefly_client::{WriteNodeClient, template};
+use firefly_client::rendering::Render;
 
 use crate::common::models::{PreparedContract, WalletAddress};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
 use crate::wallets::models::{Description, PrepareTransferInput};
 
-template! {
-    #[template(path = "wallets/send_tokens.rho")]
-    #[derive(Debug, Clone)]
-    struct TransferContract {
-        timestamp: DateTime<Utc>,
-        wallet_address_from: WalletAddress,
-        wallet_address_to: WalletAddress,
-        amount: i64,
-        description: Option<Description>,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "wallets/send_tokens.rho")]
+struct TransferContract {
+    timestamp: DateTime<Utc>,
+    wallet_address_from: WalletAddress,
+    wallet_address_to: WalletAddress,
+    amount: i64,
+    description: Option<Description>,
 }
 
 #[tracing::instrument(

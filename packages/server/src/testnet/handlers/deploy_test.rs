@@ -2,7 +2,8 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use firefly_client::models::DeployId;
-use firefly_client::{ReadNodeClient, WriteNodeClient, template};
+use firefly_client::rendering::Render;
+use firefly_client::{ReadNodeClient, WriteNodeClient};
 
 use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
@@ -14,12 +15,10 @@ use crate::testnet::models::{
     DeployTestResp,
 };
 
-template! {
-    #[template(path = "testnet/get_logs.rho")]
-    #[derive(Debug, Clone)]
-    struct GetLogs {
-        deploy_id: DeployId,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "testnet/get_logs.rho")]
+struct GetLogs {
+    deploy_id: DeployId,
 }
 
 #[tracing::instrument(level = "info", skip_all, fields(request), ret(Debug, level = "trace"))]

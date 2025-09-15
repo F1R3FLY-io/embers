@@ -1,18 +1,17 @@
 use anyhow::Context;
 use firefly_client::models::SignedCode;
-use firefly_client::{ReadNodeClient, WriteNodeClient, template};
+use firefly_client::rendering::Render;
+use firefly_client::{ReadNodeClient, WriteNodeClient};
 
 use crate::ai_agents_teams::handlers::get_agents_team;
 use crate::ai_agents_teams::models::{DeployAgentsTeamReq, DeployAgentsTeamResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
 
-template! {
-    #[template(path = "ai_agents_teams/deploy_demo.rho")]
-    #[derive(Debug, Clone)]
-    struct DeployAiAgentsTeamsDemo {
-        name: String,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents_teams/deploy_demo.rho")]
+struct DeployAiAgentsTeamsDemo {
+    name: String,
 }
 
 #[tracing::instrument(

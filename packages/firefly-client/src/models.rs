@@ -5,6 +5,7 @@ use derive_more::{AsRef, Display, From, Into};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::helpers::ShortHex;
+use crate::rendering::{IntoRhoValue, Value};
 
 pub mod servicemodelapi {
     #![allow(warnings)]
@@ -39,6 +40,12 @@ pub mod casper {
 )]
 pub struct BlockId(String);
 
+impl IntoRhoValue for BlockId {
+    fn into_rho_value(self) -> Value {
+        self.0.into_rho_value()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockInfo {
@@ -50,6 +57,12 @@ pub struct BlockInfo {
     Debug, Clone, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Into, From, Serialize, Deserialize,
 )]
 pub struct DeployId(String);
+
+impl IntoRhoValue for DeployId {
+    fn into_rho_value(self) -> Value {
+        self.0.into_rho_value()
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

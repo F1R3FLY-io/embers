@@ -1,16 +1,15 @@
-use firefly_client::{ReadNodeClient, template};
+use firefly_client::ReadNodeClient;
+use firefly_client::rendering::Render;
 
 use crate::ai_agents_teams::blockchain::dtos;
 use crate::ai_agents_teams::models::AgentsTeams;
 use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
 
-template! {
-    #[template(path = "ai_agents_teams/list_agents_teams.rho")]
-    #[derive(Debug, Clone)]
-    struct ListAgentsTeams {
-        address: WalletAddress,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents_teams/list_agents_teams.rho")]
+struct ListAgentsTeams {
+    address: WalletAddress,
 }
 
 #[tracing::instrument(

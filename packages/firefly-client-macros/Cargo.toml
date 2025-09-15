@@ -1,0 +1,33 @@
+[package]
+edition = "2024"
+name    = "firefly-client-macros"
+publish = false
+version = "0.1.0"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+darling     = { version = "0.21" }
+proc-macro2 = { version = "1.0" }
+quote       = { version = "1.0" }
+syn         = { version = "2.0" }
+
+[lints.clippy]
+cast_possible_wrap    = "allow"
+cast_sign_loss        = "allow"
+default_trait_access  = "allow"
+ignored_unit_patterns = "allow"
+implicit_hasher       = "allow"
+match_same_arms       = "allow"
+missing_errors_doc    = "allow"
+must_use_candidate    = "allow"
+too_many_lines        = "allow"
+
+[lints.clippy.pedantic]
+level    = "warn"
+priority = -1
+
+[lints.clippy.nursery]
+level    = "warn"
+priority = -1

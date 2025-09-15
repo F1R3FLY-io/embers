@@ -1,8 +1,9 @@
 use derive_more::{AsRef, Into};
+use firefly_client::rendering::IntoRhoValue;
 use serde::Serialize;
 use thiserror::Error;
 
-#[derive(Debug, Clone, Serialize, Into, AsRef)]
+#[derive(Debug, Clone, Serialize, Into, AsRef, IntoRhoValue)]
 pub struct Description(String);
 
 const MAX_DESCRIPTION_CHARS_COUNT: usize = 512;
