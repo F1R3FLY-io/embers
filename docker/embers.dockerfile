@@ -3,7 +3,7 @@ FROM --platform=$BUILDPLATFORM rust:1.89-slim-bookworm AS builder
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends pkg-config protobuf-compiler clang gcc-aarch64-linux-gnu && \
+    apt-get install -y --no-install-recommends pkg-config protobuf-compiler clang gcc-aarch64-linux-gnu libc6-dev-arm64-cross && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* && \
     rustup target add x86_64-unknown-linux-gnu && \
