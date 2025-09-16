@@ -4,80 +4,80 @@ use firefly_client::rendering::*;
 
 #[test]
 fn test_serialize_bool() {
-    let result = true.into_rho_value();
+    let result = true.into_value();
     let expected = Value::Bool(true);
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_i8() {
-    let result = 1i8.into_rho_value();
+    let result = 1i8.into_value();
     let expected = Value::Int(1);
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_i16() {
-    let result = 1i16.into_rho_value();
+    let result = 1i16.into_value();
     let expected = Value::Int(1);
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_i32() {
-    let result = 1i32.into_rho_value();
+    let result = 1i32.into_value();
     let expected = Value::Int(1);
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_i64() {
-    let result = 1i64.into_rho_value();
+    let result = 1i64.into_value();
     let expected = Value::Int(1);
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_str() {
-    let result = "str".into_rho_value();
+    let result = "str".into_value();
     let expected = Value::String("str".to_owned());
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_none() {
-    let result = None::<String>.into_rho_value();
+    let result = None::<String>.into_value();
     let expected = Value::Nil;
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_some() {
-    let result = Some("str").into_rho_value();
+    let result = Some("str").into_value();
     let expected = Value::String("str".into());
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_unit() {
-    let result = ().into_rho_value();
+    let result = ().into_value();
     let expected = Value::Tuple(Default::default());
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_newtype_struct() {
-    #[derive(IntoRhoValue)]
+    #[derive(IntoValue)]
     struct NewType(String);
 
-    let result = NewType("str".to_owned()).into_rho_value();
+    let result = NewType("str".to_owned()).into_value();
     let expected = Value::String("str".into());
     assert_eq!(result, expected);
 }
 
 #[test]
 fn test_serialize_seq() {
-    let result = vec!["foo", "bar"].into_rho_value();
+    let result = vec!["foo", "bar"].into_value();
 
     let expected = Value::List(vec![
         Value::String("foo".into()),
@@ -88,7 +88,7 @@ fn test_serialize_seq() {
 
 #[test]
 fn test_serialize_tuple() {
-    let result = ("foo", "bar").into_rho_value();
+    let result = ("foo", "bar").into_value();
 
     let expected = Value::Tuple(vec![
         Value::String("foo".into()),
@@ -99,10 +99,10 @@ fn test_serialize_tuple() {
 
 #[test]
 fn test_serialize_tuple_struct() {
-    #[derive(IntoRhoValue)]
+    #[derive(IntoValue)]
     struct TupleStruct(String, String);
 
-    let result = TupleStruct("foo".into(), "bar".into()).into_rho_value();
+    let result = TupleStruct("foo".into(), "bar".into()).into_value();
 
     let expected = Value::Tuple(vec![
         Value::String("foo".into()),
@@ -115,7 +115,7 @@ fn test_serialize_tuple_struct() {
 fn test_serialize_map() {
     let result = std::iter::once(("foo", "bar"))
         .collect::<BTreeMap<_, _>>()
-        .into_rho_value();
+        .into_value();
 
     let expected =
         Value::Map(std::iter::once(("foo".to_owned(), Value::String("bar".to_owned()))).collect());
@@ -124,7 +124,7 @@ fn test_serialize_map() {
 
 #[test]
 fn test_serialize_struct() {
-    #[derive(IntoRhoValue)]
+    #[derive(IntoValue)]
     struct Struct {
         name: String,
         second_name: String,
@@ -134,7 +134,7 @@ fn test_serialize_struct() {
         name: "foo".into(),
         second_name: "bar".into(),
     }
-    .into_rho_value();
+    .into_value();
 
     let expected = Value::Map(
         [
@@ -208,7 +208,7 @@ fn test_render_map() {
 fn test_serialize_str_is_escaped() {
     let cases = [("foo\\", "\"foo\\\\\""), ("\"foo\"", "\"\\\"foo\\\"\"")];
     for (value, expected) in cases {
-        let result = value.into_rho_value();
+        let result = value.into_value();
         assert_eq!(result.to_string(), expected);
     }
 }

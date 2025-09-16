@@ -1,7 +1,7 @@
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 use derive_more::{AsRef, Into};
-use firefly_client::rendering::IntoRhoValue;
+use firefly_client::rendering::IntoValue;
 use secp256k1::PublicKey;
 use serde::Serialize;
 use thiserror::Error;
@@ -9,7 +9,7 @@ use thiserror::Error;
 pub const FIRECAP_ID: [u8; 3] = [0, 0, 0];
 pub const FIRECAP_VERSION: u8 = 0;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Into, AsRef, IntoRhoValue)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Into, AsRef, IntoValue)]
 pub struct WalletAddress(String);
 
 #[derive(Debug, Clone, Error)]

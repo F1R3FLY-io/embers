@@ -5,7 +5,7 @@ use derive_more::{AsRef, Display, From, Into};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
 use crate::helpers::ShortHex;
-use crate::rendering::{IntoRhoValue, Value};
+use crate::rendering::{IntoValue, Value};
 
 pub mod servicemodelapi {
     #![allow(warnings)]
@@ -40,9 +40,9 @@ pub mod casper {
 )]
 pub struct BlockId(String);
 
-impl IntoRhoValue for BlockId {
-    fn into_rho_value(self) -> Value {
-        self.0.into_rho_value()
+impl IntoValue for BlockId {
+    fn into_value(self) -> Value {
+        self.0.into_value()
     }
 }
 
@@ -58,9 +58,9 @@ pub struct BlockInfo {
 )]
 pub struct DeployId(String);
 
-impl IntoRhoValue for DeployId {
-    fn into_rho_value(self) -> Value {
-        self.0.into_rho_value()
+impl IntoValue for DeployId {
+    fn into_value(self) -> Value {
+        self.0.into_value()
     }
 }
 

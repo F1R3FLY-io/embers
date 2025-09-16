@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-pub use firefly_client_macros::{IntoRhoValue, Render};
+pub use firefly_client_macros::{IntoValue, Render};
 use uuid::Uuid;
 
 use crate::models::{DeployData, DeployDataBuilder};
@@ -22,18 +22,18 @@ pub enum Value {
     Inline(String),
 }
 
-pub trait IntoRhoValue {
-    fn into_rho_value(self) -> Value;
+pub trait IntoValue {
+    fn into_value(self) -> Value;
 }
 
-impl IntoRhoValue for Value {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for Value {
+    fn into_value(self) -> Value {
         self
     }
 }
 
-impl IntoRhoValue for () {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for () {
+    fn into_value(self) -> Value {
         Value::Tuple(Default::default())
     }
 }
@@ -41,15 +41,15 @@ impl IntoRhoValue for () {
 macro_rules! impl_into_rho_value {
     ($($ty:ident),+) => {
         #[allow(non_snake_case)]
-        impl<$($ty),+> IntoRhoValue for ($($ty,)+)
+        impl<$($ty),+> IntoValue for ($($ty,)+)
         where
-            $($ty: IntoRhoValue,)+
+            $($ty: IntoValue,)+
         {
-            fn into_rho_value(self) -> Value {
+            fn into_value(self) -> Value {
                 let ($($ty,)+) = self;
                 Value::Tuple(vec![
                     $(
-                        $ty.into_rho_value()
+                        $ty.into_value()
                     ),+
                 ])
             }
@@ -67,124 +67,120 @@ impl_into_rho_value!(R1, R2, R3, R4, R5, R6, R7);
 impl_into_rho_value!(R1, R2, R3, R4, R5, R6, R7, R8);
 impl_into_rho_value!(R1, R2, R3, R4, R5, R6, R7, R8, R9);
 
-impl IntoRhoValue for bool {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for bool {
+    fn into_value(self) -> Value {
         Value::Bool(self)
     }
 }
 
-impl IntoRhoValue for i8 {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for i8 {
+    fn into_value(self) -> Value {
         Value::Int(self.into())
     }
 }
 
-impl IntoRhoValue for i16 {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for i16 {
+    fn into_value(self) -> Value {
         Value::Int(self.into())
     }
 }
 
-impl IntoRhoValue for i32 {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for i32 {
+    fn into_value(self) -> Value {
         Value::Int(self.into())
     }
 }
 
-impl IntoRhoValue for i64 {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for i64 {
+    fn into_value(self) -> Value {
         Value::Int(self)
     }
 }
 
-impl IntoRhoValue for String {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for String {
+    fn into_value(self) -> Value {
         Value::String(self)
     }
 }
 
-impl IntoRhoValue for &str {
-    fn into_rho_value(self) -> Value {
-        self.to_string().into_rho_value()
+impl IntoValue for &str {
+    fn into_value(self) -> Value {
+        self.to_string().into_value()
     }
 }
 
-impl IntoRhoValue for Vec<u8> {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for Vec<u8> {
+    fn into_value(self) -> Value {
         Value::Bytes(self)
     }
 }
 
-impl IntoRhoValue for &[u8] {
-    fn into_rho_value(self) -> Value {
-        self.to_vec().into_rho_value()
+impl IntoValue for &[u8] {
+    fn into_value(self) -> Value {
+        self.to_vec().into_value()
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Uri(pub String);
 
-impl IntoRhoValue for Uri {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for Uri {
+    fn into_value(self) -> Value {
         Value::Uri(self.0)
     }
 }
 
-impl<T: IntoRhoValue> IntoRhoValue for Vec<T> {
-    fn into_rho_value(self) -> Value {
-        Value::List(self.into_iter().map(IntoRhoValue::into_rho_value).collect())
+impl<T: IntoValue> IntoValue for Vec<T> {
+    fn into_value(self) -> Value {
+        Value::List(self.into_iter().map(IntoValue::into_value).collect())
     }
 }
 
-impl<T: IntoRhoValue> IntoRhoValue for BTreeSet<T> {
-    fn into_rho_value(self) -> Value {
-        Value::Set(self.into_iter().map(IntoRhoValue::into_rho_value).collect())
+impl<T: IntoValue> IntoValue for BTreeSet<T> {
+    fn into_value(self) -> Value {
+        Value::Set(self.into_iter().map(IntoValue::into_value).collect())
     }
 }
 
-impl<T: IntoRhoValue> IntoRhoValue for BTreeMap<String, T> {
-    fn into_rho_value(self) -> Value {
+impl<T: IntoValue> IntoValue for BTreeMap<String, T> {
+    fn into_value(self) -> Value {
+        Value::Map(self.into_iter().map(|(k, v)| (k, v.into_value())).collect())
+    }
+}
+
+impl<T: IntoValue> IntoValue for BTreeMap<&str, T> {
+    fn into_value(self) -> Value {
         Value::Map(
             self.into_iter()
-                .map(|(k, v)| (k, v.into_rho_value()))
+                .map(|(k, v)| (k.to_owned(), v.into_value()))
                 .collect(),
         )
     }
 }
 
-impl<T: IntoRhoValue> IntoRhoValue for BTreeMap<&str, T> {
-    fn into_rho_value(self) -> Value {
-        Value::Map(
-            self.into_iter()
-                .map(|(k, v)| (k.to_owned(), v.into_rho_value()))
-                .collect(),
-        )
+impl<T: IntoValue> IntoValue for Option<T> {
+    fn into_value(self) -> Value {
+        self.map_or(Value::Nil, IntoValue::into_value)
     }
 }
 
-impl<T: IntoRhoValue> IntoRhoValue for Option<T> {
-    fn into_rho_value(self) -> Value {
-        self.map_or(Value::Nil, IntoRhoValue::into_rho_value)
+impl IntoValue for Uuid {
+    fn into_value(self) -> Value {
+        self.to_string().into_value()
     }
 }
 
-impl IntoRhoValue for Uuid {
-    fn into_rho_value(self) -> Value {
-        self.to_string().into_rho_value()
-    }
-}
-
-impl<Tz: chrono::TimeZone> IntoRhoValue for chrono::DateTime<Tz> {
-    fn into_rho_value(self) -> Value {
-        self.to_rfc3339().into_rho_value()
+impl<Tz: chrono::TimeZone> IntoValue for chrono::DateTime<Tz> {
+    fn into_value(self) -> Value {
+        self.to_rfc3339().into_value()
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Inline(pub String);
 
-impl IntoRhoValue for Inline {
-    fn into_rho_value(self) -> Value {
+impl IntoValue for Inline {
+    fn into_value(self) -> Value {
         Value::Inline(self.0)
     }
 }
@@ -248,13 +244,13 @@ impl fmt::Display for Value {
 }
 
 pub trait Render: Sized {
-    fn render(self) -> Result<String, _dependencies::askama::Error>;
+    fn render(self) -> Result<String, askama::Error>;
 
-    fn builder(self) -> Result<DeployDataBuilder, _dependencies::askama::Error> {
+    fn builder(self) -> Result<DeployDataBuilder, askama::Error> {
         self.render().map(DeployData::builder)
     }
 }
 
 pub mod _dependencies {
-    pub use {askama, serde};
+    pub use askama;
 }

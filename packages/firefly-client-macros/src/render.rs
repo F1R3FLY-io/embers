@@ -20,8 +20,8 @@ pub fn render_derive(input: TokenStream) -> TokenStream {
 
     let expanded = match input.data {
         Data::Struct(data) => impl_for_struct(args, data.fields),
-        Data::Enum(_) => panic!("`IntoRhoValue` cannot be derived for enum"),
-        Data::Union(_) => panic!("`IntoRhoValue` cannot be derived for unions"),
+        Data::Enum(_) => panic!("`IntoValue` cannot be derived for enum"),
+        Data::Union(_) => panic!("`IntoValue` cannot be derived for unions"),
     };
 
     TokenStream::from(expanded)
@@ -31,8 +31,8 @@ fn impl_for_struct(args: Args, fields: Fields) -> proc_macro2::TokenStream {
     let Args { ident, path } = args;
     let fields: Vec<_> = match fields {
         Fields::Named(fields) => fields.named.into_iter().map(|f| f.ident.unwrap()).collect(),
-        Fields::Unnamed(_) => panic!("`IntoRhoValue` cannot be derived for unnamed struct"),
-        Fields::Unit => panic!("`IntoRhoValue` cannot be derived for unit struct"),
+        Fields::Unnamed(_) => panic!("`IntoValue` cannot be derived for unnamed struct"),
+        Fields::Unit => panic!("`IntoValue` cannot be derived for unit struct"),
     };
 
     let template_struct_fields = fields.iter().map(|f| {
@@ -43,7 +43,7 @@ fn impl_for_struct(args: Args, fields: Fields) -> proc_macro2::TokenStream {
 
     let template_object_fields = fields.iter().map(|f| {
         quote! {
-            #f: ::firefly_client::rendering::IntoRhoValue::into_rho_value(self.#f)
+            #f: ::firefly_client::rendering::IntoValue::into_value(self.#f)
         }
     });
 
