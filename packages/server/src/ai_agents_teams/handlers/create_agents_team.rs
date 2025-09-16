@@ -1,21 +1,20 @@
+use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
-use firefly_client::{WriteNodeClient, template};
+use firefly_client::rendering::Render;
 use uuid::Uuid;
 
 use crate::ai_agents_teams::models::{CreateAgentsTeamReq, CreateAgentsTeamResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
 
-template! {
-    #[template(path = "ai_agents_teams/create_agents_team.rho")]
-    #[derive(Debug, Clone)]
-    struct CreateAgentsTeam {
-        id: Uuid,
-        version: Uuid,
-        name: String,
-        shard: Option<String>,
-        graph: Option<String>,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents_teams/create_agents_team.rho")]
+struct CreateAgentsTeam {
+    id: Uuid,
+    version: Uuid,
+    name: String,
+    shard: Option<String>,
+    graph: Option<String>,
 }
 
 #[tracing::instrument(

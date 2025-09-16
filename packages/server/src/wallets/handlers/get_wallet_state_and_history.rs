@@ -1,17 +1,16 @@
+use firefly_client::ReadNodeClient;
 use firefly_client::models::Either;
-use firefly_client::{ReadNodeClient, template};
+use firefly_client::rendering::Render;
 
 use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
 use crate::wallets::blockchain::dtos;
 use crate::wallets::models::{Direction, Transfer, WalletStateAndHistory};
 
-template! {
-    #[template(path = "wallets/get_balance_and_histry.rho")]
-    #[derive(Debug, Clone)]
-    struct GetBalanceAndHistory {
-        wallet_address: WalletAddress,
-    }
+#[derive(Debug, Clone, Render)]
+#[template(path = "wallets/get_balance_and_histry.rho")]
+struct GetBalanceAndHistory {
+    wallet_address: WalletAddress,
 }
 
 #[tracing::instrument(

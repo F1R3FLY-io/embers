@@ -6,6 +6,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
+COPY packages/firefly-client-macros firefly-client-macros
 COPY packages/firefly-client firefly-client
 COPY packages/state-sync state-sync
 
