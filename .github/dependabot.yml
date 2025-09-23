@@ -31,3 +31,8 @@ updates:
       all:
         patterns:
           - "*"
+
+  - package-ecosystem: docker
+    directory: /docker
+    schedule:
+      interval: "weekly"
