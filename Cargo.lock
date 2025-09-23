@@ -1127,7 +1127,7 @@ dependencies = [
 [[package]]
 name = "graph-to-rholang-parser"
 version = "0.0.1"
-source = "git+https://github.com/F1R3FLY-io/graph-to-rholang-parser?tag=0.0.12#19092de2c19046ccb33c73e5d01884a10e3594de"
+source = "git+https://github.com/F1R3FLY-io/graph-to-rholang-parser?tag=0.0.14#121e2073de0d1194e33b0c8187daa2041ab168f6"
 dependencies = [
  "bindgen",
  "cc",
@@ -1580,9 +1580,9 @@ checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
 
 [[package]]
 name = "libc"
-version = "0.2.175"
+version = "0.2.176"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a82ae493e598baaea5209805c49bbf2ea7de956d50d7da0da1164f9c6d28543"
+checksum = "58f929b4d672ea937a23a1ab494143d968337a5f47e56d0815df1e0890ddf174"
 
 [[package]]
 name = "libloading"
@@ -2508,6 +2508,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "askama",
+ "base64",
  "blake2",
  "bon",
  "bs58",

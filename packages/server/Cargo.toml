@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 anyhow             = { version = "1.0", features = ["std"] }
 askama             = { version = "0.14" }
+base64             = { version = "0.22" }
 blake2             = { version = "0.10" }
 bon                = { version = "3.7" }
 bs58               = { version = "0.5" }
@@ -22,7 +23,7 @@ chrono             = { version = "0.4", features = ["serde"] }
 derive_more        = { version = "2.0", features = ["full"] }
 figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }
-graphl-parser      = { package = "graph-to-rholang-parser", git = "https://github.com/F1R3FLY-io/graph-to-rholang-parser", tag = "0.0.12" }
+graphl-parser      = { package = "graph-to-rholang-parser", git = "https://github.com/F1R3FLY-io/graph-to-rholang-parser", tag = "0.0.14" }
 hex                = { version = "0.4" }
 poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
 poem-openapi       = { version = "5.1", features = ["chrono", "swagger-ui"] }

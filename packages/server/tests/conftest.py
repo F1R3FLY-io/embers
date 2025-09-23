@@ -73,12 +73,12 @@ def assert_match_transfer(transfer: dict, match: dict):
 
 @pytest.fixture
 def agent(client: ApiClient, funded_wallet: Wallet) -> Agent:
-    resp = client.ai_agents.create(funded_wallet, name="my_agent")
+    resp = client.ai_agents.create(funded_wallet, name="my_agent", code='@Nil!("foo")')
     assert resp.status == 200
 
     wait_for_read_node_sync()
 
-    return Agent(id=resp.json["id"], version=resp.json["version"], name="my_agent")
+    return Agent(id=resp.json["id"], version=resp.json["version"], name="my_agent", code='@Nil!("foo")')
 
 
 def assert_match_agent(agent: dict, match: Agent):
