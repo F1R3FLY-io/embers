@@ -1,4 +1,4 @@
-FROM --platform=$BUILDPLATFORM rust:1.89-slim-bookworm AS builder
+FROM --platform=$BUILDPLATFORM rust:1.90-slim-bookworm AS builder
 
 WORKDIR /app
 
