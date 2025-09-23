@@ -1,3 +1,5 @@
+use base64::Engine;
+use base64::prelude::BASE64_STANDARD;
 use firefly_client::WriteNodeClient;
 use firefly_client::models::SignedCode;
 use firefly_client::rendering::Render;
@@ -38,7 +40,7 @@ pub async fn prepare_save_agent_contract(
         version,
         name: request.name,
         shard: request.shard,
-        code: request.code,
+        code: request.code.map(|v| BASE64_STANDARD.encode(v)),
     }
     .render()?;
 

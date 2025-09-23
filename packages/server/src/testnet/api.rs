@@ -4,8 +4,7 @@ use poem_openapi::OpenApi;
 use poem_openapi::payload::Json;
 use secp256k1::SecretKey;
 
-use crate::common::api::TestNet;
-use crate::common::api::dtos::ApiTags;
+use crate::common::api::dtos::{ApiTags, TestNet};
 use crate::testnet::api::dtos::{
     CreateTestwalletResp,
     DeploySignedTestReq,

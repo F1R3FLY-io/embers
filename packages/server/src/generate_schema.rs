@@ -4,16 +4,18 @@ mod common;
 mod testnet;
 mod wallets;
 
-use ai_agents::api::AIAgents;
-use ai_agents_teams::api::AIAgentsTeams;
 use poem_openapi::OpenApiService;
-use testnet::api::Testnet;
-use wallets::api::WalletsApi;
+
+use crate::ai_agents::api::AIAgents;
+use crate::ai_agents_teams::api::AIAgentsTeams;
+use crate::common::api::Service;
+use crate::testnet::api::Testnet;
+use crate::wallets::api::WalletsApi;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let api = OpenApiService::new(
-        (Testnet, WalletsApi, AIAgents, AIAgentsTeams),
+        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams),
         "Embers API",
         "0.1.0",
     )
