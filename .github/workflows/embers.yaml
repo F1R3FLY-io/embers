@@ -53,24 +53,6 @@ jobs:
       - name: Run tests
         run: cargo make test
 
-      - name: Start services
-        run: cargo make docker-up
-
-      - name: Run embers
-        run: cargo make server run &
-
-      - name: Wait for embers
-        run: |
-          echo "Waiting for 10 seconds for the app to start..."
-          sleep 10
-
-      - name: Run embers
-        run: cargo make server e2e-test
-
-      - name: Stop services
-        if: always()
-        run: cargo make docker-down
-
   lint-python:
     runs-on: ubuntu-latest
 

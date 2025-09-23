@@ -234,6 +234,7 @@ pub enum ApiTags {
     Wallets,
     AIAgents,
     AIAgentsTeams,
+    Service,
 }
 
 #[derive(Debug, Clone, Object)]
@@ -315,3 +316,6 @@ impl From<SignedContract> for firefly_client::models::SignedCode {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct TestNet<T>(pub T);
