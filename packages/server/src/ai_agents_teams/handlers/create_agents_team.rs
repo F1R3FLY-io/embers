@@ -38,7 +38,7 @@ pub async fn prepare_create_agents_team_contract(
         version,
         name: request.name,
         shard: request.shard,
-        graph: request.graph,
+        graph: request.graph.map(|graph| graph.to_graphl()),
     }
     .render()?;
 

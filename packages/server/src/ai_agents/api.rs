@@ -25,7 +25,7 @@ use crate::ai_agents::handlers::{
     prepare_deploy_agent_contract,
     prepare_save_agent_contract,
 };
-use crate::common::api::dtos::{ApiTags, MaybeNotFound, ParseFromString, SignedContract};
+use crate::common::api::dtos::{ApiTags, MaybeNotFound, SignedContract, Stringified};
 use crate::common::models::WalletAddress;
 
 mod dtos;
@@ -38,7 +38,7 @@ impl AIAgents {
     #[oai(path = "/:address", method = "get")]
     async fn list(
         &self,
-        Path(address): Path<ParseFromString<WalletAddress>>,
+        Path(address): Path<Stringified<WalletAddress>>,
         Data(read_client): Data<&ReadNodeClient>,
     ) -> poem::Result<Json<Agents>> {
         let agents = list_agents(address.0, read_client).await?;
@@ -48,7 +48,7 @@ impl AIAgents {
     #[oai(path = "/:address/:id/versions", method = "get")]
     async fn list_versions(
         &self,
-        Path(address): Path<ParseFromString<WalletAddress>>,
+        Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Data(read_client): Data<&ReadNodeClient>,
     ) -> MaybeNotFound<Agents> {
@@ -58,7 +58,7 @@ impl AIAgents {
     #[oai(path = "/:address/:id/versions/:version", method = "get")]
     async fn get(
         &self,
-        Path(address): Path<ParseFromString<WalletAddress>>,
+        Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
         Data(read_client): Data<&ReadNodeClient>,

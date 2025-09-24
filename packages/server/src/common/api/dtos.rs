@@ -16,7 +16,8 @@ use poem_openapi::types::{
 };
 use poem_openapi::{ApiResponse, NewType, Object, Tags};
 
-use crate::common::models::{self, PositiveNonZero};
+use crate::ai_agents_teams::models::Graph;
+use crate::common::models::{self, PositiveNonZero, WalletAddress};
 
 impl<T> Type for PositiveNonZero<T>
 where
@@ -162,14 +163,19 @@ impl ToJSON for Stringified<PositiveNonZero<i64>> {
     }
 }
 
-/// Parses [`String`] path parameter into T using [`TryFrom::try_from`].
-#[derive(Debug, Clone, From)]
-pub struct ParseFromString<T>(pub T);
+impl Format for WalletAddress {
+    fn format() -> &'static str {
+        "blockchain-address"
+    }
+}
 
-impl<T> Type for ParseFromString<T>
-where
-    T: Send + Sync,
-{
+impl From<Stringified<WalletAddress>> for WalletAddress {
+    fn from(value: Stringified<WalletAddress>) -> Self {
+        value.0
+    }
+}
+
+impl Type for WalletAddress {
     const IS_REQUIRED: bool = String::IS_REQUIRED;
 
     type RawValueType = Self;
@@ -198,33 +204,82 @@ where
     }
 }
 
-impl<T> ParseFromParameter for ParseFromString<T>
-where
-    T: TryFrom<String> + Send + Sync,
-    T::Error: std::fmt::Display,
-{
+impl ParseFromParameter for Stringified<WalletAddress> {
     fn parse_from_parameter(value: &str) -> ParseResult<Self> {
         value.to_owned().try_into().map(Self).map_err(Into::into)
     }
 }
 
-impl<T> ParseFromJSON for ParseFromString<T>
-where
-    T: TryFrom<String> + Send + Sync,
-    T::Error: std::fmt::Display,
-{
+impl ParseFromJSON for Stringified<WalletAddress> {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
         value.try_into().map(Self).map_err(Into::into)
     }
 }
 
-impl<T> ToJSON for ParseFromString<T>
-where
-    T: AsRef<String> + Send + Sync,
-{
+impl ToJSON for Stringified<WalletAddress> {
     fn to_json(&self) -> Option<serde_json::Value> {
         self.0.as_ref().to_json()
+    }
+}
+
+impl Format for Graph {
+    fn format() -> &'static str {
+        "graphl"
+    }
+}
+
+impl From<Stringified<Graph>> for Graph {
+    fn from(value: Stringified<Graph>) -> Self {
+        value.0
+    }
+}
+
+impl Type for Graph {
+    const IS_REQUIRED: bool = String::IS_REQUIRED;
+
+    type RawValueType = Self;
+    type RawElementValueType = Self;
+
+    fn name() -> Cow<'static, str> {
+        String::name()
+    }
+
+    fn schema_ref() -> MetaSchemaRef {
+        String::schema_ref()
+    }
+
+    fn register(registry: &mut Registry) {
+        String::register(registry);
+    }
+
+    fn as_raw_value(&self) -> Option<&Self::RawValueType> {
+        Some(self)
+    }
+
+    fn raw_element_iter<'a>(
+        &'a self,
+    ) -> Box<dyn Iterator<Item = &'a Self::RawElementValueType> + 'a> {
+        Box::new(self.as_raw_value().into_iter())
+    }
+}
+
+impl ParseFromParameter for Stringified<Graph> {
+    fn parse_from_parameter(value: &str) -> ParseResult<Self> {
+        Graph::new(value.to_owned()).map(Self).map_err(Into::into)
+    }
+}
+
+impl ParseFromJSON for Stringified<Graph> {
+    fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
+        let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
+        Graph::new(value).map(Self).map_err(Into::into)
+    }
+}
+
+impl ToJSON for Stringified<Graph> {
+    fn to_json(&self) -> Option<serde_json::Value> {
+        self.0.clone().to_graphl().to_json()
     }
 }
 

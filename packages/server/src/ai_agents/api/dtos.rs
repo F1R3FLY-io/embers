@@ -2,7 +2,7 @@ use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents::models;
-use crate::common::api::dtos::{ParseFromString, PreparedContract, Stringified};
+use crate::common::api::dtos::{PreparedContract, Stringified};
 use crate::common::models::{PositiveNonZero, WalletAddress};
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -59,7 +59,7 @@ pub struct SaveAgentResp {
 pub struct DeployAgent {
     id: String,
     version: String,
-    address: ParseFromString<WalletAddress>,
+    address: Stringified<WalletAddress>,
     phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 

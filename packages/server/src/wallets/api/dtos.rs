@@ -6,7 +6,7 @@ use structural_convert::StructuralConvert;
 use thiserror::Error;
 
 use crate::common::api::dtos::{PreparedContract, Stringified};
-use crate::common::models::{ParseWalletAddressError, PositiveNonZero};
+use crate::common::models::{PositiveNonZero, WalletAddress};
 use crate::wallets::models::{self, DescriptionError};
 
 #[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
@@ -41,13 +41,31 @@ pub enum RequestStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
-#[convert(from(models::Request))]
+#[derive(Debug, Clone, Object)]
 pub struct Request {
     pub id: String,
     pub date: Stringified<DateTime<Utc>>,
     pub amount: Stringified<PositiveNonZero<i64>>,
     pub status: RequestStatus,
+}
+
+impl From<models::Request> for Request {
+    fn from(value: models::Request) -> Self {
+        match value {
+            models::Request {
+                id,
+                date,
+                amount,
+                status,
+                ..
+            } => Request {
+                id: id.into(),
+                date: date.into(),
+                amount: amount.into(),
+                status: status.into(),
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
@@ -57,7 +75,7 @@ pub struct Transfer {
     pub direction: Direction,
     pub date: Stringified<DateTime<Utc>>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub to_address: String,
+    pub to_address: Stringified<WalletAddress>,
     pub cost: Stringified<u64>,
 }
 
@@ -73,10 +91,10 @@ pub struct WalletStateAndHistory {
 
 #[derive(Debug, Clone, Object)]
 pub struct TransferReq {
-    from: String,
-    to: String,
-    amount: Stringified<PositiveNonZero<i64>>,
-    description: Option<String>,
+    pub from: Stringified<WalletAddress>,
+    pub to: Stringified<WalletAddress>,
+    pub amount: Stringified<PositiveNonZero<i64>>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Object)]
@@ -86,10 +104,6 @@ pub struct TransferResp {
 
 #[derive(Debug, Clone, Error)]
 pub enum TransferValidationError {
-    #[error("receiver wallet adress has wrong format: {0}")]
-    WrongReceiverAddressFormat(ParseWalletAddressError),
-    #[error("sender wallet adress has wrong format: {0}")]
-    WrongSenderAddressFormat(ParseWalletAddressError),
     #[error("description format error: {0}")]
     DescriptionError(#[from] DescriptionError),
 }
@@ -104,21 +118,11 @@ impl TryFrom<TransferReq> for models::PrepareTransferInput {
     type Error = TransferValidationError;
 
     fn try_from(value: TransferReq) -> Result<Self, Self::Error> {
-        let to = value
-            .to
-            .try_into()
-            .map_err(Self::Error::WrongReceiverAddressFormat)?;
-
-        let from = value
-            .from
-            .try_into()
-            .map_err(Self::Error::WrongSenderAddressFormat)?;
-
         let description = value.description.map(TryFrom::try_from).transpose()?;
 
         Ok(Self {
-            from,
-            to,
+            from: value.from.0,
+            to: value.to.0,
             amount: value.amount.0,
             description,
         })

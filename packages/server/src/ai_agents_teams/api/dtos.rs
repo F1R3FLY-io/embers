@@ -1,8 +1,8 @@
 use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
-use crate::ai_agents_teams::models;
-use crate::common::api::dtos::{ParseFromString, PreparedContract, Stringified};
+use crate::ai_agents_teams::models::{self, Graph};
+use crate::common::api::dtos::{PreparedContract, Stringified};
 use crate::common::models::{PositiveNonZero, WalletAddress};
 
 #[derive(Debug, Clone, Object)]
@@ -31,7 +31,7 @@ pub struct AgentsTeamHeader {
 pub struct CreateAgentsTeamReq {
     pub name: String,
     pub shard: Option<String>,
-    pub graph: Option<String>,
+    pub graph: Option<Stringified<Graph>>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -41,7 +41,7 @@ pub struct AgentsTeam {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
-    pub graph: Option<String>,
+    pub graph: Option<Stringified<Graph>>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -63,16 +63,16 @@ pub struct SaveAgentsTeamResp {
 
 #[derive(Debug, Clone, Object)]
 pub struct DeployAgentsTeam {
-    id: String,
-    version: String,
-    address: ParseFromString<WalletAddress>,
-    phlo_limit: Stringified<PositiveNonZero<i64>>,
+    pub id: String,
+    pub version: String,
+    pub address: Stringified<WalletAddress>,
+    pub phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 
 #[derive(Debug, Clone, Object)]
 pub struct DeployGraph {
-    graph: String,
-    phlo_limit: Stringified<PositiveNonZero<i64>>,
+    pub graph: Stringified<Graph>,
+    pub phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 
 #[derive(Debug, Clone, Union)]
@@ -92,7 +92,7 @@ impl From<DeployAgentsTeamReq> for models::DeployAgentsTeamReq {
                 phlo_limit: deploy.phlo_limit.0,
             },
             DeployAgentsTeamReq::Graph(deploy) => Self::Graph {
-                graph: deploy.graph,
+                graph: deploy.graph.0,
                 phlo_limit: deploy.phlo_limit.0,
             },
         }
