@@ -41,31 +41,13 @@ pub enum RequestStatus {
     Cancelled,
 }
 
-#[derive(Debug, Clone, Object)]
+#[derive(Debug, Clone, Object, StructuralConvert)]
+#[convert(from(models::Request))]
 pub struct Request {
     pub id: String,
     pub date: Stringified<DateTime<Utc>>,
     pub amount: Stringified<PositiveNonZero<i64>>,
     pub status: RequestStatus,
-}
-
-impl From<models::Request> for Request {
-    fn from(value: models::Request) -> Self {
-        match value {
-            models::Request {
-                id,
-                date,
-                amount,
-                status,
-                ..
-            } => Request {
-                id: id.into(),
-                date: date.into(),
-                amount: amount.into(),
-                status: status.into(),
-            },
-        }
-    }
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
