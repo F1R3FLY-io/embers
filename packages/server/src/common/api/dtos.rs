@@ -169,8 +169,8 @@ impl Format for WalletAddress {
     }
 }
 
-impl From<Stringified<WalletAddress>> for WalletAddress {
-    fn from(value: Stringified<WalletAddress>) -> Self {
+impl From<Stringified<Self>> for WalletAddress {
+    fn from(value: Stringified<Self>) -> Self {
         value.0
     }
 }
@@ -229,8 +229,8 @@ impl Format for Graph {
     }
 }
 
-impl From<Stringified<Graph>> for Graph {
-    fn from(value: Stringified<Graph>) -> Self {
+impl From<Stringified<Self>> for Graph {
+    fn from(value: Stringified<Self>) -> Self {
         value.0
     }
 }
@@ -279,7 +279,7 @@ impl ParseFromJSON for Stringified<Graph> {
 
 impl ToJSON for Stringified<Graph> {
     fn to_json(&self) -> Option<serde_json::Value> {
-        self.0.clone().to_graphl().to_json()
+        self.0.clone().graphl().to_json()
     }
 }
 

@@ -28,7 +28,7 @@ impl Graph {
         graphl_parser::parse_to_ast(graphl).map(Self)
     }
 
-    pub fn to_graphl(self) -> String {
+    pub fn graphl(self) -> String {
         graphl_parser::ast_to_graphl(self.0).unwrap()
     }
 }
