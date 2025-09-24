@@ -81,6 +81,13 @@ def agent(client: ApiClient, funded_wallet: Wallet) -> Agent:
     return Agent(id=resp.json["id"], version=resp.json["version"], name="my_agent", code='@Nil!("foo")')
 
 
+def assert_match_agent_header(header: dict, match: Agent):
+    assert header["id"] == match.id
+    assert header["version"] == match.version
+    assert header["name"] == match.name
+    assert header.get("shard") == match.shard
+
+
 def assert_match_agent(agent: dict, match: Agent):
     assert agent["id"] == match.id
     assert agent["version"] == match.version
@@ -91,17 +98,24 @@ def assert_match_agent(agent: dict, match: Agent):
 
 @pytest.fixture
 def agents_team(client: ApiClient, funded_wallet: Wallet) -> AgentsTeam:
-    resp = client.ai_agents_teams.create(funded_wallet, name="my_agent")
+    resp = client.ai_agents_teams.create(funded_wallet, name="my_agents_team", graph="< foo > | 0 ")
     assert resp.status == 200
 
     wait_for_read_node_sync()
 
-    return AgentsTeam(id=resp.json["id"], version=resp.json["version"], name="my_agent")
+    return AgentsTeam(id=resp.json["id"], version=resp.json["version"], name="my_agents_team", graph="< foo > | 0 ")
 
 
-def assert_match_agents_team(agent: dict, match: AgentsTeam):
-    assert agent["id"] == match.id
-    assert agent["version"] == match.version
-    assert agent["name"] == match.name
-    assert agent.get("shard") == match.shard
-    assert agent.get("graph") == match.graph
+def assert_match_agents_team_header(header: dict, match: AgentsTeam):
+    assert header["id"] == match.id
+    assert header["version"] == match.version
+    assert header["name"] == match.name
+    assert header.get("shard") == match.shard
+
+
+def assert_match_agents_team(team: dict, match: AgentsTeam):
+    assert team["id"] == match.id
+    assert team["version"] == match.version
+    assert team["name"] == match.name
+    assert team.get("shard") == match.shard
+    assert team.get("graph") == match.graph

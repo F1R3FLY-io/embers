@@ -1125,15 +1125,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "graph-to-rholang-parser"
+name = "graphl-parser"
 version = "0.0.1"
-source = "git+https://github.com/F1R3FLY-io/graph-to-rholang-parser?tag=0.0.14#121e2073de0d1194e33b0c8187daa2041ab168f6"
+source = "git+https://github.com/F1R3FLY-io/graphl-parser?tag=0.0.16#ddc545566e53d41dd360c2757cdc1c6a0f0c4c74"
 dependencies = [
  "bindgen",
  "cc",
  "console_error_panic_hook",
  "scopeguard",
  "serde",
+ "thiserror",
  "tsify",
  "wasm-bindgen",
 ]
@@ -2516,7 +2517,7 @@ dependencies = [
  "derive_more",
  "figment",
  "firefly-client",
- "graph-to-rholang-parser",
+ "graphl-parser",
  "hex",
  "poem",
  "poem-openapi",

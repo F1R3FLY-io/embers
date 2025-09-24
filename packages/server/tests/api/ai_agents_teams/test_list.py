@@ -1,7 +1,7 @@
 import pytest
 
 from tests.client import AgentsTeam, ApiClient
-from tests.conftest import Wallet, assert_match_agents_team
+from tests.conftest import Wallet, assert_match_agents_team_header
 
 
 def test_list_agents_teams__no_teams(client: ApiClient, wallet: Wallet):
@@ -17,4 +17,4 @@ def test_list_agents_teams(client: ApiClient, funded_wallet: Wallet, agents_team
 
     assert resp.status == 200
     assert len(resp.json["agents_teams"]) == 1
-    assert_match_agents_team(resp.json["agents_teams"][0], agents_team)
+    assert_match_agents_team_header(resp.json["agents_teams"][0], agents_team)

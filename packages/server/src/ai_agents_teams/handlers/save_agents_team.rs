@@ -3,7 +3,7 @@ use firefly_client::models::SignedCode;
 use firefly_client::rendering::Render;
 use uuid::Uuid;
 
-use crate::ai_agents_teams::models::{SaveAgentsTeamReq, SaveAgentsTeamResp};
+use crate::ai_agents_teams::models::{Graph, SaveAgentsTeamReq, SaveAgentsTeamResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
 
@@ -38,7 +38,7 @@ pub async fn prepare_save_agents_team_contract(
         version,
         name: request.name,
         shard: request.shard,
-        graph: request.graph,
+        graph: request.graph.map(Graph::graphl),
     }
     .render()?;
 

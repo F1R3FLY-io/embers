@@ -5,7 +5,7 @@ from tests.client import ApiClient, Wallet
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_demo(client: ApiClient, funded_wallet: Wallet):
-    resp = client.ai_agents_teams.deploy(funded_wallet, graph="", phlo_limit=500_000)
+    resp = client.ai_agents_teams.deploy(funded_wallet, graph="< foo > | 0 ", phlo_limit=500_000)
     assert resp.status == 200
 
     resp = client._http_client.post(  # noqa: SLF001
