@@ -1,7 +1,7 @@
 import pytest
 
 from tests.client import AgentsTeam, ApiClient
-from tests.conftest import Wallet, assert_match_agents_team
+from tests.conftest import Wallet, assert_match_agents_team_header
 
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
@@ -10,7 +10,7 @@ def test_list_agents_team_versions(client: ApiClient, funded_wallet: Wallet, age
 
     assert resp.status == 200
     assert len(resp.json["agents_teams"]) == 1
-    assert_match_agents_team(resp.json["agents_teams"][0], agents_team)
+    assert_match_agents_team_header(resp.json["agents_teams"][0], agents_team)
 
 
 def test_fail_to_list_agents_team_versions__unknown_team(client: ApiClient, wallet: Wallet):

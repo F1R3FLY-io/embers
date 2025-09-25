@@ -9,7 +9,8 @@ use tokio::try_join;
 use crate::ai_agents::api::AIAgents;
 use crate::ai_agents_teams::api::AIAgentsTeams;
 use crate::bootstrap::{bootstrap_mainnet_contracts, bootstrap_testnet_contracts};
-use crate::common::api::TestNet;
+use crate::common::api::Service;
+use crate::common::api::dtos::TestNet;
 use crate::configuration::collect_config;
 use crate::testnet::api::Testnet;
 use crate::wallets::api::WalletsApi;
@@ -68,7 +69,7 @@ async fn main() -> anyhow::Result<()> {
     )?;
 
     let api = OpenApiService::new(
-        (Testnet, WalletsApi, AIAgents, AIAgentsTeams),
+        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams),
         "Embers API",
         "0.1.0",
     )
