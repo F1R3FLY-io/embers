@@ -86,7 +86,7 @@ impl<'a> graphl_parser::Visitor<'a, FlatGraph<'a>, anyhow::Error> for Visitor {
                     ));
                 }
             }
-        };
+        }
 
         acc.bindings_reverse
             .entry(name)
@@ -232,7 +232,7 @@ fn resolve_froms<'a>(
         .edges
         .iter()
         .filter_map(|(from, to)| bindings.iter().any(|b| b == to).then_some(from))
-        .flat_map(|from| flat.bindings.get(from).cloned()))
+        .filter_map(|from| flat.bindings.get(from).copied()))
 }
 
 fn resolve_from<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result<Vertex<'a>> {
@@ -310,7 +310,7 @@ pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
                     let output = has_output(&flat, node)?;
                     partial.nodes.insert(node, Node::TTSModel { from, output });
                 }
-            };
+            }
 
             anyhow::Ok(partial)
         })?;
