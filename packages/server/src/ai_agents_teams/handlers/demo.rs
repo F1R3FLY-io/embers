@@ -19,13 +19,7 @@ struct GetAiAgentsTeamsDemoResult {
     prompt: String,
 }
 
-#[tracing::instrument(
-    level = "info",
-    skip_all,
-    fields(request),
-    err(Debug),
-    ret(Debug, level = "trace")
-)]
+#[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
 pub async fn run_demo(
     client: &mut WriteNodeClient,
     read_client: &ReadNodeClient,
