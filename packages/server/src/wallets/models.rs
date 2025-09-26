@@ -71,7 +71,7 @@ pub enum RequestStatus {
 pub struct Exchange {}
 
 #[derive(Debug, Clone)]
-pub struct PrepareTransferInput {
+pub struct TransferReq {
     pub from: WalletAddress,
     pub to: WalletAddress,
     pub amount: Amount,

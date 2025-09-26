@@ -1,3 +1,5 @@
+use std::convert::Infallible;
+
 use askama::Template;
 
 use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
@@ -30,6 +32,20 @@ impl Graph {
 
     pub fn graphl(self) -> String {
         graphl_parser::ast_to_graphl(self.0).unwrap()
+    }
+
+    pub fn visit<'a, V, C>(&'a self, state: C, visitor: V) -> C
+    where
+        V: graphl_parser::Visitor<'a, C, Infallible>,
+    {
+        graphl_parser::Walker::new(&self.0).visit(state, visitor)
+    }
+
+    pub fn try_visit<'a, V, C, E>(&'a self, state: C, visitor: V) -> Result<C, E>
+    where
+        V: graphl_parser::Visitor<'a, C, E>,
+    {
+        graphl_parser::Walker::new(&self.0).try_visit(state, visitor)
     }
 }
 
