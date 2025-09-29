@@ -96,5 +96,6 @@ pub enum DeployAgentsTeamReq {
 
 #[derive(Debug, Clone)]
 pub struct DeployAgentsTeamResp {
+    pub name: String,
     pub contract: PreparedContract,
 }

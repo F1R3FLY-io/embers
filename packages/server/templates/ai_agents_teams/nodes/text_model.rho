@@ -1,0 +1,8 @@
+{%- match from -%}
+    {%- when From::Input -%}
+gpt4!(input, *{{ output }})
+    {%- when From::Channel(from) -%}
+for(@gpt4Request <<- {{ from }}) {
+    gpt4!(gpt4Request, *{{ output }})
+}
+{%- endmatch -%}

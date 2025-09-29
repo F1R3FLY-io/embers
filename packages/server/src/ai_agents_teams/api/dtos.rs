@@ -102,5 +102,6 @@ impl From<DeployAgentsTeamReq> for models::DeployAgentsTeamReq {
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::DeployAgentsTeamResp))]
 pub struct DeployAgentsTeamResp {
+    pub name: String,
     pub contract: PreparedContract,
 }

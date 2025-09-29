@@ -1,0 +1,8 @@
+{%- match from -%}
+    {%- when From::Input -%}
+return!(input)
+    {%- when From::Channel(from) -%}
+for(@returnValue <<- {{ from }}) {
+    return!(returnValue)
+}
+{%- endmatch -%}

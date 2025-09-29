@@ -1,19 +1,13 @@
 use anyhow::Context;
 use firefly_client::models::SignedCode;
-use firefly_client::rendering::Render;
 use firefly_client::{ReadNodeClient, WriteNodeClient};
+use uuid::Uuid;
 
 use crate::ai_agents_teams::compilation::{parse, render_agent_team};
 use crate::ai_agents_teams::handlers::get_agents_team;
 use crate::ai_agents_teams::models::{DeployAgentsTeamReq, DeployAgentsTeamResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
-
-#[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/deploy_demo.rho")]
-struct DeployAiAgentsTeamsDemo {
-    name: String,
-}
 
 #[tracing::instrument(
     level = "info",
@@ -46,16 +40,14 @@ pub async fn prepare_deploy_agents_team_contract(
         DeployAgentsTeamReq::Graph { graph, phlo_limit } => (graph, phlo_limit),
     };
 
-    let code = parse(&graph)?;
-    let _code = render_agent_team(&code);
+    let name = Uuid::new_v4().to_string();
 
-    let code = DeployAiAgentsTeamsDemo {
-        name: "demo_agents_team".into(),
-    }
-    .render()?;
+    let code = parse(&graph)?;
+    let code = render_agent_team(&name, code)?;
 
     let valid_after = client.get_head_block_index().await?;
     Ok(DeployAgentsTeamResp {
+        name,
         contract: prepare_for_signing()
             .code(code)
             .valid_after_block_number(valid_after)

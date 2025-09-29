@@ -170,20 +170,17 @@ enum NodeContext {
 
 #[derive(Debug, Clone, Default)]
 struct PartialCode<'a> {
-    input: Option<Input<'a>>,
+    input: Option<Input>,
     nodes: BTreeMap<Vertex<'a>, Node<'a>>,
     output: Option<Output<'a>>,
 }
 
 #[derive(Debug, Clone)]
-pub struct Input<'a> {
-    node: Vertex<'a>,
-}
+pub struct Input;
 
 #[derive(Debug, Clone)]
 pub struct Output<'a> {
-    node: Vertex<'a>,
-    from: Vertex<'a>,
+    pub from: Vertex<'a>,
 }
 
 #[derive(Debug, Clone)]
@@ -194,11 +191,21 @@ pub enum Node<'a> {
     TTSModel { from: Vertex<'a>, output: bool },
 }
 
+impl<'a> Node<'a> {
+    pub fn output(&self) -> bool {
+        match self {
+            Node::Compress { output, .. } => *output,
+            Node::TextModel { output, .. } => *output,
+            Node::TTIModel { output, .. } => *output,
+            Node::TTSModel { output, .. } => *output,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Code<'a> {
-    input: Input<'a>,
-    nodes: BTreeMap<Vertex<'a>, Node<'a>>,
-    output: Option<Output<'a>>,
+    pub nodes: BTreeMap<Vertex<'a>, Node<'a>>,
+    pub output: Option<Output<'a>>,
 }
 
 fn resolve_context<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result<NodeContext> {
@@ -278,14 +285,14 @@ pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
 
             match context {
                 NodeContext::Input => {
-                    let old = partial.input.replace(Input { node });
+                    let old = partial.input.replace(Input);
                     if old.is_some() {
                         return Err(anyhow!("graph has multiple input nodes"));
                     }
                 }
                 NodeContext::Output => {
                     let from = resolve_from(&flat, node)?;
-                    let old = partial.output.replace(Output { node, from });
+                    let old = partial.output.replace(Output { from });
                     if old.is_some() {
                         return Err(anyhow!("graph has multiple output nodes"));
                     }
@@ -317,14 +324,10 @@ pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
 
     match partial {
         PartialCode {
-            input: Some(input),
+            input: Some(_),
             nodes,
             output,
-        } => Ok(Code {
-            input,
-            nodes,
-            output,
-        }),
+        } => Ok(Code { nodes, output }),
         PartialCode { input: None, .. } => Err(anyhow!("input is missing")),
     }
 }
