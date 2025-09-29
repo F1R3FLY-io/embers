@@ -1,0 +1,8 @@
+{%- match from -%}
+    {%- when From::Input -%}
+textToAudio!(input, *{{ output }})
+    {%- when From::Channel(from) -%}
+for(@textToAudioRequest <<- {{ from }}) {
+    textToAudio!(textToAudioRequest, *{{ output }})
+}
+{%- endmatch -%}

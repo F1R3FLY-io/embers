@@ -1,0 +1,8 @@
+{%- let from_channels = self::filter_channels(&self.from) -%}
+for(
+{%- for channel in from_channels %}
+    @{{ channel }} <<- {{ channel }} {%- if !loop.last -%} ; {%- endif %}
+{%- endfor %}
+) {
+    {{ output }}!({{ body }})
+}

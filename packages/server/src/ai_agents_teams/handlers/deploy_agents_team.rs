@@ -1,34 +1,29 @@
 use anyhow::Context;
 use firefly_client::models::SignedCode;
-use firefly_client::rendering::Render;
 use firefly_client::{ReadNodeClient, WriteNodeClient};
+use uuid::Uuid;
 
+use crate::ai_agents_teams::compilation::{parse, render_agent_team};
 use crate::ai_agents_teams::handlers::get_agents_team;
 use crate::ai_agents_teams::models::{DeployAgentsTeamReq, DeployAgentsTeamResp};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
 
-#[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/deploy_demo.rho")]
-struct DeployAiAgentsTeamsDemo {
-    name: String,
-}
-
 #[tracing::instrument(
     level = "info",
     skip_all,
-    fields(address, id, version),
+    fields(request),
     err(Debug),
     ret(Debug, level = "trace")
 )]
 pub async fn prepare_deploy_agents_team_contract(
-    req: DeployAgentsTeamReq,
+    request: DeployAgentsTeamReq,
     client: &mut WriteNodeClient,
     read_client: &ReadNodeClient,
 ) -> anyhow::Result<DeployAgentsTeamResp> {
-    record_trace!(req);
+    record_trace!(request);
 
-    let (_graph, phlo_limit) = match req {
+    let (graph, phlo_limit) = match request {
         DeployAgentsTeamReq::AgentsTeam {
             id,
             version,
@@ -40,19 +35,19 @@ pub async fn prepare_deploy_agents_team_contract(
                 .context("agents team not found")?
                 .graph
                 .context("agents team has no graph")?;
-
             (graph, phlo_limit)
         }
         DeployAgentsTeamReq::Graph { graph, phlo_limit } => (graph, phlo_limit),
     };
 
-    let code = DeployAiAgentsTeamsDemo {
-        name: "demo_agents_team".into(),
-    }
-    .render()?;
+    let name = Uuid::new_v4().to_string();
+
+    let code = parse(&graph)?;
+    let code = render_agent_team(&name, code)?;
 
     let valid_after = client.get_head_block_index().await?;
     Ok(DeployAgentsTeamResp {
+        name,
         contract: prepare_for_signing()
             .code(code)
             .valid_after_block_number(valid_after)

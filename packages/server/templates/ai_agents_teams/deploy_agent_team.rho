@@ -1,0 +1,14 @@
+new devNull(`rho:io:devNull`),
+    {{ channels | join(",\n") | indent(4) }},
+    agentTeam
+in
+{
+    contract @"{{ name }}"(
+        @input,
+{%- if output %}
+        return
+{%- endif %}
+    ) = {
+        {{ steps | join(" |\n") | indent(8) }}
+    }
+}

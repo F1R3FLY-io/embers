@@ -96,7 +96,7 @@ impl ResponseError for TransferValidationError {
     }
 }
 
-impl TryFrom<TransferReq> for models::PrepareTransferInput {
+impl TryFrom<TransferReq> for models::TransferReq {
     type Error = TransferValidationError;
 
     fn try_from(value: TransferReq) -> Result<Self, Self::Error> {

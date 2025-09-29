@@ -10,18 +10,18 @@ use crate::common::{deploy_signed_contract, prepare_for_signing};
 #[tracing::instrument(
     level = "info",
     skip_all,
-    fields(address, id, version),
+    fields(request),
     err(Debug),
     ret(Debug, level = "trace")
 )]
 pub async fn prepare_deploy_agent_contract(
-    req: DeployAgentReq,
+    request: DeployAgentReq,
     client: &mut WriteNodeClient,
     read_client: &ReadNodeClient,
 ) -> anyhow::Result<DeployAgentResp> {
-    record_trace!(req);
+    record_trace!(request);
 
-    let (code, phlo_limit) = match req {
+    let (code, phlo_limit) = match request {
         DeployAgentReq::Agent {
             id,
             version,

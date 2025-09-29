@@ -6,7 +6,7 @@ use firefly_client::rendering::Render;
 use crate::common::models::{PreparedContract, WalletAddress};
 use crate::common::tracing::record_trace;
 use crate::common::{deploy_signed_contract, prepare_for_signing};
-use crate::wallets::models::{Description, PrepareTransferInput};
+use crate::wallets::models::{Description, TransferReq};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "wallets/send_tokens.rho")]
@@ -26,17 +26,17 @@ struct TransferContract {
     ret(Debug, level = "trace")
 )]
 pub async fn prepare_transfer_contract(
-    value: PrepareTransferInput,
+    request: TransferReq,
     client: &mut WriteNodeClient,
 ) -> anyhow::Result<PreparedContract> {
-    record_trace!(value);
+    record_trace!(request);
 
     let contract = TransferContract {
         timestamp: Utc::now(),
-        wallet_address_from: value.from,
-        wallet_address_to: value.to,
-        amount: value.amount.0,
-        description: value.description,
+        wallet_address_from: request.from,
+        wallet_address_to: request.to,
+        amount: request.amount.0,
+        description: request.description,
     }
     .render()?;
 
