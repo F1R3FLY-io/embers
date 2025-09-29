@@ -67,11 +67,11 @@ struct DeployAgentTeamTemplate<'a> {
 fn filter_channels<'a>(from: &[From<'a>]) -> impl Iterator<Item = &'a str> {
     from.iter().filter_map(|f| match f {
         From::Channel(c) => Some(*c),
-        _ => None,
+        From::Input => None,
     })
 }
 
-fn get_all_system_channels<'a>(nodes: &[&Node<'a>]) -> impl Iterator<Item = String> {
+fn get_all_system_channels(nodes: &[&Node<'_>]) -> impl Iterator<Item = String> {
     [
         nodes
             .iter()
@@ -90,7 +90,7 @@ fn get_all_system_channels<'a>(nodes: &[&Node<'a>]) -> impl Iterator<Item = Stri
     .flatten()
 }
 
-fn node_output_channel<'a>(index: usize) -> String {
+fn node_output_channel(index: usize) -> String {
     format!("channel{index}Output")
 }
 
@@ -100,8 +100,7 @@ fn get_input_for_vertex<'a, 'b>(
 ) -> From<'b> {
     outputs
         .get(vertex)
-        .map(|s| From::Channel(s))
-        .unwrap_or(From::Input)
+        .map_or(From::Input, |s| From::Channel(s))
 }
 
 fn get_output_for_vertex<'a, 'b>(
@@ -110,8 +109,7 @@ fn get_output_for_vertex<'a, 'b>(
 ) -> Output<'b> {
     outputs
         .get(&vertex)
-        .map(|s| Output::Channel(s))
-        .unwrap_or(Output::Channel("devNull"))
+        .map_or(Output::Channel("devNull"), |s| Output::Channel(s))
 }
 
 #[tracing::instrument(level = "info", skip_all, fields(code), ret(Debug, level = "trace"))]
@@ -140,7 +138,7 @@ pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
                 .iter()
                 .map(|from| get_input_for_vertex(&vertex_outputs, from))
                 .collect(),
-            output: get_output_for_vertex(&vertex_outputs, &vertex),
+            output: get_output_for_vertex(&vertex_outputs, vertex),
             body: Value::Map(
                 from.iter()
                     .map(|from| {
@@ -156,17 +154,17 @@ pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
         .render()?),
         Node::TextModel { from, .. } => Ok(TextModelTemplate {
             from: get_input_for_vertex(&vertex_outputs, from),
-            output: get_output_for_vertex(&vertex_outputs, &vertex),
+            output: get_output_for_vertex(&vertex_outputs, vertex),
         }
         .render()?),
         Node::TTIModel { from, .. } => Ok(TTIModelTemplate {
             from: get_input_for_vertex(&vertex_outputs, from),
-            output: get_output_for_vertex(&vertex_outputs, &vertex),
+            output: get_output_for_vertex(&vertex_outputs, vertex),
         }
         .render()?),
         Node::TTSModel { from, .. } => Ok(TTSModelTemplate {
             from: get_input_for_vertex(&vertex_outputs, from),
-            output: get_output_for_vertex(&vertex_outputs, &vertex),
+            output: get_output_for_vertex(&vertex_outputs, vertex),
         }
         .render()?),
     });

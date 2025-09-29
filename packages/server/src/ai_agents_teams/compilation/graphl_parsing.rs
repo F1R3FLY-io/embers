@@ -191,8 +191,8 @@ pub enum Node<'a> {
     TTSModel { from: Vertex<'a>, output: bool },
 }
 
-impl<'a> Node<'a> {
-    pub fn output(&self) -> bool {
+impl Node<'_> {
+    pub const fn output(&self) -> bool {
         match self {
             Node::Compress { output, .. } => *output,
             Node::TextModel { output, .. } => *output,
