@@ -121,7 +121,7 @@ fn get_output_for_vertex<'a, 'b>(
     skip_all,
     fields(code),
     err(Debug),
-    ret(Debug, level = "trace")
+    ret(Display, level = "trace")
 )]
 pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
     record_trace!(code);
@@ -155,8 +155,11 @@ pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
                         .map(|from| {
                             (
                                 (*from.as_ref()).to_owned(),
-                                Inline(get_input_for_vertex(&vertex_outputs, from).to_string())
-                                    .into_value(),
+                                Inline(format!(
+                                    "{}Value",
+                                    get_input_for_vertex(&vertex_outputs, from)
+                                ))
+                                .into_value(),
                             )
                         })
                         .collect(),

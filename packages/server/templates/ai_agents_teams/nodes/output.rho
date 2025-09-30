@@ -2,7 +2,8 @@
     {%- when From::Input -%}
 return!(input)
     {%- when From::Channel(from) -%}
-for(@returnValue <<- {{ from }}) {
+for(@returnValue <- {{ from }}) {
+    {{ from }}!(returnValue) |
     return!(returnValue)
 }
 {%- endmatch -%}

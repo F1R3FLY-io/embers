@@ -1,10 +1,13 @@
 {%- let from_channels = self::filter_channels(&self.from) -%}
 {%- if !from_channels.is_empty() -%}
 for(
-{%- for channel in from_channels %}
-    @{{ channel }} <<- {{ channel }} {%- if !loop.last -%} ; {%- endif %}
+{%- for channel in from_channels.iter() %}
+    @{{ channel }}Value <- {{ channel }} {%- if !loop.last %} & {%- endif %}
 {%- endfor %}
 ) {
+{%- for channel in from_channels %}
+    {{ channel }}!({{ channel }}Value) |
+{%- endfor %}
     {{ output }}!({{ body }})
 }
 {%- else -%}

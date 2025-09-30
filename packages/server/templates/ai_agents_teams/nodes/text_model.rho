@@ -2,7 +2,8 @@
     {%- when From::Input -%}
 gpt4!(input, *{{ output }})
     {%- when From::Channel(from) -%}
-for(@gpt4Request <<- {{ from }}) {
+for(@gpt4Request <- {{ from }}) {
+    {{ from }}!(gpt4Request) |
     gpt4!(gpt4Request, *{{ output }})
 }
 {%- endmatch -%}

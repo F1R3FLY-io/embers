@@ -2,7 +2,8 @@
     {%- when From::Input -%}
 textToAudio!(input, *{{ output }})
     {%- when From::Channel(from) -%}
-for(@textToAudioRequest <<- {{ from }}) {
+for(@textToAudioRequest <- {{ from }}) {
+    {{ from }}!(textToAudioRequest) |
     textToAudio!(textToAudioRequest, *{{ output }})
 }
 {%- endmatch -%}

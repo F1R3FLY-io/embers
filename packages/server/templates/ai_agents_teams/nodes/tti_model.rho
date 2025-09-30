@@ -2,7 +2,8 @@
     {%- when From::Input -%}
 dalle3!(input, *{{ output }})
     {%- when From::Channel(from) -%}
-for(@dalle3Request <<- {{ from }}) {
+for(@dalle3Request <- {{ from }}) {
+    {{ from }}!(dalle3Request) |
     dalle3!(dalle3Request, *{{ output }})
 }
 {%- endmatch -%}

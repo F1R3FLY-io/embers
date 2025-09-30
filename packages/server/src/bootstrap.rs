@@ -49,7 +49,7 @@ pub async fn bootstrap_testnet_contracts(
     client
         .deploy(key, deploy_data)
         .await
-        .context("failed to deploy agents env")?;
+        .context("failed to testnet env")?;
 
     client.propose().await
 }
