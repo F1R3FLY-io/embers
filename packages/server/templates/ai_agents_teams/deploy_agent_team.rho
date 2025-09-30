@@ -1,5 +1,7 @@
 new devNull(`rho:io:devNull`),
-    {{ channels | join(",\n") | indent(4) }},
+{%- if !system_channels.is_empty() %}
+    {{ system_channels | join(",\n") | indent(4) }},
+{%- endif %}
     agentTeam
 in
 {
@@ -9,6 +11,13 @@ in
         return
 {%- endif %}
     ) = {
+{%- if !output_channels.is_empty() %}
+        new {{ output_channels | join(",\n") | indent(12) }}
+        in {
+            {{ steps | join(" |\n") | indent(12) }}
+        }
+{%- else -%}
         {{ steps | join(" |\n") | indent(8) }}
+{%- endif %}
     }
 }
