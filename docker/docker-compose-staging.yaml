@@ -1,6 +1,7 @@
 services:
   firefly:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     env_file:
       - .env
@@ -25,6 +26,7 @@ services:
 
   firefly-read:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     command:
       - run
@@ -37,6 +39,7 @@ services:
 
   firefly-testnet:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     volumes:
       - ./testnet/genesis:/var/lib/rnode/genesis
@@ -59,6 +62,7 @@ services:
 
   firefly-read-testnet:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     command:
       - run
@@ -71,6 +75,7 @@ services:
 
   embers:
     image: f1r3flyindustries/embers:0.0.2
+    pull_policy: always
     environment:
       EMBERS__MAINNET__DEPLOY_SERVICE_URL: http://firefly:40401
       EMBERS__MAINNET__PROPOSE_SERVICE_URL: http://firefly:40402
@@ -95,6 +100,7 @@ services:
 
   embers-frontend:
     image: f1r3flyindustries/embers-frontend:0.0.2
+    pull_policy: always
     environment:
       API_URL: https://localhost
     networks:
@@ -106,6 +112,7 @@ services:
 
   nginx:
     image: nginx:latest
+    pull_policy: always
     container_name: nginx_proxy
     restart: always
     ports:

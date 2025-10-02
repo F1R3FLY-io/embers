@@ -5,6 +5,7 @@ use crate::testnet::models;
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::LogLevel))]
+#[serde(rename_all = "lowercase")]
 pub enum LogLevel {
     Debug,
     Info,

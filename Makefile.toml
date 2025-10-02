@@ -75,10 +75,3 @@ cd packages/server
 cargo make ${1}
 '''
 workspace = false
-
-[tasks.install-nix]
-script = '''
-curl --proto '=https' --tlsv1.2 -L https://nixos.org/nix/install | sh -s -- --no-daemon && \
-. /home/vscode/.nix-profile/etc/profile.d/nix.sh
-'''
-workspace = false

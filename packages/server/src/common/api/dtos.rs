@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use firefly_client::helpers::ShortHex;
+use firefly_client::rendering::Uri;
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
@@ -374,3 +375,8 @@ impl From<SignedContract> for firefly_client::models::SignedCode {
 
 #[derive(Debug, Clone)]
 pub struct TestNet<T>(pub T);
+
+#[derive(Debug, Clone)]
+pub struct Envs {
+    pub testnet_env_uri: Uri,
+}

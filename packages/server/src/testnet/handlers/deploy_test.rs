@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use firefly_client::models::DeployId;
-use firefly_client::rendering::Render;
+use firefly_client::rendering::{Render, Uri};
 use firefly_client::{ReadNodeClient, WriteNodeClient};
 
 use crate::common::prepare_for_signing;
@@ -18,10 +18,17 @@ use crate::testnet::models::{
 #[derive(Debug, Clone, Render)]
 #[template(path = "testnet/get_logs.rho")]
 struct GetLogs {
+    env_uri: Uri,
     deploy_id: DeployId,
 }
 
-#[tracing::instrument(level = "info", skip_all, fields(request), ret(Debug, level = "trace"))]
+#[tracing::instrument(
+    level = "info",
+    skip_all,
+    fields(request),
+    err(Debug),
+    ret(Debug, level = "trace")
+)]
 pub async fn prepare_test_contract(
     request: DeployTestReq,
     client: &mut WriteNodeClient,
@@ -53,6 +60,7 @@ pub async fn prepare_test_contract(
 pub async fn deploy_test_contract(
     client: &mut WriteNodeClient,
     read_client: &ReadNodeClient,
+    test_env_uri: &Uri,
     request: DeploySignedTestReq,
 ) -> anyhow::Result<DeploySignedTestResp> {
     record_trace!(request);
@@ -88,7 +96,11 @@ pub async fn deploy_test_contract(
         return Err(anyhow!("block is not finalized"));
     }
 
-    let code = GetLogs { deploy_id }.render()?;
+    let code = GetLogs {
+        deploy_id,
+        env_uri: test_env_uri.clone(),
+    }
+    .render()?;
 
     let logs: Option<Vec<blockchain::dtos::Log>> = read_client.get_data(code).await?;
 

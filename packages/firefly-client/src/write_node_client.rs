@@ -55,10 +55,9 @@ impl WriteNodeClient {
         };
 
         let msg = {
-            let timestamp = chrono::Utc::now().timestamp_millis();
             let mut msg = DeployDataProto {
                 term: deploy_data.term,
-                timestamp,
+                timestamp: deploy_data.timestamp.timestamp_millis(),
                 phlo_price: 1,
                 phlo_limit: deploy_data.phlo_limit as _,
                 valid_after_block_number: valid_after_block_number as _,

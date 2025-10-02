@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use chrono::{DateTime, Utc};
 use derive_more::{AsRef, Display, From, Into};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
@@ -236,6 +237,9 @@ pub struct DeployData {
 
     #[builder(default = 500_000)]
     pub phlo_limit: u64,
+
+    #[builder(default = chrono::Utc::now())]
+    pub timestamp: DateTime<Utc>,
 
     #[builder(default = ValidAfter::Head)]
     pub valid_after_block_number: ValidAfter,

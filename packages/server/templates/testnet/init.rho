@@ -1,82 +1,116 @@
-new
-    rl(`rho:registry:lookup`),
+new rl(`rho:registry:lookup`),
+    rs(`rho:registry:insertSigned:secp256k1`),
     devNull(`rho:io:devNull`),
+    abort(`rho:execution:abort`),
+    prevEnvCh,
+    initEnv,
     treeHashMapCh,
     stackCh,
     getValueOr,
-    log
+    log,
+    private,
+    uriCh
 in {
-    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-    for(treeHashMap <- treeHashMapCh) {
-        treeHashMap!("init", 3, *treeHashMapCh) |
+    rl!({{ env_uri }}, *prevEnvCh) |
 
-        for(@map <- treeHashMapCh) {
-            treeHashMapCh!(*treeHashMap, map)
+    for(@Nil <- prevEnvCh) {
+        initEnv!()
+    } |
+
+    for(@(nonce, _) <- prevEnvCh) {
+        if (nonce < {{ nonce }}) {
+            initEnv!()
         }
     } |
 
-    rl!(`rho:lang:stack`, *stackCh) |
-    for(@(_, stack) <- stackCh) {
-        stackCh!(stack)
-    } |
+    for(<- initEnv) {
+        rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
+        for(treeHashMap <- treeHashMapCh) {
+            treeHashMap!("init", 3, *treeHashMapCh) |
 
-    contract getValueOr(@address, valueCh, nilCh) = {
-        new retCh in {
-            for(treeHashMap, @map <<- treeHashMapCh) {
-                treeHashMap!("get", map, address, *retCh) |
+            for(@map <- treeHashMapCh) {
+                treeHashMapCh!(*treeHashMap, map)
+            }
+        } |
 
-                for(@value <- retCh) {
-                    match value {
-                        Nil => nilCh!()
-                        value => valueCh!(value)
+        rl!(`rho:lang:stack`, *stackCh) |
+        for(@(_, stack) <- stackCh) {
+            stackCh!(stack)
+        } |
+
+        contract getValueOr(@address, valueCh, nilCh) = {
+            new retCh in {
+                for(treeHashMap, @map <<- treeHashMapCh) {
+                    treeHashMap!("get", map, address, *retCh) |
+
+                    for(@value <- retCh) {
+                        match value {
+                            Nil => nilCh!()
+                            value => valueCh!(value)
+                        }
                     }
                 }
             }
-        }
-    } |
+        } |
 
-    contract log(@level, @hex, @message) = {
-        new valueCh, nilCh, logsCh in {
-            for(@logs <- valueCh; stack <<- stackCh) {
-                stack!("push", logs, {"level": level, "message": message}, *devNull)
-            } |
+        contract @(*log, *private)(@level, @message) = {
+            new deployData(`rho:deploy:data`), deployDataCh, valueCh, nilCh, logsCh in {
+                deployData!(*deployDataCh) |
 
-            for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
-                stack!("init", *logsCh) |
+                for(_, _, @deployId <- deployDataCh) {
+                    getValueOr!(deployId.toString(), *valueCh, *nilCh) |
 
-                for(@logs <- logsCh) {
-                    stack!("push", logs, {"level": level, "message": message}, *devNull) |
-                    treeHashMap!("set", map, hex, logs, *devNull)
+                    for(@logs <- valueCh; stack <<- stackCh) {
+                        stack!("push", logs, {"level": level, "message": message}, *devNull)
+                    } |
+
+                    for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                        stack!("init", *logsCh) |
+
+                        for(@logs <- logsCh) {
+                            stack!("push", logs, {"level": level, "message": message}, *devNull) |
+                            treeHashMap!("set", map, deployId.toString(), logs, *devNull)
+                        }
+                    }
                 }
-            } |
+            }
+        } |
 
-            getValueOr!(hex, *valueCh, *nilCh)
-        }
-    } |
+        contract log(@"debug", @message) = {
+            @(*log, *private)!("debug", message)
+        } |
 
-    contract @"logDebug"(@deployId, @message) = {
-        log!("Debug", deployId.toString(), message)
-    } |
+        contract log(@"info", @message) = {
+            @(*log, *private)!("info", message)
+        } |
 
-    contract @"logInfo"(@deployId, @message) = {
-        log!("Info", deployId.toString(), message)
-    } |
+        contract log(@"error", @message) = {
+            @(*log, *private)!("error", message)
+        } |
 
-    contract @"logError"(@deployId, @message) = {
-        log!("Error", deployId.toString(), message)
-    } |
+        contract log(@"get", @deployId, ret) = {
+            new valueCh, nilCh in {
+                for(@logs <- valueCh; stack <<- stackCh) {
+                    stack!("toList", logs, *ret)
+                } |
 
-    contract @"getLogs"(@deployId, ret) = {
-        new valueCh, nilCh in {
-            for(@logs <- valueCh; stack <<- stackCh) {
-                stack!("toList", logs, *ret)
-            } |
+                for(<- nilCh) {
+                    ret!(Nil)
+                } |
 
-            for(<- nilCh) {
-                ret!(Nil)
-            } |
+                getValueOr!(deployId, *valueCh, *nilCh)
+            }
+        } |
 
-            getValueOr!(deployId, *valueCh, *nilCh)
+        rs!(
+            {{ public_key }},
+            ({{ nonce }}, bundle+{*log}),
+            {{ sig }},
+            *uriCh
+        ) |
+
+        for(@Nil <- uriCh) {
+            abort!("failed to insert test env")
         }
     }
 }

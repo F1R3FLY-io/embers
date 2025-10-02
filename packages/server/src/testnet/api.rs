@@ -4,7 +4,7 @@ use poem_openapi::OpenApi;
 use poem_openapi::payload::Json;
 use secp256k1::SecretKey;
 
-use crate::common::api::dtos::{ApiTags, TestNet};
+use crate::common::api::dtos::{ApiTags, Envs, TestNet};
 use crate::testnet::api::dtos::{
     CreateTestwalletResp,
     DeploySignedTestReq,
@@ -49,10 +49,16 @@ impl Testnet {
         Json(input): Json<DeploySignedTestReq>,
         Data(test_client): Data<&TestNet<WriteNodeClient>>,
         Data(test_read_client): Data<&TestNet<ReadNodeClient>>,
+        Data(envs): Data<&Envs>,
     ) -> poem::Result<Json<DeploySignedTestResp>> {
         let mut test_client = test_client.0.clone();
-        let result =
-            deploy_test_contract(&mut test_client, &test_read_client.0, input.into()).await?;
+        let result = deploy_test_contract(
+            &mut test_client,
+            &test_read_client.0,
+            &envs.testnet_env_uri,
+            input.into(),
+        )
+        .await?;
         Ok(Json(result.into()))
     }
 }

@@ -4,13 +4,14 @@ use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
+use secp256k1::{PublicKey, Secp256k1};
 use tokio::try_join;
 
 use crate::ai_agents::api::AIAgents;
 use crate::ai_agents_teams::api::AIAgentsTeams;
 use crate::bootstrap::{bootstrap_mainnet_contracts, bootstrap_testnet_contracts};
 use crate::common::api::Service;
-use crate::common::api::dtos::TestNet;
+use crate::common::api::dtos::{Envs, TestNet};
 use crate::configuration::collect_config;
 use crate::testnet::api::Testnet;
 use crate::wallets::api::WalletsApi;
@@ -39,6 +40,12 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    let secp = Secp256k1::new();
+    let envs = Envs {
+        testnet_env_uri: PublicKey::from_secret_key(&secp, &config.testnet.env_key).into(),
+    };
+    tracing::info!("embers env uris: {envs:?}");
+
     let read_client = ReadNodeClient::new(config.mainnet.read_node_url);
     let testnet_read_client = ReadNodeClient::new(config.testnet.read_node_url);
 
@@ -61,8 +68,12 @@ async fn main() -> anyhow::Result<()> {
             )
             .await?;
 
-            bootstrap_testnet_contracts(&mut testnet_write_client, &config.testnet.service_key)
-                .await?;
+            bootstrap_testnet_contracts(
+                &mut testnet_write_client,
+                &config.testnet.service_key,
+                &config.testnet.env_key,
+            )
+            .await?;
 
             anyhow::Ok(testnet_write_client)
         },
@@ -84,6 +95,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/index.html", ui)
         .nest("/swagger-ui/openapi.json", spec)
         .nest("/swagger-ui/openapi.yaml", spec_yaml)
+        .data(envs)
         .data(read_client)
         .data(write_client)
         .data(TestNet(testnet_read_client))
