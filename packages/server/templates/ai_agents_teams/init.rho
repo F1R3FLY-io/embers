@@ -8,14 +8,8 @@ new rl(`rho:registry:lookup`),
     getValueOr,
     visit
 in {
-    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-    for(treeHashMap <- treeHashMapCh) {
-        treeHashMap!("init", 3, *treeHashMapCh) |
-
-        for(@map <- treeHashMapCh) {
-            treeHashMapCh!(*treeHashMap, map)
-        }
-    } |
+    {%- import "common/init_map.rho" as initMap -%}
+    {% call initMap::call("rl", "treeHashMapCh", "getValueOr", 4) %} |
 
     rl!(`rho:lang:listOps`, *listOpsCh) |
     for(@(_, listOps) <- listOpsCh) {
@@ -25,21 +19,6 @@ in {
     rl!(`rho:lang:stack`, *stackCh) |
     for(@(_, stack) <- stackCh) {
         stackCh!(stack)
-    } |
-
-    contract getValueOr(@map, @address, valueCh, nilCh) = {
-        new retCh in {
-            for(treeHashMap, _ <<- treeHashMapCh) {
-                treeHashMap!("get", map, address, *retCh) |
-
-                for(@value <- retCh) {
-                    match value {
-                        Nil => nilCh!()
-                        value => valueCh!(value)
-                    }
-                }
-            }
-        }
     } |
 
     contract visit(@"agentsTeams", @deployerId, f, notFound) = {

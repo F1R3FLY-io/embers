@@ -24,47 +24,26 @@ in {
     } |
 
     for(<- initEnv) {
-        rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-        for(treeHashMap <- treeHashMapCh) {
-            treeHashMap!("init", 3, *treeHashMapCh) |
-
-            for(@map <- treeHashMapCh) {
-                treeHashMapCh!(*treeHashMap, map)
-            }
-        } |
+        {%- import "common/init_map.rho" as initMap -%}
+        {% call initMap::call("rl", "treeHashMapCh", "getValueOr", 8) %} |
 
         rl!(`rho:lang:stack`, *stackCh) |
         for(@(_, stack) <- stackCh) {
             stackCh!(stack)
         } |
 
-        contract getValueOr(@address, valueCh, nilCh) = {
-            new retCh in {
-                for(treeHashMap, @map <<- treeHashMapCh) {
-                    treeHashMap!("get", map, address, *retCh) |
-
-                    for(@value <- retCh) {
-                        match value {
-                            Nil => nilCh!()
-                            value => valueCh!(value)
-                        }
-                    }
-                }
-            }
-        } |
-
         contract @(*log, *private)(@level, @message) = {
             new deployData(`rho:deploy:data`), deployDataCh, valueCh, nilCh, logsCh in {
                 deployData!(*deployDataCh) |
 
-                for(_, _, @deployId <- deployDataCh) {
-                    getValueOr!(deployId.toString(), *valueCh, *nilCh) |
+                for(_, _, @deployId <- deployDataCh; _, @map <<- treeHashMapCh; stack <<- stackCh) {
+                    getValueOr!(map, deployId.toString(), *valueCh, *nilCh)
 
-                    for(@logs <- valueCh; stack <<- stackCh) {
+                    for(@logs <- valueCh) {
                         stack!("push", logs, {"level": level, "message": message}, *devNull)
                     } |
 
-                    for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                    for(<- nilCh) {
                         stack!("init", *logsCh) |
 
                         for(@logs <- logsCh) {
@@ -98,7 +77,9 @@ in {
                     ret!(Nil)
                 } |
 
-                getValueOr!(deployId, *valueCh, *nilCh)
+                for(_, @map <<- treeHashMapCh) {
+                    getValueOr!(map, deployId, *valueCh, *nilCh)
+                }
             }
         } |
 

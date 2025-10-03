@@ -12,29 +12,8 @@ new rl(`rho:registry:lookup`),
     getTransactionsHistory,
     getBalance
 in {
-    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-    for(treeHashMap <- treeHashMapCh) {
-        treeHashMap!("init", 3, *treeHashMapCh) |
-
-        for(@map <- treeHashMapCh) {
-            treeHashMapCh!(*treeHashMap, map)
-        }
-    } |
-
-    contract getValueOr(@address, valueCh, nilCh) = {
-        new retCh in {
-            for(treeHashMap, @map <<- treeHashMapCh) {
-                treeHashMap!("get", map, address, *retCh) |
-
-                for(@value <- retCh) {
-                    match value {
-                        Nil => nilCh!()
-                        value => valueCh!(value)
-                    }
-                }
-            }
-        }
-    } |
+    {%- import "common/init_map.rho" as initMap -%}
+    {% call initMap::call("rl", "treeHashMapCh", "getValueOr", 4) %} |
 
     rl!(`rho:rchain:revVault`, *revVaultCh) |
     for(@(_, revVault) <- revVaultCh) {
@@ -80,35 +59,37 @@ in {
 
     contract updateTransferHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
         new valueCh, nilCh in {
-            getValueOr!(walletOwner, *valueCh, *nilCh) |
+            for(treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                getValueOr!(map, walletOwner, *valueCh, *nilCh)
 
-            for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
-                new userHistoryCh in {
-                    stack!("init", *userHistoryCh) |
+                for(<- nilCh) {
+                    new userHistoryCh in {
+                        stack!("init", *userHistoryCh) |
 
-                    for(@history <- userHistoryCh) {
-                        stack!("push", history, {
-                            "id": id,
-                            "timestamp": timestamp,
-                            "from": walletAddressFrom,
-                            "to": walletAddressTo,
-                            "amount": amount,
-                            "description": description,
-                        }, *devNull) |
-                        treeHashMap!("set", map, walletOwner, history, *devNull)
+                        for(@history <- userHistoryCh) {
+                            stack!("push", history, {
+                                "id": id,
+                                "timestamp": timestamp,
+                                "from": walletAddressFrom,
+                                "to": walletAddressTo,
+                                "amount": amount,
+                                "description": description,
+                            }, *devNull) |
+                            treeHashMap!("set", map, walletOwner, history, *devNull)
+                        }
                     }
-                }
-            } |
+                } |
 
-            for(@history <- valueCh; stack <<- stackCh) {
-                stack!("push", history, {
-                    "id": id,
-                    "timestamp": timestamp,
-                    "from": walletAddressFrom,
-                    "to": walletAddressTo,
-                    "amount": amount,
-                    "description": description,
-                }, *devNull)
+                for(@history <- valueCh) {
+                    stack!("push", history, {
+                        "id": id,
+                        "timestamp": timestamp,
+                        "from": walletAddressFrom,
+                        "to": walletAddressTo,
+                        "amount": amount,
+                        "description": description,
+                    }, *devNull)
+                }
             }
         }
     } |
@@ -130,7 +111,9 @@ in {
 
     contract getTransactionsHistory(@walletAddress, ret) = {
         new valueCh, nilCh in {
-            getValueOr!(walletAddress, *valueCh, *nilCh) |
+            for(_, @map <<- treeHashMapCh) {
+                getValueOr!(map, walletAddress, *valueCh, *nilCh)
+            } |
 
             for(<- nilCh) {
                 ret!([])

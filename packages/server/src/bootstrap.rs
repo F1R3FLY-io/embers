@@ -1,5 +1,4 @@
 use anyhow::Context;
-use askama::Template;
 use blake2::{Blake2b, Digest};
 use chrono::{DateTime, Utc};
 use firefly_client::WriteNodeClient;

@@ -1,5 +1,5 @@
-use askama::Template;
 use chrono::{DateTime, Utc};
+use firefly_client::rendering::Render;
 
 use crate::common::models::{PositiveNonZero, WalletAddress};
 
@@ -8,8 +8,8 @@ mod description;
 pub use description::*;
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Template)]
-#[template(path = "wallets/init.rho", escape = "none")]
+#[derive(Debug, Clone, Render)]
+#[template(path = "wallets/init.rho")]
 pub struct InitWalletsEnv;
 
 pub type Amount = PositiveNonZero<i64>;

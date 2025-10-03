@@ -14,10 +14,10 @@ in
 {%- if !output_channels.is_empty() %}
         new {{ output_channels | join(",\n") | indent(12) }}
         in {
-            {{ steps | join(" |\n") | indent(12) }}
+            {{ nodes | join(" |\n") | indent(12) }}
         }
 {%- else -%}
-        {{ steps | join(" |\n") | indent(8) }}
+        {{ nodes | join(" |\n") | indent(8) }}
 {%- endif %}
     }
 }
