@@ -36,8 +36,8 @@ in {
             new deployData(`rho:deploy:data`), deployDataCh, valueCh, nilCh, logsCh in {
                 deployData!(*deployDataCh) |
 
-                for(_, _, @deployId <- deployDataCh; _, @map <<- treeHashMapCh; stack <<- stackCh) {
-                    getValueOr!(map, deployId.toString(), *valueCh, *nilCh)
+                for(_, _, @deployId <- deployDataCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                    getValueOr!(map, deployId.toString(), *valueCh, *nilCh) |
 
                     for(@logs <- valueCh) {
                         stack!("push", logs, {"level": level, "message": message}, *devNull)

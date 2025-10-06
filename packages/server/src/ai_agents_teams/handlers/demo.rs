@@ -2,6 +2,7 @@ use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::anyhow;
+use firefly_client::models::DeployId;
 use firefly_client::rendering::Render;
 use firefly_client::{ReadNodeClient, WriteNodeClient};
 use secp256k1::SecretKey;
@@ -16,7 +17,7 @@ struct RunAiAgentsTeamsDemo {
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/get_demo_result.rho")]
 struct GetAiAgentsTeamsDemoResult {
-    prompt: String,
+    deploy_id: DeployId,
 }
 
 #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
@@ -38,7 +39,7 @@ pub async fn run_demo(
     .phlo_limit(500_000_000)
     .build();
 
-    client.deploy(&key, deploy_data).await?;
+    let deploy_id = client.deploy(&key, deploy_data).await?;
     let block_hash = client.propose().await?;
 
     let finalized = read_client
@@ -49,6 +50,6 @@ pub async fn run_demo(
         return Err(anyhow!("block is not finalized"));
     }
 
-    let code = GetAiAgentsTeamsDemoResult { prompt }.render()?;
+    let code = GetAiAgentsTeamsDemoResult { deploy_id }.render()?;
     read_client.get_data(code).await.map_err(Into::into)
 }

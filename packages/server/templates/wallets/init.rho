@@ -60,7 +60,7 @@ in {
     contract updateTransferHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
         new valueCh, nilCh in {
             for(treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
-                getValueOr!(map, walletOwner, *valueCh, *nilCh)
+                getValueOr!(map, walletOwner, *valueCh, *nilCh) |
 
                 for(<- nilCh) {
                     new userHistoryCh in {

@@ -1,5 +1,5 @@
 new ret in {
-    for(@result <- @{{ prompt }}) {
+    for(@result <- @{{ deploy_id }}) {
         ret!(result)
     }
 }

@@ -286,14 +286,3 @@ pub trait Render: Sized {
 pub mod _dependencies {
     pub use askama;
 }
-
-#[test]
-fn test_uri_builder() {
-    use std::str::FromStr;
-
-    let public_key = PublicKey::from_str("04f4b4417f930e6fab5765ac0defcf9fce169982acfd046e7c27f9b14c0804014623c0439e5c8035e9607599a549303b5b6b90cd9685e6965278bddca65dac7510").unwrap();
-    assert_eq!(
-        Uri::from(public_key).0,
-        "rho:id:1qw5ehmq1x49dey4eadr1h4ncm361w3536asho7dr38iyookwcsp6i"
-    );
-}

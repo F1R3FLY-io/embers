@@ -76,7 +76,7 @@ pub async fn bootstrap_testnet_contracts(
     client
         .deploy(deployer_key, deploy_data)
         .await
-        .context("failed to testnet env")?;
+        .context("failed to deploy testnet env")?;
 
     client.propose().await
 }
