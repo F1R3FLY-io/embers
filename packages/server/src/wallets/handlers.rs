@@ -1,5 +1,12 @@
+use firefly_client::rendering::Uri;
+use firefly_client::{ReadNodeClient, WriteNodeClient};
+
 mod get_wallet_state_and_history;
 mod transfer;
 
-pub use get_wallet_state_and_history::*;
-pub use transfer::*;
+#[derive(Clone)]
+pub struct WalletsService {
+    pub uri: Uri,
+    pub write_client: WriteNodeClient,
+    pub read_client: ReadNodeClient,
+}

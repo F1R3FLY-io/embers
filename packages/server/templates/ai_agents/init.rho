@@ -5,11 +5,16 @@ new rl(`rho:registry:lookup`),
     treeHashMapCh,
     listOpsCh,
     stackCh,
-    getValueOr,
     visit
 in {
-    {%- import "common/init_map.rho" as initMap -%}
-    {% call initMap::call("rl", "treeHashMapCh", "getValueOr", 4) %} |
+    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
+    for(treeHashMap <- treeHashMapCh) {
+        treeHashMap!("init", 3, *treeHashMapCh) |
+
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
+        }
+    } |
 
     rl!(`rho:lang:listOps`, *listOpsCh) |
     for(@(_, listOps) <- listOpsCh) {
@@ -22,8 +27,8 @@ in {
     } |
 
     contract visit(@"agents", @deployerId, f, notFound) = {
-        for(_, @map <<- treeHashMapCh) {
-            getValueOr!(map, deployerId, *f, *notFound)
+        for(treeHashMap, @map <<- treeHashMapCh) {
+            treeHashMap!("getOrElse", map, deployerId, *f, *notFound)
         }
     } |
 
@@ -31,8 +36,8 @@ in {
         new foundCh in {
             visit!("agents", deployerId, *foundCh, *notFound) |
 
-            for(@(agents, _) <- foundCh) {
-                getValueOr!(agents, id, *f, *notFound)
+            for(@(agents, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", agents, id, *f, *notFound)
             }
         }
     } |
@@ -41,8 +46,8 @@ in {
         new foundCh in {
             visit!("agentVersions", deployerId, id, *foundCh, *notFound) |
 
-            for(@(agentVersions, _) <- foundCh) {
-                getValueOr!(agentVersions, version, *f, *notFound)
+            for(@(agentVersions, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", agentVersions, version, *f, *notFound)
             }
         }
     } |
@@ -85,7 +90,7 @@ in {
                             }
                         } |
 
-                        getValueOr!(agents, id, *errCh, *insertAgentCh)
+                        treeHashMap!("getOrElse", agents, id, *errCh, *insertAgentCh)
                     }
                 } |
 
@@ -238,7 +243,7 @@ in {
                             }, *devNull)
                     } |
 
-                    getValueOr!(agentVersions, version, *errCh, *insertAgentVersionCh)
+                    treeHashMap!("getOrElse", agentVersions, version, *errCh, *insertAgentVersionCh)
                 } |
 
                 for(<- errCh) {

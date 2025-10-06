@@ -1,97 +1,81 @@
+{% extends "common/insert_signed.rho" %}
+
+{% block name -%} log {%- endblock %}
+
+{% block initialization -%}
+{% filter indent(8) -%}
+
 new rl(`rho:registry:lookup`),
-    rs(`rho:registry:insertSigned:secp256k1`),
     devNull(`rho:io:devNull`),
-    abort(`rho:execution:abort`),
-    prevEnvCh,
-    initEnv,
     treeHashMapCh,
     stackCh,
-    getValueOr,
-    log,
-    private,
-    uriCh
+    private
 in {
-    rl!({{ env_uri }}, *prevEnvCh) |
+    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
+    for(treeHashMap <- treeHashMapCh) {
+        treeHashMap!("init", 3, *treeHashMapCh) |
 
-    for(@Nil <- prevEnvCh) {
-        initEnv!()
-    } |
-
-    for(@(nonce, _) <- prevEnvCh) {
-        if (nonce < {{ nonce }}) {
-            initEnv!()
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
         }
     } |
 
-    for(<- initEnv) {
-        {%- import "common/init_map.rho" as initMap -%}
-        {% call initMap::call("rl", "treeHashMapCh", "getValueOr", 8) %} |
+    rl!(`rho:lang:stack`, *stackCh) |
+    for(@(_, stack) <- stackCh) {
+        stackCh!(stack)
+    } |
 
-        rl!(`rho:lang:stack`, *stackCh) |
-        for(@(_, stack) <- stackCh) {
-            stackCh!(stack)
-        } |
+    contract @(*log, *private)(@level, @message) = {
+        new deployData(`rho:deploy:data`), deployDataCh, valueCh, nilCh, logsCh in {
+            deployData!(*deployDataCh) |
 
-        contract @(*log, *private)(@level, @message) = {
-            new deployData(`rho:deploy:data`), deployDataCh, valueCh, nilCh, logsCh in {
-                deployData!(*deployDataCh) |
+            for(_, _, @deployId <- deployDataCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                treeHashMap!("getOrElse", map, deployId.toString(), *valueCh, *nilCh) |
 
-                for(_, _, @deployId <- deployDataCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
-                    getValueOr!(map, deployId.toString(), *valueCh, *nilCh) |
-
-                    for(@logs <- valueCh) {
-                        stack!("push", logs, {"level": level, "message": message}, *devNull)
-                    } |
-
-                    for(<- nilCh) {
-                        stack!("init", *logsCh) |
-
-                        for(@logs <- logsCh) {
-                            stack!("push", logs, {"level": level, "message": message}, *devNull) |
-                            treeHashMap!("set", map, deployId.toString(), logs, *devNull)
-                        }
-                    }
-                }
-            }
-        } |
-
-        contract log(@"debug", @message) = {
-            @(*log, *private)!("debug", message)
-        } |
-
-        contract log(@"info", @message) = {
-            @(*log, *private)!("info", message)
-        } |
-
-        contract log(@"error", @message) = {
-            @(*log, *private)!("error", message)
-        } |
-
-        contract log(@"get", @deployId, ret) = {
-            new valueCh, nilCh in {
-                for(@logs <- valueCh; stack <<- stackCh) {
-                    stack!("toList", logs, *ret)
+                for(@logs <- valueCh) {
+                    stack!("push", logs, {"level": level, "message": message}, *devNull)
                 } |
 
                 for(<- nilCh) {
-                    ret!(Nil)
-                } |
+                    stack!("init", *logsCh) |
 
-                for(_, @map <<- treeHashMapCh) {
-                    getValueOr!(map, deployId, *valueCh, *nilCh)
+                    for(@logs <- logsCh) {
+                        stack!("push", logs, {"level": level, "message": message}, *devNull) |
+                        treeHashMap!("set", map, deployId.toString(), logs, *devNull)
+                    }
                 }
             }
-        } |
+        }
+    } |
 
-        rs!(
-            {{ public_key }},
-            ({{ nonce }}, bundle+{*log}),
-            {{ sig }},
-            *uriCh
-        ) |
+    contract log(@"debug", @message) = {
+        @(*log, *private)!("debug", message)
+    } |
 
-        for(@Nil <- uriCh) {
-            abort!("failed to insert test env")
+    contract log(@"info", @message) = {
+        @(*log, *private)!("info", message)
+    } |
+
+    contract log(@"error", @message) = {
+        @(*log, *private)!("error", message)
+    } |
+
+    contract log(@"get", @deployId, ret) = {
+        new valueCh, nilCh in {
+            for(@logs <- valueCh; stack <<- stackCh) {
+                stack!("toList", logs, *ret)
+            } |
+
+            for(<- nilCh) {
+                ret!(Nil)
+            } |
+
+            for(treeHashMap, @map <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", map, deployId, *valueCh, *nilCh)
+            }
         }
     }
 }
+
+{%- endfilter %}
+{%- endblock %}

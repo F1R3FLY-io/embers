@@ -3,11 +3,11 @@ use std::time::Duration;
 use anyhow::anyhow;
 use firefly_client::models::DeployId;
 use firefly_client::rendering::{Render, Uri};
-use firefly_client::{ReadNodeClient, WriteNodeClient};
 
 use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
 use crate::testnet::blockchain;
+use crate::testnet::handlers::TestnetService;
 use crate::testnet::models::{
     DeploySignedTestReq,
     DeploySignedTestResp,
@@ -22,93 +22,94 @@ struct GetLogs {
     deploy_id: DeployId,
 }
 
-#[tracing::instrument(
-    level = "info",
-    skip_all,
-    fields(request),
-    err(Debug),
-    ret(Debug, level = "trace")
-)]
-pub async fn prepare_test_contract(
-    request: DeployTestReq,
-    client: &mut WriteNodeClient,
-) -> anyhow::Result<DeployTestResp> {
-    record_trace!(request);
+impl TestnetService {
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        fields(request),
+        err(Debug),
+        ret(Debug, level = "trace")
+    )]
+    pub async fn prepare_test_contract(
+        &mut self,
+        request: DeployTestReq,
+    ) -> anyhow::Result<DeployTestResp> {
+        record_trace!(request);
 
-    let valid_after = client.get_head_block_index().await?;
-    Ok(DeployTestResp {
-        env_contract: request.env.map(|env| {
-            prepare_for_signing()
-                .code(env)
+        let valid_after = self.write_client.get_head_block_index().await?;
+        Ok(DeployTestResp {
+            env_contract: request.env.map(|env| {
+                prepare_for_signing()
+                    .code(env)
+                    .valid_after_block_number(valid_after)
+                    .call()
+            }),
+            test_contract: prepare_for_signing()
+                .code(request.test)
                 .valid_after_block_number(valid_after)
-                .call()
-        }),
-        test_contract: prepare_for_signing()
-            .code(request.test)
-            .valid_after_block_number(valid_after)
-            .call(),
-    })
-}
+                .call(),
+        })
+    }
 
-#[tracing::instrument(
-    level = "info",
-    skip_all,
-    fields(request),
-    err(Debug),
-    ret(Debug, level = "trace")
-)]
-pub async fn deploy_test_contract(
-    client: &mut WriteNodeClient,
-    read_client: &ReadNodeClient,
-    test_env_uri: &Uri,
-    request: DeploySignedTestReq,
-) -> anyhow::Result<DeploySignedTestResp> {
-    record_trace!(request);
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        fields(request),
+        err(Debug),
+        ret(Debug, level = "trace")
+    )]
+    pub async fn deploy_test_contract(
+        &mut self,
+        request: DeploySignedTestReq,
+    ) -> anyhow::Result<DeploySignedTestResp> {
+        record_trace!(request);
 
-    if let Some(contract) = request.env {
-        let result = client.deploy_signed_contract(contract).await;
-        if let Err(err) = result {
-            return Ok(DeploySignedTestResp::EnvDeployFailed {
-                error: err.to_string(),
-            });
+        if let Some(contract) = request.env {
+            let result = self.write_client.deploy_signed_contract(contract).await;
+            if let Err(err) = result {
+                return Ok(DeploySignedTestResp::EnvDeployFailed {
+                    error: err.to_string(),
+                });
+            }
+
+            self.write_client.propose().await?;
         }
 
-        client.propose().await?;
-    }
+        let result = self.write_client.deploy_signed_contract(request.test).await;
+        let deploy_id = match result {
+            Ok(deploy_id) => deploy_id,
+            Err(err) => {
+                return Ok(DeploySignedTestResp::TestDeployFailed {
+                    error: err.to_string(),
+                });
+            }
+        };
 
-    let result = client.deploy_signed_contract(request.test).await;
-    let deploy_id = match result {
-        Ok(deploy_id) => deploy_id,
-        Err(err) => {
-            return Ok(DeploySignedTestResp::TestDeployFailed {
-                error: err.to_string(),
-            });
+        let block_hash = self.write_client.propose().await?;
+
+        let finalized = self
+            .read_client
+            .wait_finalization(block_hash, Duration::from_secs(15))
+            .await?;
+
+        if !finalized {
+            return Err(anyhow!("block is not finalized"));
         }
-    };
 
-    let block_hash = client.propose().await?;
+        let code = GetLogs {
+            deploy_id,
+            env_uri: self.uri.clone(),
+        }
+        .render()?;
 
-    let finalized = read_client
-        .wait_finalization(block_hash, Duration::from_secs(15))
-        .await?;
+        let logs: Option<Vec<blockchain::dtos::Log>> = self.read_client.get_data(code).await?;
 
-    if !finalized {
-        return Err(anyhow!("block is not finalized"));
+        Ok(DeploySignedTestResp::Ok {
+            logs: logs
+                .unwrap_or_default()
+                .into_iter()
+                .map(Into::into)
+                .collect(),
+        })
     }
-
-    let code = GetLogs {
-        deploy_id,
-        env_uri: test_env_uri.clone(),
-    }
-    .render()?;
-
-    let logs: Option<Vec<blockchain::dtos::Log>> = read_client.get_data(code).await?;
-
-    Ok(DeploySignedTestResp::Ok {
-        logs: logs
-            .unwrap_or_default()
-            .into_iter()
-            .map(Into::into)
-            .collect(),
-    })
 }

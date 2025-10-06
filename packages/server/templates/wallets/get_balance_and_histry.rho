@@ -1,3 +1,9 @@
-new ret in {
-    @"getBalanceAndHistory"!({{ wallet_address }}, *ret)
+new ret,
+    rl(`rho:registry:lookup`),
+    walletCh
+in {
+    rl!({{ env_uri }}, *walletCh) |
+    for(@(_, wallet) <- walletCh) {
+        @wallet!("getBalanceAndHistory", {{ wallet_address }}, *ret)
+    }
 }
