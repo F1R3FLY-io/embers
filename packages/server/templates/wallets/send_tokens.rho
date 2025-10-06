@@ -1,11 +1,11 @@
 new deployerId(`rho:rchain:deployerId`),
     deployId(`rho:rchain:deployId`),
     rl(`rho:registry:lookup`),
-    walletCh
+    walletsCh
 in {
-    rl!({{ env_uri }}, *walletCh) |
-    for(@(_, wallet) <- walletCh) {
-        @wallet!(
+    rl!({{ env_uri }}, *walletsCh) |
+    for(@(_, wallets) <- walletsCh) {
+        @wallets!(
             "sendTransfer",
             {{ timestamp }},
             {{ wallet_address_from }},

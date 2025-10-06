@@ -11,6 +11,7 @@ pub struct MainNet {
     pub read_node_url: String,
     pub service_key: SecretKey,
     pub wallets_env_key: SecretKey,
+    pub agents_teams_env_key: SecretKey,
 }
 
 #[derive(Debug, Clone, Deserialize)]

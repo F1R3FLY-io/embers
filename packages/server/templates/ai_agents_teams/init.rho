@@ -1,3 +1,10 @@
+{% extends "common/insert_signed.rho" %}
+
+{% block name -%} agentsTeams {%- endblock %}
+
+{% block initialization -%}
+{% filter indent(8) -%}
+
 new rl(`rho:registry:lookup`),
     revAddress(`rho:rev:address`),
     devNull(`rho:io:devNull`),
@@ -52,7 +59,7 @@ in {
         }
     } |
 
-    contract @"createAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+    contract agentsTeams(@"create", @deployerId, @id, @version, @name, @shard, @graph) = {
         new deployerAddressCh, valueCh, nilCh, errCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
@@ -142,7 +149,7 @@ in {
         }
     } |
 
-    contract @"listAiAgentsTeams"(@address, ret) = {
+    contract agentsTeams(@"list", @address, ret) = {
         new valueCh, nilCh in {
             for(@(agentsTeams, agentsTeamsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
                 new toAgentsTeamHeader, agentsTeamsListCh in {
@@ -176,7 +183,7 @@ in {
         }
     } |
 
-    contract @"listAiAgentsTeamVersions"(@address, @id, ret) = {
+    contract agentsTeams(@"listVersions", @address, @id, ret) = {
         new valueCh, nilCh, agentsTeamVersionsListCh, toAgentsTeamHeader in {
             for(@(agentsTeamVersions, agentsTeamVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
                 contract toAgentsTeamHeader(@version, ret) = {
@@ -204,7 +211,7 @@ in {
         }
     } |
 
-    contract @"getAiAgentsTeam"(@address, @id, @version, ret) = {
+    contract agentsTeams(@"get", @address, @id, @version, ret) = {
         new valueCh, nilCh in {
             for(@agentsTeamVersion <- valueCh) {
                 ret!(agentsTeamVersion.union({"id": id, "version": version}))
@@ -218,7 +225,7 @@ in {
         }
     } |
 
-    contract @"saveAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+    contract agentsTeams(@"save", @deployerId, @id, @version, @name, @shard, @graph) = {
         new deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
@@ -255,3 +262,6 @@ in {
         }
     }
 }
+
+{%- endfilter %}
+{%- endblock %}

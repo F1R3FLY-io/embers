@@ -1,3 +1,9 @@
-new deployerId(`rho:rchain:deployerId`) in {
-    @"createAiAgentsTeam"!(*deployerId, {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ graph }})
+new rl(`rho:registry:lookup`),
+    deployerId(`rho:rchain:deployerId`),
+    agentsTeamsCh
+in {
+    rl!({{ env_uri }}, *agentsTeamsCh) |
+    for(@(_, agentsTeams) <- agentsTeamsCh) {
+        @agentsTeams!("create", *deployerId, {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ graph }})
+    }
 }

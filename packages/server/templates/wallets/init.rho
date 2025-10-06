@@ -1,6 +1,6 @@
 {% extends "common/insert_signed.rho" %}
 
-{% block name -%} wallet {%- endblock %}
+{% block name -%} wallets {%- endblock %}
 
 {% block initialization -%}
 {% filter indent(8) -%}
@@ -106,7 +106,7 @@ in {
         }
     } |
 
-    contract wallet(@"sendTransfer", @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
+    contract wallets(@"sendTransfer", @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
         new deployData(`rho:deploy:data`), deployDataCh, transferResultCh, updateHistory in {
             deployData!(*deployDataCh) |
             for(either <<- eitherCh; _, @deployerId, @deployId <- deployDataCh) {
@@ -158,7 +158,7 @@ in {
         }
     } |
 
-    contract wallet(@"getBalanceAndHistory", @walletAddress, ret) = {
+    contract wallets(@"getBalanceAndHistory", @walletAddress, ret) = {
         new balanceCh, historyCh, mapOp in {
             for(either <<- eitherCh) {
                 getBalance!(walletAddress, *balanceCh) |

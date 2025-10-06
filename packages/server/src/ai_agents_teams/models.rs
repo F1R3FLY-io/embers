@@ -1,13 +1,6 @@
 use std::convert::Infallible;
 
-use firefly_client::rendering::Render;
-
 use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/init.rho")]
-pub struct InitAgentsTeamsEnv;
 
 #[derive(Debug, Clone)]
 pub struct AgentsTeams {

@@ -8,6 +8,7 @@ use tokio::try_join;
 
 use crate::ai_agents::api::AIAgents;
 use crate::ai_agents_teams::api::AIAgentsTeams;
+use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::bootstrap::bootstrap_mainnet_contracts;
 use crate::common::api::Service;
 use crate::configuration::collect_config;
@@ -43,11 +44,19 @@ async fn main() -> anyhow::Result<()> {
     let read_client = ReadNodeClient::new(config.mainnet.read_node_url);
     let testnet_read_client = ReadNodeClient::new(config.testnet.read_node_url);
 
-    let ((write_client, wallets_service), testnet_service) = try_join!(
+    let ((write_client, agents_teams_service, wallets_service), testnet_service) = try_join!(
         async {
             let mut write_client = WriteNodeClient::new(
                 config.mainnet.deploy_service_url,
                 config.mainnet.propose_service_url,
+            )
+            .await?;
+
+            let agents_teams_service = AgentsTeamsService::bootstrap(
+                write_client.clone(),
+                read_client.clone(),
+                &config.mainnet.service_key,
+                &config.mainnet.agents_teams_env_key,
             )
             .await?;
 
@@ -61,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
 
             bootstrap_mainnet_contracts(&mut write_client, &config.mainnet.service_key).await?;
 
-            anyhow::Ok((write_client, wallets_service))
+            anyhow::Ok((write_client, agents_teams_service, wallets_service))
         },
         async {
             let mut testnet_write_client = WriteNodeClient::new(
@@ -102,6 +111,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/openapi.yaml", spec_yaml)
         .data(read_client)
         .data(write_client)
+        .data(agents_teams_service)
         .data(wallets_service)
         .data(testnet_service)
         .with(Cors::new().allow_origin_regex("*"))
