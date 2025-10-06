@@ -1,13 +1,7 @@
-use askama::Template;
 use firefly_client::models::SignedCode;
 use secp256k1::SecretKey;
 
 use crate::common::models::PreparedContract;
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Template)]
-#[template(path = "testnet/init.rho", escape = "none")]
-pub struct InitTestnetEnv;
 
 #[derive(Debug, Clone)]
 pub struct CreateTestwalletResp {

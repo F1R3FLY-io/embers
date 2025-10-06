@@ -1,7 +1,13 @@
 use std::collections::HashMap;
 
 use anyhow::{Context, anyhow};
+use blake2::digest::consts::U32;
+use blake2::{Blake2b, Digest};
+use chrono::{DateTime, Utc};
+use prost::Message as _;
+use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 
+use crate::models::rhoapi;
 use crate::models::rhoapi::expr::ExprInstance;
 
 pub trait FromExpr: Sized {
@@ -98,4 +104,72 @@ where
             hex::encode(slice)
         }
     }
+}
+
+pub fn insert_signed_signature(
+    key: &SecretKey,
+    timestamp: DateTime<Utc>,
+    deployer: &PublicKey,
+    version: i64,
+) -> Vec<u8> {
+    let par = rhoapi::Par {
+        exprs: vec![rhoapi::Expr {
+            expr_instance: Some(rhoapi::expr::ExprInstance::ETupleBody(rhoapi::ETuple {
+                ps: vec![
+                    rhoapi::Par {
+                        exprs: vec![rhoapi::Expr {
+                            expr_instance: Some(rhoapi::expr::ExprInstance::GInt(
+                                timestamp.timestamp_millis(),
+                            )),
+                        }],
+                        ..Default::default()
+                    },
+                    rhoapi::Par {
+                        exprs: vec![rhoapi::Expr {
+                            expr_instance: Some(rhoapi::expr::ExprInstance::GByteArray(
+                                deployer.serialize_uncompressed().into(),
+                            )),
+                        }],
+                        ..Default::default()
+                    },
+                    rhoapi::Par {
+                        exprs: vec![rhoapi::Expr {
+                            expr_instance: Some(rhoapi::expr::ExprInstance::GInt(version)),
+                        }],
+                        ..Default::default()
+                    },
+                ],
+                ..Default::default()
+            })),
+        }],
+        ..Default::default()
+    }
+    .encode_to_vec();
+
+    let hash = Blake2b::<U32>::new().chain_update(par).finalize();
+
+    Secp256k1::new()
+        .sign_ecdsa(Message::from_digest(hash.into()), key)
+        .serialize_der()
+        .to_vec()
+}
+
+#[test]
+fn test_insert_signed_signature() {
+    use std::str::FromStr;
+
+    let secp = Secp256k1::new();
+    let timestamp = DateTime::from_timestamp_millis(1559156356769).unwrap();
+    let secret_key =
+        SecretKey::from_str("f450b26bac63e5dd9343cd46f5fae1986d367a893cd21eedd98a4cb3ac699abc")
+            .unwrap();
+    let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+    let nonce = 9223372036854775807;
+
+    let sig = insert_signed_signature(&secret_key, timestamp, &public_key, nonce);
+
+    assert_eq!(
+        hex::encode(sig),
+        "3044022038044777f2faccfc503363ce70d5701ae64969ca98e64049f92d8477fdea0c1402200843c073c6f0121f580f38bb2940f16cef54fc24ea325ebc00230fa6e3117549"
+    );
 }

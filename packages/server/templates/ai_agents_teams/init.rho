@@ -1,3 +1,10 @@
+{% extends "common/insert_signed.rho" %}
+
+{% block name -%} agentsTeams {%- endblock %}
+
+{% block initialization -%}
+{% filter indent(8) -%}
+
 new rl(`rho:registry:lookup`),
     revAddress(`rho:rev:address`),
     devNull(`rho:io:devNull`),
@@ -5,7 +12,6 @@ new rl(`rho:registry:lookup`),
     treeHashMapCh,
     listOpsCh,
     stackCh,
-    getValueOr,
     visit
 in {
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
@@ -27,24 +33,9 @@ in {
         stackCh!(stack)
     } |
 
-    contract getValueOr(@map, @address, valueCh, nilCh) = {
-        new retCh in {
-            for(treeHashMap, _ <<- treeHashMapCh) {
-                treeHashMap!("get", map, address, *retCh) |
-
-                for(@value <- retCh) {
-                    match value {
-                        Nil => nilCh!()
-                        value => valueCh!(value)
-                    }
-                }
-            }
-        }
-    } |
-
     contract visit(@"agentsTeams", @deployerId, f, notFound) = {
-        for(_, @map <<- treeHashMapCh) {
-            getValueOr!(map, deployerId, *f, *notFound)
+        for(treeHashMap, @map <<- treeHashMapCh) {
+            treeHashMap!("getOrElse", map, deployerId, *f, *notFound)
         }
     } |
 
@@ -52,8 +43,8 @@ in {
         new foundCh in {
             visit!("agentsTeams", deployerId, *foundCh, *notFound) |
 
-            for(@(agentsTeams, _) <- foundCh) {
-                getValueOr!(agentsTeams, id, *f, *notFound)
+            for(@(agentsTeams, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", agentsTeams, id, *f, *notFound)
             }
         }
     } |
@@ -62,13 +53,13 @@ in {
         new foundCh in {
             visit!("agentsTeamVersions", deployerId, id, *foundCh, *notFound) |
 
-            for(@(agentsTeamVersions, _) <- foundCh) {
-                getValueOr!(agentsTeamVersions, version, *f, *notFound)
+            for(@(agentsTeamVersions, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", agentsTeamVersions, version, *f, *notFound)
             }
         }
     } |
 
-    contract @"createAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+    contract agentsTeams(@"create", @deployerId, @id, @version, @name, @shard, @graph) = {
         new deployerAddressCh, valueCh, nilCh, errCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
@@ -106,7 +97,7 @@ in {
                             }
                         } |
 
-                        getValueOr!(agentsTeams, id, *errCh, *insertAgentsTeamCh)
+                        treeHashMap!("getOrElse", agentsTeams, id, *errCh, *insertAgentsTeamCh)
                     }
                 } |
 
@@ -158,7 +149,7 @@ in {
         }
     } |
 
-    contract @"listAiAgentsTeams"(@address, ret) = {
+    contract agentsTeams(@"list", @address, ret) = {
         new valueCh, nilCh in {
             for(@(agentsTeams, agentsTeamsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
                 new toAgentsTeamHeader, agentsTeamsListCh in {
@@ -192,7 +183,7 @@ in {
         }
     } |
 
-    contract @"listAiAgentsTeamVersions"(@address, @id, ret) = {
+    contract agentsTeams(@"listVersions", @address, @id, ret) = {
         new valueCh, nilCh, agentsTeamVersionsListCh, toAgentsTeamHeader in {
             for(@(agentsTeamVersions, agentsTeamVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
                 contract toAgentsTeamHeader(@version, ret) = {
@@ -220,7 +211,7 @@ in {
         }
     } |
 
-    contract @"getAiAgentsTeam"(@address, @id, @version, ret) = {
+    contract agentsTeams(@"get", @address, @id, @version, ret) = {
         new valueCh, nilCh in {
             for(@agentsTeamVersion <- valueCh) {
                 ret!(agentsTeamVersion.union({"id": id, "version": version}))
@@ -234,7 +225,7 @@ in {
         }
     } |
 
-    contract @"saveAiAgentsTeam"(@deployerId, @id, @version, @name, @shard, @graph) = {
+    contract agentsTeams(@"save", @deployerId, @id, @version, @name, @shard, @graph) = {
         new deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
             revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
 
@@ -259,7 +250,7 @@ in {
                             }, *devNull)
                     } |
 
-                    getValueOr!(agentsTeamVersions, version, *errCh, *insertAgentsTeamVersionCh)
+                    treeHashMap!("getOrElse", agentsTeamVersions, version, *errCh, *insertAgentsTeamVersionCh)
                 } |
 
                 for(<- errCh) {
@@ -271,3 +262,6 @@ in {
         }
     }
 }
+
+{%- endfilter %}
+{%- endblock %}

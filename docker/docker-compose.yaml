@@ -1,6 +1,7 @@
 services:
   firefly:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     env_file:
       - .env
@@ -27,6 +28,7 @@ services:
 
   firefly-read:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     ports:
       - 14413:40403 # rest api
@@ -39,6 +41,7 @@ services:
 
   firefly-testnet:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     ports:
       - 15401:40401 # deploy service
@@ -63,6 +66,7 @@ services:
 
   firefly-read-testnet:
     image: f1r3flyindustries/f1r3fly-scala-node:latest
+    pull_policy: always
     user: root
     ports:
       - 15413:40403 # rest api

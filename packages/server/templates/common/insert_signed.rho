@@ -1,0 +1,35 @@
+new rl(`rho:registry:lookup`),
+    rs(`rho:registry:insertSigned:secp256k1`),
+    abort(`rho:execution:abort`),
+    prevEnvCh,
+    initEnv,
+    {% block name %}{% endblock %},
+    uriCh
+in {
+    rl!({{ env_uri }}, *prevEnvCh) |
+
+    for(@Nil <- prevEnvCh) {
+        initEnv!()
+    } |
+
+    for(@(version, _) <- prevEnvCh) {
+        if (version < {{ version }}) {
+            initEnv!()
+        }
+    } |
+
+    for(<- initEnv) {
+        {% block initialization %}{% endblock %} |
+
+        rs!(
+            {{ public_key }},
+            ({{ version }}, bundle+{*{% block name %}{% endblock %}}),
+            {{ sig }},
+            *uriCh
+        ) |
+
+        for(@Nil <- uriCh) {
+            abort!("failed to insert env")
+        }
+    }
+}

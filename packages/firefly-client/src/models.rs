@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::marker::PhantomData;
 
+use chrono::{DateTime, Utc};
 use derive_more::{AsRef, Display, From, Into};
 use serde::{Deserialize, Deserializer, Serialize, de};
 
@@ -46,13 +47,6 @@ impl IntoValue for BlockId {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BlockInfo {
-    pub block_hash: BlockId,
-    pub parents_hash_list: Vec<BlockId>,
-}
-
 #[derive(
     Debug, Clone, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Into, From, Serialize, Deserialize,
 )]
@@ -62,25 +56,6 @@ impl IntoValue for DeployId {
     fn into_value(self) -> Value {
         self.0.into_value()
     }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Deploy {
-    pub timestamp: i64,
-    pub cost: u64,
-    pub term: String,
-    pub sig: String,
-    pub deployer: String,
-    pub errored: bool,
-    pub system_deploy_error: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Block {
-    pub block_info: BlockInfo,
-    pub deploys: Vec<Deploy>,
 }
 
 #[derive(derive_more::Debug, Clone)]
@@ -236,6 +211,9 @@ pub struct DeployData {
 
     #[builder(default = 500_000)]
     pub phlo_limit: u64,
+
+    #[builder(default = chrono::Utc::now())]
+    pub timestamp: DateTime<Utc>,
 
     #[builder(default = ValidAfter::Head)]
     pub valid_after_block_number: ValidAfter,

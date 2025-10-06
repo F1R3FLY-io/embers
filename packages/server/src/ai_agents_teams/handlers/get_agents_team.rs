@@ -1,7 +1,7 @@
-use firefly_client::ReadNodeClient;
-use firefly_client::rendering::Render;
+use firefly_client::rendering::{Render, Uri};
 
 use crate::ai_agents_teams::blockchain::dtos;
+use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::AgentsTeam;
 use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
@@ -9,33 +9,37 @@ use crate::common::tracing::record_trace;
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/get_agents_team.rho")]
 struct GetAgentsTeam {
+    env_uri: Uri,
     address: WalletAddress,
     id: String,
     version: String,
 }
 
-#[tracing::instrument(
-    level = "info",
-    skip_all,
-    fields(address, id, version),
-    err(Debug),
-    ret(Debug, level = "trace")
-)]
-pub async fn get_agents_team(
-    address: WalletAddress,
-    id: String,
-    version: String,
-    client: &ReadNodeClient,
-) -> anyhow::Result<Option<AgentsTeam>> {
-    record_trace!(address, id, version);
+impl AgentsTeamsService {
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        fields(address, id, version),
+        err(Debug),
+        ret(Debug, level = "trace")
+    )]
+    pub async fn get_agents_team(
+        &self,
+        address: WalletAddress,
+        id: String,
+        version: String,
+    ) -> anyhow::Result<Option<AgentsTeam>> {
+        record_trace!(address, id, version);
 
-    let code = GetAgentsTeam {
-        address,
-        id,
-        version,
+        let code = GetAgentsTeam {
+            env_uri: self.uri.clone(),
+            address,
+            id,
+            version,
+        }
+        .render()?;
+
+        let agents_team: Option<dtos::AgentsTeam> = self.read_client.get_data(code).await?;
+        Ok(agents_team.map(Into::into))
     }
-    .render()?;
-
-    let agents_team: Option<dtos::AgentsTeam> = client.get_data(code).await?;
-    Ok(agents_team.map(Into::into))
 }

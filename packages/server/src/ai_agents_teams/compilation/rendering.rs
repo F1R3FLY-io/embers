@@ -1,8 +1,7 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use askama::{Result, Template};
 use derive_more::Display;
-use firefly_client::rendering::{Inline, IntoValue, Value};
+use firefly_client::rendering::{Inline, Render};
 
 use crate::ai_agents_teams::compilation::graphl_parsing::Vertex;
 use crate::ai_agents_teams::compilation::{Code, Node};
@@ -20,48 +19,69 @@ enum Output<'a> {
     Channel(&'a str),
 }
 
-#[derive(Debug, Clone, askama::Template)]
-#[template(path = "ai_agents_teams/nodes/compress.rho", escape = "none")]
-struct CompressTemplate<'a> {
-    from: Vec<From<'a>>,
-    output: Output<'a>,
-    body: Value,
+#[derive(Debug, Clone, Render)]
+enum NodesTemplate<'a> {
+    #[template(path = "ai_agents_teams/nodes/compress.rho")]
+    Compress {
+        #[template(direct)]
+        from: Vec<From<'a>>,
+
+        #[template(direct)]
+        output: Output<'a>,
+
+        body: BTreeMap<String, Inline>,
+    },
+
+    #[template(path = "ai_agents_teams/nodes/text_model.rho")]
+    TextModel {
+        #[template(direct)]
+        from: From<'a>,
+
+        #[template(direct)]
+        output: Output<'a>,
+    },
+
+    #[template(path = "ai_agents_teams/nodes/tti_model.rho")]
+    TTIModel {
+        #[template(direct)]
+        from: From<'a>,
+
+        #[template(direct)]
+        output: Output<'a>,
+    },
+
+    #[template(path = "ai_agents_teams/nodes/tts_model.rho")]
+    TTSModel {
+        #[template(direct)]
+        from: From<'a>,
+
+        #[template(direct)]
+        output: Output<'a>,
+    },
+
+    #[template(path = "ai_agents_teams/nodes/output.rho")]
+    Output {
+        #[template(direct)]
+        from: From<'a>,
+    },
 }
 
-#[derive(Debug, Clone, askama::Template)]
-#[template(path = "ai_agents_teams/nodes/text_model.rho", escape = "none")]
-struct TextModelTemplate<'a> {
-    from: From<'a>,
-    output: Output<'a>,
-}
-
-#[derive(Debug, Clone, askama::Template)]
-#[template(path = "ai_agents_teams/nodes/tti_model.rho", escape = "none")]
-struct TTIModelTemplate<'a> {
-    from: From<'a>,
-    output: Output<'a>,
-}
-
-#[derive(Debug, Clone, askama::Template)]
-#[template(path = "ai_agents_teams/nodes/tts_model.rho", escape = "none")]
-struct TTSModelTemplate<'a> {
-    from: From<'a>,
-    output: Output<'a>,
-}
-
-#[derive(Debug, Clone, askama::Template)]
-#[template(path = "ai_agents_teams/nodes/output.rho", escape = "none")]
-struct OutputTemplate<'a> {
-    from: From<'a>,
-}
-
-#[derive(Debug, Clone, askama::Template)]
-#[template(path = "ai_agents_teams/deploy_agent_team.rho", escape = "none")]
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents_teams/deploy_agent_team.rho")]
 struct DeployAgentTeamTemplate<'a> {
+    #[template(direct)]
     name: &'a str,
+
+    #[template(direct)]
     system_channels: Vec<&'static str>,
-    output_channels: Vec<String>,
-    steps: Vec<String>,
+
+    #[template(direct)]
+    output_channels: Vec<&'a str>,
+
+    #[template(direct)]
+    nodes: Vec<String>,
+
+    #[template(direct)]
     output: bool,
 }
 
@@ -74,24 +94,26 @@ fn filter_channels<'a>(from: &[From<'a>]) -> Vec<&'a str> {
         .collect()
 }
 
-fn get_all_system_channels(nodes: &[Node<'_>]) -> Vec<&'static str> {
-    [
-        nodes
-            .iter()
-            .any(|node| matches!(node, Node::TextModel { .. }))
-            .then_some("gpt4(`rho:ai:gpt4`)"),
-        nodes
-            .iter()
-            .any(|node| matches!(node, Node::TTIModel { .. }))
-            .then_some("dalle3(`rho:ai:dalle3`)"),
-        nodes
-            .iter()
-            .any(|node| matches!(node, Node::TTSModel { .. }))
-            .then_some("textToAudio(`rho:ai:textToAudio`)"),
-    ]
-    .into_iter()
-    .flatten()
-    .collect()
+fn get_all_system_channels<'a>(nodes: &BTreeMap<Vertex<'a>, Node<'a>>) -> Vec<&'static str> {
+    nodes
+        .values()
+        .fold(BTreeSet::default(), |mut acc, node| {
+            match node {
+                Node::Compress { .. } => {}
+                Node::TextModel { .. } => {
+                    acc.insert("gpt4(`rho:ai:gpt4`)");
+                }
+                Node::TTIModel { .. } => {
+                    acc.insert("dalle3(`rho:ai:dalle3`)");
+                }
+                Node::TTSModel { .. } => {
+                    acc.insert("textToAudio(`rho:ai:textToAudio`)");
+                }
+            }
+            acc
+        })
+        .into_iter()
+        .collect()
 }
 
 fn node_output_channel(index: usize) -> String {
@@ -138,62 +160,55 @@ pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
         .output
         .as_ref()
         .map(|v| get_input_for_vertex(&vertex_outputs, &v.from))
-        .map(|from| OutputTemplate { from }.render());
+        .map(|from| NodesTemplate::Output { from });
 
-    let steps = code
+    let nodes = code
         .nodes
         .iter()
         .map(|(vertex, node)| match node {
-            Node::Compress { from, .. } => Ok(CompressTemplate {
+            Node::Compress { from, .. } => NodesTemplate::Compress {
                 from: from
                     .iter()
                     .map(|from| get_input_for_vertex(&vertex_outputs, from))
                     .collect(),
                 output: get_output_for_vertex(&vertex_outputs, vertex),
-                body: Value::Map(
-                    from.iter()
-                        .map(|from| {
-                            (
-                                (*from.as_ref()).to_owned(),
-                                Inline(format!(
-                                    "{}Value",
-                                    get_input_for_vertex(&vertex_outputs, from)
-                                ))
-                                .into_value(),
-                            )
-                        })
-                        .collect(),
-                ),
-            }
-            .render()?),
-            Node::TextModel { from, .. } => Ok(TextModelTemplate {
+                body: from
+                    .iter()
+                    .map(|from| {
+                        (
+                            (*from.as_ref()).to_owned(),
+                            Inline(format!(
+                                "{}Value",
+                                get_input_for_vertex(&vertex_outputs, from)
+                            )),
+                        )
+                    })
+                    .collect(),
+            },
+            Node::TextModel { from, .. } => NodesTemplate::TextModel {
                 from: get_input_for_vertex(&vertex_outputs, from),
                 output: get_output_for_vertex(&vertex_outputs, vertex),
-            }
-            .render()?),
-            Node::TTIModel { from, .. } => Ok(TTIModelTemplate {
+            },
+            Node::TTIModel { from, .. } => NodesTemplate::TTIModel {
                 from: get_input_for_vertex(&vertex_outputs, from),
                 output: get_output_for_vertex(&vertex_outputs, vertex),
-            }
-            .render()?),
-            Node::TTSModel { from, .. } => Ok(TTSModelTemplate {
+            },
+            Node::TTSModel { from, .. } => NodesTemplate::TTSModel {
                 from: get_input_for_vertex(&vertex_outputs, from),
                 output: get_output_for_vertex(&vertex_outputs, vertex),
-            }
-            .render()?),
+            },
         })
         .chain(output)
+        .map(Render::render)
         .collect::<Result<_, _>>()?;
 
-    let output_channels = vertex_outputs.into_values().collect();
-
-    let nodes: Vec<_> = code.nodes.into_values().collect();
+    let output_channels = vertex_outputs.values().map(AsRef::as_ref).collect();
 
     DeployAgentTeamTemplate {
         name,
-        system_channels: get_all_system_channels(&nodes),
+        system_channels: get_all_system_channels(&code.nodes),
         output_channels,
-        steps,
+        nodes,
         output: code.output.is_some(),
     }
     .render()

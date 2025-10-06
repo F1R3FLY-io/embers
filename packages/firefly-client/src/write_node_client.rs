@@ -54,33 +54,29 @@ impl WriteNodeClient {
             ValidAfter::Index(i) => i,
         };
 
-        let msg = {
-            let timestamp = chrono::Utc::now().timestamp_millis();
-            let mut msg = DeployDataProto {
-                term: deploy_data.term,
-                timestamp,
-                phlo_price: 1,
-                phlo_limit: deploy_data.phlo_limit as _,
-                valid_after_block_number: valid_after_block_number as _,
-                shard_id: "root".into(),
-                ..Default::default()
-            };
-
-            let secp = Secp256k1::new();
-
-            let hash = Blake2b::<U32>::new()
-                .chain_update(msg.encode_to_vec())
-                .finalize();
-
-            let signature = secp.sign_ecdsa(Message::from_digest(hash.into()), key);
-
-            msg.sig = signature.serialize_der().to_vec();
-            msg.sig_algorithm = "secp256k1".into();
-
-            let public_key = key.public_key(&secp);
-            msg.deployer = public_key.serialize_uncompressed().into();
-            msg
+        let mut msg = DeployDataProto {
+            term: deploy_data.term,
+            timestamp: deploy_data.timestamp.timestamp_millis(),
+            phlo_price: 1,
+            phlo_limit: deploy_data.phlo_limit as _,
+            valid_after_block_number: valid_after_block_number as _,
+            shard_id: "root".into(),
+            ..Default::default()
         };
+
+        let secp = Secp256k1::new();
+
+        let hash = Blake2b::<U32>::new()
+            .chain_update(msg.encode_to_vec())
+            .finalize();
+
+        let signature = secp.sign_ecdsa(Message::from_digest(hash.into()), key);
+
+        msg.sig = signature.serialize_der().to_vec();
+        msg.sig_algorithm = "secp256k1".into();
+
+        let public_key = key.public_key(&secp);
+        msg.deployer = public_key.serialize_uncompressed().into();
 
         let resp = self
             .deploy_client
@@ -107,15 +103,11 @@ impl WriteNodeClient {
         &mut self,
         contract: SignedCode,
     ) -> anyhow::Result<DeployId> {
-        let msg = {
-            let mut msg = DeployDataProto::decode(contract.contract.as_slice())?;
+        let mut msg = DeployDataProto::decode(contract.contract.as_slice())?;
 
-            msg.sig = contract.sig;
-            msg.sig_algorithm = contract.sig_algorithm;
-            msg.deployer = contract.deployer;
-
-            msg
-        };
+        msg.sig = contract.sig;
+        msg.sig_algorithm = contract.sig_algorithm;
+        msg.deployer = contract.deployer;
 
         let resp = self
             .deploy_client

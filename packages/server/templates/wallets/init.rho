@@ -1,6 +1,12 @@
+{% extends "common/insert_signed.rho" %}
+
+{% block name -%} wallets {%- endblock %}
+
+{% block initialization -%}
+{% filter indent(8) -%}
+
 new rl(`rho:registry:lookup`),
     treeHashMapCh,
-    getValueOr,
     revVaultCh,
     eitherCh,
     stackCh,
@@ -18,21 +24,6 @@ in {
 
         for(@map <- treeHashMapCh) {
             treeHashMapCh!(*treeHashMap, map)
-        }
-    } |
-
-    contract getValueOr(@address, valueCh, nilCh) = {
-        new retCh in {
-            for(treeHashMap, @map <<- treeHashMapCh) {
-                treeHashMap!("get", map, address, *retCh) |
-
-                for(@value <- retCh) {
-                    match value {
-                        Nil => nilCh!()
-                        value => valueCh!(value)
-                    }
-                }
-            }
         }
     } |
 
@@ -80,47 +71,50 @@ in {
 
     contract updateTransferHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
         new valueCh, nilCh in {
-            getValueOr!(walletOwner, *valueCh, *nilCh) |
+            for(treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                treeHashMap!("getOrElse", map, walletOwner, *valueCh, *nilCh) |
 
-            for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
-                new userHistoryCh in {
-                    stack!("init", *userHistoryCh) |
+                for(<- nilCh) {
+                    new userHistoryCh in {
+                        stack!("init", *userHistoryCh) |
 
-                    for(@history <- userHistoryCh) {
-                        stack!("push", history, {
-                            "id": id,
-                            "timestamp": timestamp,
-                            "from": walletAddressFrom,
-                            "to": walletAddressTo,
-                            "amount": amount,
-                            "description": description,
-                        }, *devNull) |
-                        treeHashMap!("set", map, walletOwner, history, *devNull)
+                        for(@history <- userHistoryCh) {
+                            stack!("push", history, {
+                                "id": id,
+                                "timestamp": timestamp,
+                                "from": walletAddressFrom,
+                                "to": walletAddressTo,
+                                "amount": amount,
+                                "description": description,
+                            }, *devNull) |
+                            treeHashMap!("set", map, walletOwner, history, *devNull)
+                        }
                     }
-                }
-            } |
+                } |
 
-            for(@history <- valueCh; stack <<- stackCh) {
-                stack!("push", history, {
-                    "id": id,
-                    "timestamp": timestamp,
-                    "from": walletAddressFrom,
-                    "to": walletAddressTo,
-                    "amount": amount,
-                    "description": description,
-                }, *devNull)
+                for(@history <- valueCh) {
+                    stack!("push", history, {
+                        "id": id,
+                        "timestamp": timestamp,
+                        "from": walletAddressFrom,
+                        "to": walletAddressTo,
+                        "amount": amount,
+                        "description": description,
+                    }, *devNull)
+                }
             }
         }
     } |
 
-    contract @"sendTransfer"(@deployerId, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
-        new transferResultCh, updateHistory in {
-            for(either <<- eitherCh) {
+    contract wallets(@"sendTransfer", @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
+        new deployData(`rho:deploy:data`), deployDataCh, transferResultCh, updateHistory in {
+            deployData!(*deployDataCh) |
+            for(either <<- eitherCh; _, @deployerId, @deployId <- deployDataCh) {
                 doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *transferResultCh) |
 
                 for(_ <- updateHistory) {
-                    updateTransferHistory!(walletAddressFrom, id, timestamp, walletAddressFrom, walletAddressTo, amount, description) |
-                    updateTransferHistory!(walletAddressTo  , id, timestamp, walletAddressFrom, walletAddressTo, amount, description)
+                    updateTransferHistory!(walletAddressFrom, deployId, timestamp, walletAddressFrom, walletAddressTo, amount, description) |
+                    updateTransferHistory!(walletAddressTo  , deployId, timestamp, walletAddressFrom, walletAddressTo, amount, description)
                 } |
 
                 okOrAbort!(*transferResultCh, *updateHistory, "transfer failed")
@@ -130,7 +124,9 @@ in {
 
     contract getTransactionsHistory(@walletAddress, ret) = {
         new valueCh, nilCh in {
-            getValueOr!(walletAddress, *valueCh, *nilCh) |
+            for(treeHashMap, @map <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", map, walletAddress, *valueCh, *nilCh)
+            } |
 
             for(<- nilCh) {
                 ret!([])
@@ -162,7 +158,7 @@ in {
         }
     } |
 
-    contract @"getBalanceAndHistory"(@walletAddress, ret) = {
+    contract wallets(@"getBalanceAndHistory", @walletAddress, ret) = {
         new balanceCh, historyCh, mapOp in {
             for(either <<- eitherCh) {
                 getBalance!(walletAddress, *balanceCh) |
@@ -177,3 +173,6 @@ in {
         }
     }
 }
+
+{%- endfilter %}
+{%- endblock %}

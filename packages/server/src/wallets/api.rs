@@ -1,15 +1,13 @@
 use firefly_client::models::SignedCode;
-use firefly_client::{ReadNodeClient, WriteNodeClient};
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
-use super::handlers::{deploy_signed_transfer, prepare_transfer_contract};
 use crate::common::api::dtos::{ApiTags, SignedContract, Stringified};
 use crate::common::models::WalletAddress;
 use crate::wallets::api::dtos::{TransferReq, TransferResp, WalletStateAndHistory};
-use crate::wallets::handlers::get_wallet_state_and_history;
+use crate::wallets::handlers::WalletsService;
 
 mod dtos;
 
@@ -22,9 +20,10 @@ impl WalletsApi {
     async fn wallet_state_and_history(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<Json<WalletStateAndHistory>> {
-        let wallet_state_and_history = get_wallet_state_and_history(read_client, address.0)
+        let wallet_state_and_history = wallets
+            .get_wallet_state_and_history(address.0)
             .await
             .map(Into::into)?;
 
@@ -35,11 +34,11 @@ impl WalletsApi {
     async fn prepare_transfer(
         &self,
         Json(input): Json<TransferReq>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<Json<TransferResp>> {
-        let mut client = client.to_owned();
+        let mut wallets = wallets.to_owned();
         let input = input.try_into()?;
-        let result = prepare_transfer_contract(input, &mut client).await?;
+        let result = wallets.prepare_transfer_contract(input).await?;
 
         Ok(Json(TransferResp {
             contract: result.into(),
@@ -50,12 +49,13 @@ impl WalletsApi {
     async fn transfer(
         &self,
         Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
+        let mut wallets = wallets.to_owned();
         let code = SignedCode::from(body);
 
-        deploy_signed_transfer(&mut client, code)
+        wallets
+            .deploy_signed_transfer(code)
             .await
             .map_err(Into::into)
     }

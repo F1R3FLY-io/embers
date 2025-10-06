@@ -1,5 +1,14 @@
+use firefly_client::rendering::Uri;
+use firefly_client::{ReadNodeClient, WriteNodeClient};
+use secp256k1::SecretKey;
+
 mod create_test_wallet;
 mod deploy_test;
 
-pub use create_test_wallet::*;
-pub use deploy_test::*;
+#[derive(Clone)]
+pub struct TestnetService {
+    pub uri: Uri,
+    pub service_key: SecretKey,
+    pub write_client: WriteNodeClient,
+    pub read_client: ReadNodeClient,
+}

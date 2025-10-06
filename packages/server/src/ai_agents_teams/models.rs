@@ -1,13 +1,6 @@
 use std::convert::Infallible;
 
-use askama::Template;
-
 use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
-
-#[allow(dead_code)]
-#[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents_teams/init.rho", escape = "none")]
-pub struct InitAgentsTeamsEnv;
 
 #[derive(Debug, Clone)]
 pub struct AgentsTeams {

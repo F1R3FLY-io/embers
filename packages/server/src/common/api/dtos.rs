@@ -371,6 +371,3 @@ impl From<SignedContract> for firefly_client::models::SignedCode {
         }
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct TestNet<T>(pub T);

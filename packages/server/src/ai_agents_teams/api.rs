@@ -1,4 +1,3 @@
-use firefly_client::{ReadNodeClient, WriteNodeClient};
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
@@ -15,18 +14,7 @@ use crate::ai_agents_teams::api::dtos::{
     SaveAgentsTeamReq,
     SaveAgentsTeamResp,
 };
-use crate::ai_agents_teams::handlers::{
-    deploy_signed_create_agents_team,
-    deploy_signed_deploy_agents_team,
-    deploy_signed_save_agents_team,
-    get_agents_team,
-    list_agents_team_versions,
-    list_agents_teams,
-    prepare_create_agents_team_contract,
-    prepare_deploy_agents_team_contract,
-    prepare_save_agents_team_contract,
-    run_demo,
-};
+use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::common::api::dtos::{ApiTags, MaybeNotFound, SignedContract, Stringified};
 use crate::common::models::WalletAddress;
 
@@ -41,11 +29,10 @@ impl AIAgentsTeams {
     async fn run_demo(
         &self,
         Json(body): Json<RunDemoReq>,
-        Data(client): Data<&WriteNodeClient>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<serde_json::Value>> {
-        let mut client = client.to_owned();
-        let demo_result = run_demo(&mut client, read_client, body.name, body.prompt).await?;
+        let mut agents_teams = agents_teams.to_owned();
+        let demo_result = agents_teams.run_demo(body.name, body.prompt).await?;
         Ok(Json(demo_result))
     }
 
@@ -53,9 +40,9 @@ impl AIAgentsTeams {
     async fn list(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<AgentsTeams>> {
-        let agents_teams = list_agents_teams(address.0, read_client).await?;
+        let agents_teams = agents_teams.list_agents_teams(address.0).await?;
         Ok(Json(agents_teams.into()))
     }
 
@@ -64,9 +51,10 @@ impl AIAgentsTeams {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> MaybeNotFound<AgentsTeams> {
-        list_agents_team_versions(address.0, id, read_client)
+        agents_teams
+            .list_agents_team_versions(address.0, id)
             .await
             .into()
     }
@@ -77,9 +65,10 @@ impl AIAgentsTeams {
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> MaybeNotFound<AgentsTeam> {
-        get_agents_team(address.0, id, version, read_client)
+        agents_teams
+            .get_agents_team(address.0, id, version)
             .await
             .into()
     }
@@ -88,10 +77,12 @@ impl AIAgentsTeams {
     async fn prepare_create(
         &self,
         Json(input): Json<CreateAgentsTeamReq>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<CreateAgentsTeamResp>> {
-        let mut client = client.to_owned();
-        let contract = prepare_create_agents_team_contract(input.into(), &mut client).await?;
+        let mut agents_teams = agents_teams.to_owned();
+        let contract = agents_teams
+            .prepare_create_agents_team_contract(input.into())
+            .await?;
         Ok(Json(contract.into()))
     }
 
@@ -99,10 +90,11 @@ impl AIAgentsTeams {
     async fn create(
         &self,
         Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_signed_create_agents_team(&mut client, body.into())
+        let mut agents_teams = agents_teams.to_owned();
+        agents_teams
+            .deploy_signed_create_agents_team(body.into())
             .await
             .map_err(Into::into)
     }
@@ -111,12 +103,12 @@ impl AIAgentsTeams {
     async fn prepare_deploy_agents_team(
         &self,
         Json(body): Json<DeployAgentsTeamReq>,
-        Data(client): Data<&WriteNodeClient>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<DeployAgentsTeamResp>> {
-        let mut client = client.to_owned();
-        let contract =
-            prepare_deploy_agents_team_contract(body.into(), &mut client, read_client).await?;
+        let mut agents_teams = agents_teams.to_owned();
+        let contract = agents_teams
+            .prepare_deploy_agents_team_contract(body.into())
+            .await?;
         Ok(Json(contract.into()))
     }
 
@@ -124,10 +116,11 @@ impl AIAgentsTeams {
     async fn deploy_agents_team(
         &self,
         Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_signed_deploy_agents_team(&mut client, body.into())
+        let mut agents_teams = agents_teams.to_owned();
+        agents_teams
+            .deploy_signed_deploy_agents_team(body.into())
             .await
             .map_err(Into::into)
     }
@@ -137,10 +130,12 @@ impl AIAgentsTeams {
         &self,
         Path(id): Path<String>,
         Json(input): Json<SaveAgentsTeamReq>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SaveAgentsTeamResp>> {
-        let mut client = client.to_owned();
-        let contract = prepare_save_agents_team_contract(id, input.into(), &mut client).await?;
+        let mut agents_teams = agents_teams.to_owned();
+        let contract = agents_teams
+            .prepare_save_agents_team_contract(id, input.into())
+            .await?;
         Ok(Json(contract.into()))
     }
 
@@ -149,10 +144,11 @@ impl AIAgentsTeams {
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_signed_save_agents_team(&mut client, body.into())
+        let mut agents_teams = agents_teams.to_owned();
+        agents_teams
+            .deploy_signed_save_agents_team(body.into())
             .await
             .map_err(Into::into)
     }

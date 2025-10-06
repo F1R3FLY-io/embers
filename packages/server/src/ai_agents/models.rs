@@ -1,10 +1,10 @@
-use askama::Template;
+use firefly_client::rendering::Render;
 
 use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
 
 #[allow(dead_code)]
-#[derive(Debug, Clone, Template)]
-#[template(path = "ai_agents/init.rho", escape = "none")]
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents/init.rho")]
 pub struct InitAgentsEnv;
 
 #[derive(Debug, Clone)]

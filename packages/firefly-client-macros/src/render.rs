@@ -1,12 +1,35 @@
-use darling::FromDeriveInput;
+use darling::{FromDeriveInput, FromField, FromVariant, ast};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Data, DeriveInput, Fields, parse_macro_input};
+use syn::{DeriveInput, parse_macro_input};
 
 #[derive(Debug, Clone, FromDeriveInput)]
-#[darling(attributes(template))]
+#[darling(
+    attributes(template),
+    supports(struct_named, struct_unit, enum_named, enum_unit)
+)]
 struct Args {
     ident: syn::Ident,
+    generics: syn::Generics,
+    path: Option<String>,
+    data: ast::Data<EnumFieldArgs, StructFieldArgs>,
+}
+
+#[derive(Debug, Clone, FromField)]
+#[darling(attributes(template), forward_attrs(allow, cfg))]
+struct StructFieldArgs {
+    ident: Option<syn::Ident>,
+    ty: syn::Type,
+    attrs: Vec<syn::Attribute>,
+    direct: Option<bool>,
+}
+
+#[derive(Debug, Clone, FromVariant)]
+#[darling(attributes(template), forward_attrs(allow, cfg))]
+struct EnumFieldArgs {
+    ident: syn::Ident,
+    attrs: Vec<syn::Attribute>,
+    fields: ast::Fields<StructFieldArgs>,
     path: String,
 }
 
@@ -18,46 +41,175 @@ pub fn render_derive(input: TokenStream) -> TokenStream {
         Err(err) => return err.write_errors().into(),
     };
 
-    let expanded = match input.data {
-        Data::Struct(data) => impl_for_struct(args, data.fields),
-        Data::Enum(_) => panic!("`IntoValue` cannot be derived for enum"),
-        Data::Union(_) => panic!("`IntoValue` cannot be derived for unions"),
-    };
-
-    TokenStream::from(expanded)
+    match args.data {
+        ast::Data::Struct(fields) => TokenStream::from(impl_for_struct(
+            &args.ident,
+            &args.generics,
+            &args.path.unwrap(),
+            fields,
+        )),
+        ast::Data::Enum(items) => {
+            TokenStream::from(impl_for_enum(&args.ident, &args.generics, &items))
+        }
+    }
 }
 
-fn impl_for_struct(args: Args, fields: Fields) -> proc_macro2::TokenStream {
-    let Args { ident, path } = args;
-    let fields: Vec<_> = match fields {
-        Fields::Named(fields) => fields.named.into_iter().map(|f| f.ident.unwrap()).collect(),
-        Fields::Unnamed(_) => panic!("`IntoValue` cannot be derived for unnamed struct"),
-        Fields::Unit => panic!("`IntoValue` cannot be derived for unit struct"),
-    };
+fn impl_for_struct(
+    ident: &syn::Ident,
+    generics: &syn::Generics,
+    path: &str,
+    fields: ast::Fields<StructFieldArgs>,
+) -> proc_macro2::TokenStream {
+    let fields = fields.fields;
 
     let template_struct_fields = fields.iter().map(|f| {
-        quote! {
-            #f: ::firefly_client::rendering::Value
+        let ident = f.ident.as_ref().unwrap();
+        let attrs = &f.attrs;
+
+        if f.direct == Some(true) {
+            let type_ = &f.ty;
+            quote! {
+                #(#attrs)*
+                #ident: #type_
+            }
+        } else {
+            quote! {
+                #(#attrs)*
+                #ident: ::firefly_client::rendering::Value
+            }
         }
     });
 
     let template_object_fields = fields.iter().map(|f| {
-        quote! {
-            #f: ::firefly_client::rendering::IntoValue::into_value(self.#f)
+        let ident = f.ident.as_ref().unwrap();
+        let attrs = &f.attrs;
+
+        if f.direct == Some(true) {
+            quote! {
+                #(#attrs)*
+                #ident: self.#ident
+            }
+        } else {
+            quote! {
+                #(#attrs)*
+                #ident: ::firefly_client::rendering::IntoValue::into_value(self.#ident)
+            }
         }
     });
 
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
     quote! {
-        impl ::firefly_client::rendering::Render for #ident {
+        impl #impl_generics ::firefly_client::rendering::Render for #ident #ty_generics
+            #where_clause
+        {
             fn render(self) -> ::std::result::Result<::std::string::String, ::firefly_client::rendering::_dependencies::askama::Error> {
                 #[derive(::firefly_client::rendering::_dependencies::askama::Template)]
                 #[template(path = #path, escape = "none")]
-                struct Template {
+                struct Template #ty_generics {
                     #(#template_struct_fields),*
                 }
 
                 let template = Template {
                     #(#template_object_fields),*
+                };
+
+                ::firefly_client::rendering::_dependencies::askama::Template::render(&template)
+            }
+        }
+    }
+}
+
+fn impl_for_enum(
+    ident: &syn::Ident,
+    generics: &syn::Generics,
+    items: &[EnumFieldArgs],
+) -> proc_macro2::TokenStream {
+    let template_enum_items = items.iter().map(|item| {
+        let ident = &item.ident;
+        let attrs = &item.attrs;
+        let path = &item.path;
+
+        let fields = item.fields.fields.iter().map(|f| {
+            let ident = &f.ident;
+            let attrs = &f.attrs;
+
+            if f.direct == Some(true) {
+                let type_ = &f.ty;
+                quote! {
+                    #(#attrs)*
+                    #ident: #type_
+                }
+            } else {
+                quote! {
+                    #(#attrs)*
+                    #ident: ::firefly_client::rendering::Value
+                }
+            }
+        });
+
+        quote! {
+            #(#attrs)*
+            #[template(path = #path, escape = "none")]
+            #ident {
+                #(#fields),*
+            }
+        }
+    });
+
+    let template_enum_fields = items.iter().map(|item| {
+        let ident = &item.ident;
+        let attrs = &item.attrs;
+
+        let variables = item.fields.fields.iter().map(|f| {
+            let ident = &f.ident;
+            let attrs = &f.attrs;
+
+            quote! {
+                #(#attrs)*
+                #ident
+            }
+        });
+
+        let mappings = item.fields.fields.iter().map(|f| {
+            let ident = &f.ident;
+            let attrs = &f.attrs;
+
+            if f.direct == Some(true) {
+                quote! {
+                    #(#attrs)*
+                    #ident: #ident
+                }
+            } else {
+                quote! {
+                    #(#attrs)*
+                    #ident: ::firefly_client::rendering::IntoValue::into_value(#ident)
+                }
+            }
+        });
+
+        quote! {
+            #(#attrs)*
+            Self::#ident { #(#variables),* } => Template::#ident {
+                #(#mappings),*
+            }
+        }
+    });
+
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    quote! {
+        impl #impl_generics ::firefly_client::rendering::Render for #ident #ty_generics
+            #where_clause
+        {
+            fn render(self) -> ::std::result::Result<::std::string::String, ::firefly_client::rendering::_dependencies::askama::Error> {
+                #[derive(::firefly_client::rendering::_dependencies::askama::Template)]
+                enum Template #ty_generics {
+                    #(#template_enum_items),*
+                }
+
+                let template = match self {
+                    #(#template_enum_fields),*
                 };
 
                 ::firefly_client::rendering::_dependencies::askama::Template::render(&template)

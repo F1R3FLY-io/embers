@@ -1,3 +1,6 @@
-new ret in {
-    @"getLogs"!({{ deploy_id }}, *ret)
+new ret, rl(`rho:registry:lookup`), logCh in {
+    rl!({{ env_uri }}, *logCh) |
+    for(@(_, log) <- logCh) {
+        @log!("get", {{ deploy_id }}, *ret)
+    }
 }
