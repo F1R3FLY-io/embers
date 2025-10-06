@@ -1,8 +1,4 @@
-new deployerId(`rho:rchain:deployerId`),
-    deployId(`rho:rchain:deployId`),
-    rl(`rho:registry:lookup`),
-    walletsCh
-in {
+new rl(`rho:registry:lookup`), walletsCh in {
     rl!({{ env_uri }}, *walletsCh) |
     for(@(_, wallets) <- walletsCh) {
         @wallets!(

@@ -1,9 +1,6 @@
-new rl(`rho:registry:lookup`),
-    deployerId(`rho:rchain:deployerId`),
-    agentsTeamsCh
-in {
+new rl(`rho:registry:lookup`), agentsTeamsCh in {
     rl!({{ env_uri }}, *agentsTeamsCh) |
     for(@(_, agentsTeams) <- agentsTeamsCh) {
-        @agentsTeams!("save", *deployerId, {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ graph }})
+        @agentsTeams!("save", {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ graph }})
     }
 }

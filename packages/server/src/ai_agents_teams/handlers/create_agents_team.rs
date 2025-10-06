@@ -27,7 +27,7 @@ impl AgentsTeamsService {
         ret(Debug, level = "trace")
     )]
     pub async fn prepare_create_agents_team_contract(
-        &mut self,
+        &self,
         request: CreateAgentsTeamReq,
     ) -> anyhow::Result<CreateAgentsTeamResp> {
         record_trace!(request);
@@ -45,7 +45,7 @@ impl AgentsTeamsService {
         }
         .render()?;
 
-        let valid_after = self.write_client.get_head_block_index().await?;
+        let valid_after = self.write_client.clone().get_head_block_index().await?;
         Ok(CreateAgentsTeamResp {
             id: id.into(),
             version: version.into(),
@@ -64,12 +64,12 @@ impl AgentsTeamsService {
         ret(Debug, level = "trace")
     )]
     pub async fn deploy_signed_create_agents_team(
-        &mut self,
+        &self,
         contract: SignedCode,
     ) -> anyhow::Result<()> {
         record_trace!(contract);
 
-        deploy_signed_contract(&mut self.write_client, contract).await?;
+        deploy_signed_contract(&mut self.write_client.clone(), contract).await?;
         Ok(())
     }
 }

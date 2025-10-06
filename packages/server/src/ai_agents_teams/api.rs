@@ -31,7 +31,6 @@ impl AIAgentsTeams {
         Json(body): Json<RunDemoReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<serde_json::Value>> {
-        let mut agents_teams = agents_teams.to_owned();
         let demo_result = agents_teams.run_demo(body.name, body.prompt).await?;
         Ok(Json(demo_result))
     }
@@ -79,7 +78,6 @@ impl AIAgentsTeams {
         Json(input): Json<CreateAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<CreateAgentsTeamResp>> {
-        let mut agents_teams = agents_teams.to_owned();
         let contract = agents_teams
             .prepare_create_agents_team_contract(input.into())
             .await?;
@@ -92,7 +90,6 @@ impl AIAgentsTeams {
         Json(body): Json<SignedContract>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
-        let mut agents_teams = agents_teams.to_owned();
         agents_teams
             .deploy_signed_create_agents_team(body.into())
             .await
@@ -105,7 +102,6 @@ impl AIAgentsTeams {
         Json(body): Json<DeployAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<DeployAgentsTeamResp>> {
-        let mut agents_teams = agents_teams.to_owned();
         let contract = agents_teams
             .prepare_deploy_agents_team_contract(body.into())
             .await?;
@@ -118,7 +114,6 @@ impl AIAgentsTeams {
         Json(body): Json<SignedContract>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
-        let mut agents_teams = agents_teams.to_owned();
         agents_teams
             .deploy_signed_deploy_agents_team(body.into())
             .await
@@ -132,7 +127,6 @@ impl AIAgentsTeams {
         Json(input): Json<SaveAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SaveAgentsTeamResp>> {
-        let mut agents_teams = agents_teams.to_owned();
         let contract = agents_teams
             .prepare_save_agents_team_contract(id, input.into())
             .await?;
@@ -146,7 +140,6 @@ impl AIAgentsTeams {
         Json(body): Json<SignedContract>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
-        let mut agents_teams = agents_teams.to_owned();
         agents_teams
             .deploy_signed_save_agents_team(body.into())
             .await

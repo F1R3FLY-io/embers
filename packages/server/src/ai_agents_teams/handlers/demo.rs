@@ -24,7 +24,7 @@ struct GetAiAgentsTeamsDemoResult {
 impl AgentsTeamsService {
     #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
     pub async fn run_demo(
-        &mut self,
+        &self,
         name: String,
         prompt: String,
     ) -> anyhow::Result<serde_json::Value> {
@@ -40,8 +40,9 @@ impl AgentsTeamsService {
         .phlo_limit(500_000_000)
         .build();
 
-        let deploy_id = self.write_client.deploy(&key, deploy_data).await?;
-        let block_hash = self.write_client.propose().await?;
+        let mut write_client = self.write_client.clone();
+        let deploy_id = write_client.deploy(&key, deploy_data).await?;
+        let block_hash = write_client.propose().await?;
 
         let finalized = self
             .read_client

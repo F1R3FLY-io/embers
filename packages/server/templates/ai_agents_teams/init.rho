@@ -9,6 +9,7 @@ new rl(`rho:registry:lookup`),
     revAddress(`rho:rev:address`),
     devNull(`rho:io:devNull`),
     abort(`rho:execution:abort`),
+    deployData(`rho:deploy:data`),
     treeHashMapCh,
     listOpsCh,
     stackCh,
@@ -33,15 +34,15 @@ in {
         stackCh!(stack)
     } |
 
-    contract visit(@"agentsTeams", @deployerId, f, notFound) = {
+    contract visit(@"agentsTeams", @address, f, notFound) = {
         for(treeHashMap, @map <<- treeHashMapCh) {
-            treeHashMap!("getOrElse", map, deployerId, *f, *notFound)
+            treeHashMap!("getOrElse", map, address, *f, *notFound)
         }
     } |
 
-    contract visit(@"agentsTeamVersions", @deployerId, @id, f, notFound) = {
+    contract visit(@"agentsTeamVersions", @address, @id, f, notFound) = {
         new foundCh in {
-            visit!("agentsTeams", deployerId, *foundCh, *notFound) |
+            visit!("agentsTeams", address, *foundCh, *notFound) |
 
             for(@(agentsTeams, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("getOrElse", agentsTeams, id, *f, *notFound)
@@ -49,9 +50,9 @@ in {
         }
     } |
 
-    contract visit(@"agentsTeamVersion", @deployerId, @id, @version, f, notFound) = {
+    contract visit(@"agentsTeamVersion", @address, @id, @version, f, notFound) = {
         new foundCh in {
-            visit!("agentsTeamVersions", deployerId, id, *foundCh, *notFound) |
+            visit!("agentsTeamVersions", address, id, *foundCh, *notFound) |
 
             for(@(agentsTeamVersions, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("getOrElse", agentsTeamVersions, version, *f, *notFound)
@@ -59,11 +60,17 @@ in {
         }
     } |
 
-    contract agentsTeams(@"create", @deployerId, @id, @version, @name, @shard, @graph) = {
-        new deployerAddressCh, valueCh, nilCh, errCh in {
-            revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+    contract agentsTeams(@"create", @id, @version, @name, @shard, @graph) = {
+        new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
+            deployData!(*deployDataCh) |
+
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
 
             for(@address <- deployerAddressCh) {
+                visit!("agentsTeams", address, *valueCh, *nilCh) |
+
                 for(@(agentsTeams, agentsTeamsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
                     new insertAgentsTeamCh, agentsTeamVersionsCh, agentsTeamVersionsIndexCh in {
                         for(<- insertAgentsTeamCh) {
@@ -138,13 +145,11 @@ in {
                             stack!("push", agentsTeamVersionsIndex, version, *devNull)
                         }
                     }
-                } |
+                }
+            } |
 
-                for(<- errCh) {
-                    abort!("in createAiAgentsTeam")
-                } |
-
-                visit!("agentsTeams", address, *valueCh, *nilCh)
+            for(<- errCh) {
+                abort!("in createAiAgentsTeam")
             }
         }
     } |
@@ -225,39 +230,43 @@ in {
         }
     } |
 
-    contract agentsTeams(@"save", @deployerId, @id, @version, @name, @shard, @graph) = {
-        new deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
-            revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+    contract agentsTeams(@"save", @id, @version, @name, @shard, @graph) = {
+        new deployDataCh, deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
+            deployData!(*deployDataCh) |
+
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
 
             for(@address <- deployerAddressCh) {
-                for(@(agentsTeamVersions, agentsTeamVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
-                    for(<- insertAgentsTeamVersionCh) {
-                        stack!("push", agentsTeamVersionsIndex, version, *devNull) |
-
-                        treeHashMap!("set", agentsTeamVersions, version,
-                            {
-                                "name": name,
-                                "shard": shard,
-                                "graph": graph,
-                            }, *devNull) |
-
-                        treeHashMap!("set", agentsTeamVersions, "latest",
-                            {
-                                "version": version,
-                                "name": name,
-                                "shard": shard,
-                                "graph": graph,
-                            }, *devNull)
-                    } |
-
-                    treeHashMap!("getOrElse", agentsTeamVersions, version, *errCh, *insertAgentsTeamVersionCh)
-                } |
-
-                for(<- errCh) {
-                    abort!("in saveAiAgentsTeam")
-                } |
-
                 visit!("agentsTeamVersions", address, id, *valueCh, *errCh)
+            } |
+
+            for(@(agentsTeamVersions, agentsTeamVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
+                for(<- insertAgentsTeamVersionCh) {
+                    stack!("push", agentsTeamVersionsIndex, version, *devNull) |
+
+                    treeHashMap!("set", agentsTeamVersions, version,
+                        {
+                            "name": name,
+                            "shard": shard,
+                            "graph": graph,
+                        }, *devNull) |
+
+                    treeHashMap!("set", agentsTeamVersions, "latest",
+                        {
+                            "version": version,
+                            "name": name,
+                            "shard": shard,
+                            "graph": graph,
+                        }, *devNull)
+                } |
+
+                treeHashMap!("getOrElse", agentsTeamVersions, version, *errCh, *insertAgentsTeamVersionCh)
+            } |
+
+            for(<- errCh) {
+                abort!("in saveAiAgentsTeam")
             }
         }
     }

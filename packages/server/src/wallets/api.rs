@@ -36,7 +36,6 @@ impl WalletsApi {
         Json(input): Json<TransferReq>,
         Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<Json<TransferResp>> {
-        let mut wallets = wallets.to_owned();
         let input = input.try_into()?;
         let result = wallets.prepare_transfer_contract(input).await?;
 
@@ -51,7 +50,6 @@ impl WalletsApi {
         Json(body): Json<SignedContract>,
         Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<()> {
-        let mut wallets = wallets.to_owned();
         let code = SignedCode::from(body);
 
         wallets

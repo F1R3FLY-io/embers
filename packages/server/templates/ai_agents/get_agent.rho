@@ -1,3 +1,6 @@
-new ret in {
-    @"getAiAgent"!({{ address }}, {{ id }}, {{ version }}, *ret)
+new ret, rl(`rho:registry:lookup`), agentsCh in {
+    rl!({{ env_uri }}, *agentsCh) |
+    for(@(_, agents) <- agentsCh) {
+        @agents!("get", {{ address }}, {{ id }}, {{ version }}, *ret)
+    }
 }

@@ -31,12 +31,12 @@ impl TestnetService {
         ret(Debug, level = "trace")
     )]
     pub async fn prepare_test_contract(
-        &mut self,
+        &self,
         request: DeployTestReq,
     ) -> anyhow::Result<DeployTestResp> {
         record_trace!(request);
 
-        let valid_after = self.write_client.get_head_block_index().await?;
+        let valid_after = self.write_client.clone().get_head_block_index().await?;
         Ok(DeployTestResp {
             env_contract: request.env.map(|env| {
                 prepare_for_signing()
@@ -59,23 +59,25 @@ impl TestnetService {
         ret(Debug, level = "trace")
     )]
     pub async fn deploy_test_contract(
-        &mut self,
+        &self,
         request: DeploySignedTestReq,
     ) -> anyhow::Result<DeploySignedTestResp> {
         record_trace!(request);
 
+        let mut write_client = self.write_client.clone();
+
         if let Some(contract) = request.env {
-            let result = self.write_client.deploy_signed_contract(contract).await;
+            let result = write_client.deploy_signed_contract(contract).await;
             if let Err(err) = result {
                 return Ok(DeploySignedTestResp::EnvDeployFailed {
                     error: err.to_string(),
                 });
             }
 
-            self.write_client.propose().await?;
+            write_client.propose().await?;
         }
 
-        let result = self.write_client.deploy_signed_contract(request.test).await;
+        let result = write_client.deploy_signed_contract(request.test).await;
         let deploy_id = match result {
             Ok(deploy_id) => deploy_id,
             Err(err) => {
@@ -85,7 +87,7 @@ impl TestnetService {
             }
         };
 
-        let block_hash = self.write_client.propose().await?;
+        let block_hash = write_client.propose().await?;
 
         let finalized = self
             .read_client

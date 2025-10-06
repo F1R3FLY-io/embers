@@ -1,4 +1,3 @@
-use firefly_client::{ReadNodeClient, WriteNodeClient};
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
@@ -14,17 +13,7 @@ use crate::ai_agents::api::dtos::{
     SaveAgentReq,
     SaveAgentResp,
 };
-use crate::ai_agents::handlers::{
-    deploy_signed_create_agent,
-    deploy_signed_deploy_agent,
-    deploy_signed_save_agent,
-    get_agent,
-    list_agent_versions,
-    list_agents,
-    prepare_create_agent_contract,
-    prepare_deploy_agent_contract,
-    prepare_save_agent_contract,
-};
+use crate::ai_agents::handlers::AgentsService;
 use crate::common::api::dtos::{ApiTags, MaybeNotFound, SignedContract, Stringified};
 use crate::common::models::WalletAddress;
 
@@ -39,9 +28,9 @@ impl AIAgents {
     async fn list(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<Agents>> {
-        let agents = list_agents(address.0, read_client).await?;
+        let agents = agents.list_agents(address.0).await?;
         Ok(Json(agents.into()))
     }
 
@@ -50,9 +39,9 @@ impl AIAgents {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> MaybeNotFound<Agents> {
-        list_agent_versions(address.0, id, read_client).await.into()
+        agents.list_agent_versions(address.0, id).await.into()
     }
 
     #[oai(path = "/:address/:id/versions/:version", method = "get")]
@@ -61,19 +50,18 @@ impl AIAgents {
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> MaybeNotFound<Agent> {
-        get_agent(address.0, id, version, read_client).await.into()
+        agents.get_agent(address.0, id, version).await.into()
     }
 
     #[oai(path = "/create/prepare", method = "post")]
     async fn prepare_create(
         &self,
         Json(input): Json<CreateAgentReq>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<CreateAgentResp>> {
-        let mut client = client.to_owned();
-        let contract = prepare_create_agent_contract(input.into(), &mut client).await?;
+        let contract = agents.prepare_create_agent_contract(input.into()).await?;
         Ok(Json(contract.into()))
     }
 
@@ -81,10 +69,10 @@ impl AIAgents {
     async fn create(
         &self,
         Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_signed_create_agent(&mut client, body.into())
+        agents
+            .deploy_signed_create_agent(body.into())
             .await
             .map_err(Into::into)
     }
@@ -93,11 +81,9 @@ impl AIAgents {
     async fn prepare_deploy_agent(
         &self,
         Json(body): Json<DeployAgentReq>,
-        Data(client): Data<&WriteNodeClient>,
-        Data(read_client): Data<&ReadNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<DeployAgentResp>> {
-        let mut client = client.to_owned();
-        let contract = prepare_deploy_agent_contract(body.into(), &mut client, read_client).await?;
+        let contract = agents.prepare_deploy_agent_contract(body.into()).await?;
         Ok(Json(contract.into()))
     }
 
@@ -105,10 +91,10 @@ impl AIAgents {
     async fn deploy_agent(
         &self,
         Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_signed_deploy_agent(&mut client, body.into())
+        agents
+            .deploy_signed_deploy_agent(body.into())
             .await
             .map_err(Into::into)
     }
@@ -118,10 +104,9 @@ impl AIAgents {
         &self,
         Path(id): Path<String>,
         Json(input): Json<SaveAgentReq>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SaveAgentResp>> {
-        let mut client = client.to_owned();
-        let contract = prepare_save_agent_contract(id, input.into(), &mut client).await?;
+        let contract = agents.prepare_save_agent_contract(id, input.into()).await?;
         Ok(Json(contract.into()))
     }
 
@@ -130,10 +115,10 @@ impl AIAgents {
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
-        Data(client): Data<&WriteNodeClient>,
+        Data(agents): Data<&AgentsService>,
     ) -> poem::Result<()> {
-        let mut client = client.to_owned();
-        deploy_signed_save_agent(&mut client, body.into())
+        agents
+            .deploy_signed_save_agent(body.into())
             .await
             .map_err(Into::into)
     }

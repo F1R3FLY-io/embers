@@ -12,6 +12,7 @@ new rl(`rho:registry:lookup`),
     stackCh,
     abort(`rho:execution:abort`),
     devNull(`rho:io:devNull`),
+    deployData(`rho:deploy:data`),
     okOrAbort,
     doTransfer,
     updateTransferHistory,
@@ -107,7 +108,7 @@ in {
     } |
 
     contract wallets(@"sendTransfer", @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description) = {
-        new deployData(`rho:deploy:data`), deployDataCh, transferResultCh, updateHistory in {
+        new deployDataCh, transferResultCh, updateHistory in {
             deployData!(*deployDataCh) |
             for(either <<- eitherCh; _, @deployerId, @deployId <- deployDataCh) {
                 doTransfer!(deployerId, walletAddressFrom, walletAddressTo, amount, *transferResultCh) |

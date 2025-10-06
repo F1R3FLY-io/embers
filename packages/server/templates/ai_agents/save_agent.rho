@@ -1,3 +1,6 @@
-new deployerId(`rho:rchain:deployerId`) in {
-    @"saveAiAgent"!(*deployerId, {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ code }})
+new rl(`rho:registry:lookup`), agentsCh in {
+    rl!({{ env_uri }}, *agentsCh) |
+    for(@(_, agents) <- agentsCh) {
+        @agents!("save", {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ code }})
+    }
 }

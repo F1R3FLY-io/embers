@@ -28,7 +28,7 @@ impl WalletsService {
         ret(Debug, level = "trace")
     )]
     pub async fn prepare_transfer_contract(
-        &mut self,
+        &self,
         request: TransferReq,
     ) -> anyhow::Result<PreparedContract> {
         record_trace!(request);
@@ -43,7 +43,7 @@ impl WalletsService {
         }
         .render()?;
 
-        let valid_after = self.write_client.get_head_block_index().await?;
+        let valid_after = self.write_client.clone().get_head_block_index().await?;
         Ok(prepare_for_signing()
             .code(contract)
             .valid_after_block_number(valid_after)
@@ -57,10 +57,10 @@ impl WalletsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn deploy_signed_transfer(&mut self, contract: SignedCode) -> anyhow::Result<()> {
+    pub async fn deploy_signed_transfer(&self, contract: SignedCode) -> anyhow::Result<()> {
         record_trace!(contract);
 
-        deploy_signed_contract(&mut self.write_client, contract).await?;
+        deploy_signed_contract(&mut self.write_client.clone(), contract).await?;
         Ok(())
     }
 }
