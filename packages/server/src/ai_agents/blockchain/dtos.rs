@@ -18,9 +18,10 @@ pub struct Agents {
 pub struct AgentHeader {
     pub id: String,
     pub version: String,
+    pub created_at: blockchain::dtos::DateTime,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: blockchain::dtos::DateTime,
+    pub logo: Option<String>,
 }
 
 #[derive(Debug, Clone, Into)]
@@ -44,8 +45,9 @@ impl<'de> Deserialize<'de> for Code {
 pub struct Agent {
     pub id: String,
     pub version: String,
+    pub created_at: blockchain::dtos::DateTime,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: blockchain::dtos::DateTime,
+    pub logo: Option<String>,
     pub code: Option<Code>,
 }

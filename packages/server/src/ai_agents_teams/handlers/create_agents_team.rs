@@ -14,9 +14,10 @@ struct CreateAgentsTeam {
     env_uri: Uri,
     id: Uuid,
     version: Uuid,
+    created_at: i64,
     name: String,
     shard: Option<String>,
-    created_at: i64,
+    logo: Option<String>,
     graph: Option<String>,
 }
 
@@ -41,9 +42,10 @@ impl AgentsTeamsService {
             env_uri: self.uri.clone(),
             id,
             version,
+            created_at: Utc::now().timestamp(),
             name: request.name,
             shard: request.shard,
-            created_at: Utc::now().timestamp(),
+            logo: request.logo,
             graph: request.graph.map(Graph::graphl),
         }
         .render()?;

@@ -73,53 +73,74 @@ def assert_match_transfer(transfer: dict, match: dict):
 
 @pytest.fixture
 def agent(client: ApiClient, funded_wallet: Wallet) -> Agent:
-    resp = client.ai_agents.create(funded_wallet, name="my_agent", code='@Nil!("foo")')
+    resp = client.ai_agents.create(funded_wallet, name="my_agent", logo="http://nice-logo", code='@Nil!("foo")')
     assert resp.status == 200
 
     wait_for_read_node_sync()
 
-    return Agent(id=resp.json["id"], version=resp.json["version"], name="my_agent", code='@Nil!("foo")')
+    return Agent(
+        id=resp.json["id"],
+        version=resp.json["version"],
+        name="my_agent",
+        logo="http://nice-logo",
+        code='@Nil!("foo")',
+    )
 
 
 def assert_match_agent_header(header: dict, match: Agent):
     assert header["id"] == match.id
     assert header["version"] == match.version
+    assert header.get("created_at")
     assert header["name"] == match.name
     assert header.get("shard") == match.shard
-    assert header.get("created_at")
+    assert header.get("logo") == match.logo
 
 
 def assert_match_agent(agent: dict, match: Agent):
     assert agent["id"] == match.id
     assert agent["version"] == match.version
+    assert agent.get("created_at")
     assert agent["name"] == match.name
     assert agent.get("shard") == match.shard
-    assert agent.get("created_at")
+    assert agent.get("logo") == match.logo
     assert agent.get("code") == match.code
 
 
 @pytest.fixture
 def agents_team(client: ApiClient, funded_wallet: Wallet) -> AgentsTeam:
-    resp = client.ai_agents_teams.create(funded_wallet, name="my_agents_team", graph="< foo > | 0 ")
+    resp = client.ai_agents_teams.create(
+        funded_wallet,
+        name="my_agents_team",
+        logo="http://nice-logo",
+        graph="< foo > | 0 ",
+    )
     assert resp.status == 200
 
     wait_for_read_node_sync()
 
-    return AgentsTeam(id=resp.json["id"], version=resp.json["version"], name="my_agents_team", graph="< foo > | 0 ")
+    return AgentsTeam(
+        id=resp.json["id"],
+        version=resp.json["version"],
+        name="my_agents_team",
+        logo="http://nice-logo",
+        graph="< foo > | 0 ",
+    )
 
 
 def assert_match_agents_team_header(header: dict, match: AgentsTeam):
     assert header["id"] == match.id
     assert header["version"] == match.version
+    assert header.get("created_at")
     assert header["name"] == match.name
     assert header.get("shard") == match.shard
-    assert header.get("created_at")
+    assert header.get("logo") == match.logo
 
 
 def assert_match_agents_team(team: dict, match: AgentsTeam):
     assert team["id"] == match.id
     assert team["version"] == match.version
+    assert team.get("created_at")
     assert team["name"] == match.name
     assert team.get("shard") == match.shard
+    assert team.get("logo") == match.logo
     assert team.get("graph") == match.graph
-    assert team.get("created_at")

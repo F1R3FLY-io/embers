@@ -60,7 +60,7 @@ in {
         }
     } |
 
-    contract agents(@"create", @id, @version, @name, @shard, @created_at, @code) = {
+    contract agents(@"create", @id, @version, @created_at, @name, @shard, @logo, @code) = {
         new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
             deployData!(*deployDataCh) |
 
@@ -87,18 +87,20 @@ in {
 
                                 treeHashMap!("set", agentVersions, version,
                                     {
+                                        "created_at": created_at,
                                         "name": name,
                                         "shard": shard,
-                                        "created_at": created_at,
+                                        "logo": logo,
                                         "code": code,
                                     }, *devNull) |
 
                                 treeHashMap!("set", agentVersions, "latest",
                                     {
                                         "version": version,
+                                        "created_at": created_at,
                                         "name": name,
                                         "shard": shard,
-                                        "created_at": created_at,
+                                        "logo": logo,
                                         "code": code,
                                     }, *devNull) |
 
@@ -131,18 +133,20 @@ in {
 
                             treeHashMap!("set", agentVersions, version,
                                 {
+                                    "created_at": created_at,
                                     "name": name,
                                     "shard": shard,
-                                    "created_at": created_at,
+                                    "logo": logo,
                                     "code": code,
                                 }, *devNull) |
 
                             treeHashMap!("set", agentVersions, "latest",
                                 {
                                     "version": version,
+                                    "created_at": created_at,
                                     "name": name,
                                     "shard": shard,
-                                    "created_at": created_at,
+                                    "logo": logo,
                                     "code": code,
                                 }, *devNull) |
 
@@ -234,7 +238,7 @@ in {
         }
     } |
 
-    contract agents(@"save", @id, @version, @name, @shard, @created_at, @code) = {
+    contract agents(@"save", @id, @version, @created_at, @name, @shard, @logo, @code) = {
         new deployDataCh, deployerAddressCh, valueCh, errCh, insertAgentVersionCh in {
             deployData!(*deployDataCh) |
 
@@ -252,18 +256,20 @@ in {
 
                     treeHashMap!("set", agentVersions, version,
                         {
+                            "created_at": created_at,
                             "name": name,
                             "shard": shard,
-                            "created_at": created_at,
+                            "logo": logo,
                             "code": code,
                         }, *devNull) |
 
                     treeHashMap!("set", agentVersions, "latest",
                         {
                             "version": version,
+                            "created_at": created_at,
                             "name": name,
                             "shard": shard,
-                            "created_at": created_at,
+                            "logo": logo,
                             "code": code,
                         }, *devNull)
                 } |

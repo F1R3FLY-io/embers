@@ -16,9 +16,10 @@ struct SaveAgent {
     env_uri: Uri,
     id: String,
     version: Uuid,
+    created_at: i64,
     name: String,
     shard: Option<String>,
-    created_at: i64,
+    logo: Option<String>,
     code: Option<String>,
 }
 
@@ -43,9 +44,10 @@ impl AgentsService {
             env_uri: self.uri.clone(),
             id,
             version,
+            created_at: Utc::now().timestamp(),
             name: request.name,
             shard: request.shard,
-            created_at: Utc::now().timestamp(),
+            logo: request.logo,
             code: request.code.map(|v| BASE64_STANDARD.encode(v)),
         }
         .render()?;

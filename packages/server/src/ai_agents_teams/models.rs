@@ -13,9 +13,10 @@ pub struct AgentsTeams {
 pub struct AgentsTeamHeader {
     pub id: String,
     pub version: String,
+    pub created_at: DateTime<Utc>,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub logo: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -49,6 +50,7 @@ impl Graph {
 pub struct CreateAgentsTeamReq {
     pub name: String,
     pub shard: Option<String>,
+    pub logo: Option<String>,
     pub graph: Option<Graph>,
 }
 
@@ -56,9 +58,10 @@ pub struct CreateAgentsTeamReq {
 pub struct AgentsTeam {
     pub id: String,
     pub version: String,
+    pub created_at: DateTime<Utc>,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub logo: Option<String>,
     pub graph: Option<Graph>,
 }
 

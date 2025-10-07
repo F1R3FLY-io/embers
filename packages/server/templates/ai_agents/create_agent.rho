@@ -1,6 +1,6 @@
 new rl(`rho:registry:lookup`), agentsCh in {
     rl!({{ env_uri }}, *agentsCh) |
     for(@(_, agents) <- agentsCh) {
-        @agents!("create", {{ id }}, {{ version }}, {{ name }}, {{ shard }}, {{ created_at }}, {{ code }})
+        @agents!("create", {{ id }}, {{ version }}, {{ created_at }}, {{ name }}, {{ shard }}, {{ logo }}, {{ code }})
     }
 }

@@ -16,9 +16,10 @@ pub struct AgentsTeams {
 pub struct AgentsTeamHeader {
     pub id: String,
     pub version: String,
+    pub created_at: blockchain::dtos::DateTime,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: blockchain::dtos::DateTime,
+    pub logo: Option<String>,
 }
 
 #[derive(Debug, Clone, Into)]
@@ -41,8 +42,9 @@ impl<'de> Deserialize<'de> for Graph {
 pub struct AgentsTeam {
     pub id: String,
     pub version: String,
+    pub created_at: blockchain::dtos::DateTime,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: blockchain::dtos::DateTime,
+    pub logo: Option<String>,
     pub graph: Option<Graph>,
 }

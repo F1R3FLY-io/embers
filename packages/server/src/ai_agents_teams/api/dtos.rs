@@ -23,9 +23,10 @@ pub struct AgentsTeams {
 pub struct AgentsTeamHeader {
     pub id: String,
     pub version: String,
+    pub created_at: Stringified<DateTime<Utc>>,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: Stringified<DateTime<Utc>>,
+    pub logo: Option<String>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -33,6 +34,7 @@ pub struct AgentsTeamHeader {
 pub struct CreateAgentsTeamReq {
     pub name: String,
     pub shard: Option<String>,
+    pub logo: Option<String>,
     pub graph: Option<Stringified<models::Graph>>,
 }
 
@@ -41,9 +43,10 @@ pub struct CreateAgentsTeamReq {
 pub struct AgentsTeam {
     pub id: String,
     pub version: String,
+    pub created_at: Stringified<DateTime<Utc>>,
     pub name: String,
     pub shard: Option<String>,
-    pub created_at: Stringified<DateTime<Utc>>,
+    pub logo: Option<String>,
     pub graph: Option<Stringified<models::Graph>>,
 }
 
