@@ -177,7 +177,7 @@ pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
                     .map(|from| {
                         (
                             (*from.as_ref()).to_owned(),
-                            Inline(format!(
+                            Inline::from(format!(
                                 "{}Value",
                                 get_input_for_vertex(&vertex_outputs, from)
                             )),

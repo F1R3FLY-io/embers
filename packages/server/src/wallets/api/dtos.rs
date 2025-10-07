@@ -7,7 +7,7 @@ use thiserror::Error;
 
 use crate::common::api::dtos::{PreparedContract, Stringified};
 use crate::common::models::{PositiveNonZero, WalletAddress};
-use crate::wallets::models::{self, DescriptionError};
+use crate::wallets::models;
 
 #[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
 #[convert(from(models::Direction))]
@@ -87,7 +87,7 @@ pub struct TransferResp {
 #[derive(Debug, Clone, Error)]
 pub enum TransferValidationError {
     #[error("description format error: {0}")]
-    DescriptionError(#[from] DescriptionError),
+    DescriptionError(#[from] models::DescriptionError),
 }
 
 impl ResponseError for TransferValidationError {

@@ -1,7 +1,9 @@
+use derive_more::Into;
 use serde::{Deserialize, de};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents_teams::models;
+use crate::common::blockchain;
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::AgentsTeams))]
@@ -16,9 +18,10 @@ pub struct AgentsTeamHeader {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: blockchain::dtos::DateTime,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Into)]
 pub struct Graph(models::Graph);
 
 impl<'de> Deserialize<'de> for Graph {
@@ -33,12 +36,6 @@ impl<'de> Deserialize<'de> for Graph {
     }
 }
 
-impl From<Graph> for models::Graph {
-    fn from(value: Graph) -> Self {
-        value.0
-    }
-}
-
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::AgentsTeam))]
 pub struct AgentsTeam {
@@ -46,5 +43,6 @@ pub struct AgentsTeam {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: blockchain::dtos::DateTime,
     pub graph: Option<Graph>,
 }

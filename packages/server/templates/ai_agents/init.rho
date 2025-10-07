@@ -1,9 +1,9 @@
 {% extends "common/insert_signed.rho" %}
 
-{% block name -%} agents {%- endblock %}
+{%- block name -%} agents {%- endblock -%}
 
-{% block initialization -%}
-{% filter indent(8) -%}
+{%- block initialization -%}
+{%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
     revAddress(`rho:rev:address`),
@@ -60,7 +60,7 @@ in {
         }
     } |
 
-    contract agents(@"create", @id, @version, @name, @shard, @code) = {
+    contract agents(@"create", @id, @version, @name, @shard, @created_at, @code) = {
         new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
             deployData!(*deployDataCh) |
 
@@ -89,6 +89,7 @@ in {
                                     {
                                         "name": name,
                                         "shard": shard,
+                                        "created_at": created_at,
                                         "code": code,
                                     }, *devNull) |
 
@@ -97,6 +98,7 @@ in {
                                         "version": version,
                                         "name": name,
                                         "shard": shard,
+                                        "created_at": created_at,
                                         "code": code,
                                     }, *devNull) |
 
@@ -131,6 +133,7 @@ in {
                                 {
                                     "name": name,
                                     "shard": shard,
+                                    "created_at": created_at,
                                     "code": code,
                                 }, *devNull) |
 
@@ -139,6 +142,7 @@ in {
                                     "version": version,
                                     "name": name,
                                     "shard": shard,
+                                    "created_at": created_at,
                                     "code": code,
                                 }, *devNull) |
 
@@ -230,7 +234,7 @@ in {
         }
     } |
 
-    contract agents(@"save", @id, @version, @name, @shard, @code) = {
+    contract agents(@"save", @id, @version, @name, @shard, @created_at, @code) = {
         new deployDataCh, deployerAddressCh, valueCh, errCh, insertAgentVersionCh in {
             deployData!(*deployDataCh) |
 
@@ -250,6 +254,7 @@ in {
                         {
                             "name": name,
                             "shard": shard,
+                            "created_at": created_at,
                             "code": code,
                         }, *devNull) |
 
@@ -258,6 +263,7 @@ in {
                             "version": version,
                             "name": name,
                             "shard": shard,
+                            "created_at": created_at,
                             "code": code,
                         }, *devNull)
                 } |
@@ -272,5 +278,5 @@ in {
     }
 }
 
-{%- endfilter %}
-{%- endblock %}
+{%- endfilter -%}
+{%- endblock -%}

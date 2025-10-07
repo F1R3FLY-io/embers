@@ -1,9 +1,11 @@
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
+use derive_more::Into;
 use serde::{Deserialize, de};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents::models;
+use crate::common::blockchain;
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::Agents))]
@@ -18,9 +20,10 @@ pub struct AgentHeader {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: blockchain::dtos::DateTime,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Into)]
 pub struct Code(String);
 
 impl<'de> Deserialize<'de> for Code {
@@ -36,12 +39,6 @@ impl<'de> Deserialize<'de> for Code {
     }
 }
 
-impl From<Code> for String {
-    fn from(value: Code) -> Self {
-        value.0
-    }
-}
-
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::Agent))]
 pub struct Agent {
@@ -49,5 +46,6 @@ pub struct Agent {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: blockchain::dtos::DateTime,
     pub code: Option<Code>,
 }

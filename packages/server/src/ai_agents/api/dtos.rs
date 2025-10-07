@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
@@ -18,6 +19,7 @@ pub struct AgentHeader {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: Stringified<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -35,6 +37,7 @@ pub struct Agent {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: Stringified<DateTime<Utc>>,
     pub code: Option<String>,
 }
 

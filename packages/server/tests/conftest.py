@@ -86,6 +86,7 @@ def assert_match_agent_header(header: dict, match: Agent):
     assert header["version"] == match.version
     assert header["name"] == match.name
     assert header.get("shard") == match.shard
+    assert header.get("created_at")
 
 
 def assert_match_agent(agent: dict, match: Agent):
@@ -93,6 +94,7 @@ def assert_match_agent(agent: dict, match: Agent):
     assert agent["version"] == match.version
     assert agent["name"] == match.name
     assert agent.get("shard") == match.shard
+    assert agent.get("created_at")
     assert agent.get("code") == match.code
 
 
@@ -111,6 +113,7 @@ def assert_match_agents_team_header(header: dict, match: AgentsTeam):
     assert header["version"] == match.version
     assert header["name"] == match.name
     assert header.get("shard") == match.shard
+    assert header.get("created_at")
 
 
 def assert_match_agents_team(team: dict, match: AgentsTeam):
@@ -119,3 +122,4 @@ def assert_match_agents_team(team: dict, match: AgentsTeam):
     assert team["name"] == match.name
     assert team.get("shard") == match.shard
     assert team.get("graph") == match.graph
+    assert team.get("created_at")

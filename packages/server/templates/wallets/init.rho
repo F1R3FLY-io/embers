@@ -1,9 +1,9 @@
 {% extends "common/insert_signed.rho" %}
 
-{% block name -%} wallets {%- endblock %}
+{%- block name -%} wallets {%- endblock -%}
 
-{% block initialization -%}
-{% filter indent(8) -%}
+{%- block initialization -%}
+{%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
     treeHashMapCh,
@@ -175,5 +175,5 @@ in {
     }
 }
 
-{%- endfilter %}
-{%- endblock %}
+{%- endfilter -%}
+{%- endblock -%}

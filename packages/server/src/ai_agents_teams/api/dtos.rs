@@ -1,7 +1,8 @@
+use chrono::{DateTime, Utc};
 use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
-use crate::ai_agents_teams::models::{self, Graph};
+use crate::ai_agents_teams::models;
 use crate::common::api::dtos::{PreparedContract, Stringified};
 use crate::common::models::{PositiveNonZero, WalletAddress};
 
@@ -24,6 +25,7 @@ pub struct AgentsTeamHeader {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: Stringified<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -31,7 +33,7 @@ pub struct AgentsTeamHeader {
 pub struct CreateAgentsTeamReq {
     pub name: String,
     pub shard: Option<String>,
-    pub graph: Option<Stringified<Graph>>,
+    pub graph: Option<Stringified<models::Graph>>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -41,7 +43,8 @@ pub struct AgentsTeam {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
-    pub graph: Option<Stringified<Graph>>,
+    pub created_at: Stringified<DateTime<Utc>>,
+    pub graph: Option<Stringified<models::Graph>>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -71,7 +74,7 @@ pub struct DeployAgentsTeam {
 
 #[derive(Debug, Clone, Object)]
 pub struct DeployGraph {
-    pub graph: Stringified<Graph>,
+    pub graph: Stringified<models::Graph>,
     pub phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 

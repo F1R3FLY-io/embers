@@ -1,9 +1,9 @@
 {% extends "common/insert_signed.rho" %}
 
-{% block name -%} log {%- endblock %}
+{%- block name -%} log {%- endblock -%}
 
-{% block initialization -%}
-{% filter indent(8) -%}
+{%- block initialization -%}
+{%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
     devNull(`rho:io:devNull`),
@@ -77,5 +77,5 @@ in {
     }
 }
 
-{%- endfilter %}
-{%- endblock %}
+{%- endfilter -%}
+{%- endblock -%}

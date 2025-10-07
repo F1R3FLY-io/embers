@@ -4,6 +4,7 @@ use std::fmt;
 use blake2::digest::consts::U32;
 use blake2::{Blake2b, Digest};
 use crc::Crc;
+use derive_more::{From, Into};
 pub use firefly_client_macros::{IntoValue, Render};
 use secp256k1::PublicKey;
 use uuid::Uuid;
@@ -125,8 +126,8 @@ impl IntoValue for &[u8] {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Uri(pub String);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Into)]
+pub struct Uri(String);
 
 impl From<PublicKey> for Uri {
     fn from(value: PublicKey) -> Self {
@@ -208,8 +209,8 @@ impl<Tz: chrono::TimeZone> IntoValue for chrono::DateTime<Tz> {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Inline(pub String);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, From, Into)]
+pub struct Inline(String);
 
 impl IntoValue for Inline {
     fn into_value(self) -> Value {

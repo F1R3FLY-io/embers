@@ -1,3 +1,5 @@
+use chrono::{DateTime, Utc};
+
 use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
 
 #[derive(Debug, Clone)]
@@ -11,6 +13,7 @@ pub struct AgentHeader {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,6 +29,7 @@ pub struct Agent {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: DateTime<Utc>,
     pub code: Option<String>,
 }
 

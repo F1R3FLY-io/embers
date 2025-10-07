@@ -1,5 +1,7 @@
 use std::convert::Infallible;
 
+use chrono::{DateTime, Utc};
+
 use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
 
 #[derive(Debug, Clone)]
@@ -13,6 +15,7 @@ pub struct AgentsTeamHeader {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone)]
@@ -55,6 +58,7 @@ pub struct AgentsTeam {
     pub version: String,
     pub name: String,
     pub shard: Option<String>,
+    pub created_at: DateTime<Utc>,
     pub graph: Option<Graph>,
 }
 

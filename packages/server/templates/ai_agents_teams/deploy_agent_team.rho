@@ -16,7 +16,7 @@ in
         in {
             {{ nodes | join(" |\n") | indent(12) }}
         }
-{%- else -%}
+{%- else %}
         {{ nodes | join(" |\n") | indent(8) }}
 {%- endif %}
     }

@@ -1,3 +1,4 @@
+use chrono::Utc;
 use firefly_client::models::SignedCode;
 use firefly_client::rendering::{Render, Uri};
 use uuid::Uuid;
@@ -15,6 +16,7 @@ struct SaveAgentsTeam {
     version: Uuid,
     name: String,
     shard: Option<String>,
+    created_at: i64,
     graph: Option<String>,
 }
 
@@ -41,6 +43,7 @@ impl AgentsTeamsService {
             version,
             name: request.name,
             shard: request.shard,
+            created_at: Utc::now().timestamp(),
             graph: request.graph.map(Graph::graphl),
         }
         .render()?;

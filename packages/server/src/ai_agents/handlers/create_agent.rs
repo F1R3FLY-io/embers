@@ -1,5 +1,6 @@
 use base64::Engine;
 use base64::prelude::BASE64_STANDARD;
+use chrono::Utc;
 use firefly_client::models::SignedCode;
 use firefly_client::rendering::{Render, Uri};
 use uuid::Uuid;
@@ -17,6 +18,7 @@ struct CreateAgent {
     version: Uuid,
     name: String,
     shard: Option<String>,
+    created_at: i64,
     code: Option<String>,
 }
 
@@ -43,6 +45,7 @@ impl AgentsService {
             version,
             name: request.name,
             shard: request.shard,
+            created_at: Utc::now().timestamp(),
             code: request.code.map(|v| BASE64_STANDARD.encode(v)),
         }
         .render()?;

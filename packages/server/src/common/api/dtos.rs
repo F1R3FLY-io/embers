@@ -17,9 +17,9 @@ use poem_openapi::types::{
 use poem_openapi::{ApiResponse, NewType, Object, Tags};
 
 use crate::ai_agents_teams::models::Graph;
-use crate::common::models::{self, PositiveNonZero, WalletAddress};
+use crate::common::models;
 
-impl<T> Type for PositiveNonZero<T>
+impl<T> Type for models::PositiveNonZero<T>
 where
     T: Type + Format,
 {
@@ -140,7 +140,7 @@ impl Format for i64 {
     }
 }
 
-impl<T> Format for PositiveNonZero<T>
+impl<T> Format for models::PositiveNonZero<T>
 where
     T: Format,
 {
@@ -149,7 +149,7 @@ where
     }
 }
 
-impl ParseFromJSON for Stringified<PositiveNonZero<i64>> {
+impl ParseFromJSON for Stringified<models::PositiveNonZero<i64>> {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
         let number = value.parse::<i64>().map_err(ParseError::custom)?;
@@ -157,25 +157,25 @@ impl ParseFromJSON for Stringified<PositiveNonZero<i64>> {
     }
 }
 
-impl ToJSON for Stringified<PositiveNonZero<i64>> {
+impl ToJSON for Stringified<models::PositiveNonZero<i64>> {
     fn to_json(&self) -> Option<serde_json::Value> {
         self.0.0.to_string().to_json()
     }
 }
 
-impl Format for WalletAddress {
+impl Format for models::WalletAddress {
     fn format() -> &'static str {
         "blockchain-address"
     }
 }
 
-impl From<Stringified<Self>> for WalletAddress {
+impl From<Stringified<Self>> for models::WalletAddress {
     fn from(value: Stringified<Self>) -> Self {
         value.0
     }
 }
 
-impl Type for WalletAddress {
+impl Type for models::WalletAddress {
     const IS_REQUIRED: bool = String::IS_REQUIRED;
 
     type RawValueType = Self;
@@ -204,20 +204,20 @@ impl Type for WalletAddress {
     }
 }
 
-impl ParseFromParameter for Stringified<WalletAddress> {
+impl ParseFromParameter for Stringified<models::WalletAddress> {
     fn parse_from_parameter(value: &str) -> ParseResult<Self> {
         value.to_owned().try_into().map(Self).map_err(Into::into)
     }
 }
 
-impl ParseFromJSON for Stringified<WalletAddress> {
+impl ParseFromJSON for Stringified<models::WalletAddress> {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
         value.try_into().map(Self).map_err(Into::into)
     }
 }
 
-impl ToJSON for Stringified<WalletAddress> {
+impl ToJSON for Stringified<models::WalletAddress> {
     fn to_json(&self) -> Option<serde_json::Value> {
         self.0.as_ref().to_json()
     }
