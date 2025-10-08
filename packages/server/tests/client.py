@@ -226,7 +226,25 @@ class AiAgentsTeamsApi:
 
         return resp
 
-    def deploy(self, wallet: Wallet, graph: str, phlo_limit: int) -> Responce:
+    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int) -> Responce:
+        resp = self._client.post(
+            "/ai-agents-teams/deploy/prepare",
+            json={
+                "type": "AgentsTeam",
+                "id": agents_team.id,
+                "version": agents_team.version,
+                "address": wallet.address,
+                "phlo_limit": phlo_limit,
+            },
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post("/ai-agents-teams/deploy/send", json=sing_contract(wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return resp
+
+    def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int) -> Responce:
         resp = self._client.post(
             "/ai-agents-teams/deploy/prepare",
             json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit},

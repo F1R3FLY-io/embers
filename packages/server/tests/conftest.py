@@ -72,8 +72,13 @@ def assert_match_transfer(transfer: dict, match: dict):
 
 
 @pytest.fixture
-def agent(client: ApiClient, funded_wallet: Wallet) -> Agent:
-    resp = client.ai_agents.create(funded_wallet, name="my_agent", logo="http://nice-logo", code='@Nil!("foo")')
+def agent(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureRequest) -> Agent:
+    resp = client.ai_agents.create(
+        funded_wallet,
+        name="my_agent",
+        logo="http://nice-logo",
+        code='@Nil!("foo")' if not hasattr(request, "param") else request.param,
+    )
     assert resp.status == 200
 
     wait_for_read_node_sync()
@@ -107,12 +112,12 @@ def assert_match_agent(agent: dict, match: Agent):
 
 
 @pytest.fixture
-def agents_team(client: ApiClient, funded_wallet: Wallet) -> AgentsTeam:
+def agents_team(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureRequest) -> AgentsTeam:
     resp = client.ai_agents_teams.create(
         funded_wallet,
         name="my_agents_team",
         logo="http://nice-logo",
-        graph="< foo > | 0 ",
+        graph="< foo > | 0 " if not hasattr(request, "param") else request.param,
     )
     assert resp.status == 200
 

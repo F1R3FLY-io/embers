@@ -90,7 +90,7 @@ services:
     profiles:
       - state-sync
     command:
-      - --wallet-key=a8cf01d889cc6ef3119ecbd57301036a52c41ae6e44964e098cb2aefa4598954
+      - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
       - --propose-service-url=http://firefly:40402
       - --service-id=docker-pds
@@ -110,7 +110,7 @@ services:
     profiles:
       - state-sync
     command:
-      - --wallet-key=a8cf01d889cc6ef3119ecbd57301036a52c41ae6e44964e098cb2aefa4598954
+      - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
       - --propose-service-url=http://firefly:40402
       - --service-id=docker-pds
@@ -129,7 +129,7 @@ services:
     profiles:
       - multiple-networks
     command:
-      - --wallet-key=a8cf01d889cc6ef3119ecbd57301036a52c41ae6e44964e098cb2aefa4598954
+      - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
       - --propose-service-url=http://firefly:40402
       - --service-id=docker-pds
@@ -151,7 +151,7 @@ services:
     profiles:
       - multiple-networks
     command:
-      - --wallet-key=a8cf01d889cc6ef3119ecbd57301036a52c41ae6e44964e098cb2aefa4598954
+      - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
       - --propose-service-url=http://firefly:40402
       - --service-id=docker-pds
@@ -175,7 +175,7 @@ services:
     profiles:
       - multiple-networks
     command:
-      - --wallet-key=a8cf01d889cc6ef3119ecbd57301036a52c41ae6e44964e098cb2aefa4598954
+      - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
       - --propose-service-url=http://firefly:40402
       - --service-id=docker-pds

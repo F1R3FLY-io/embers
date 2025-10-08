@@ -177,10 +177,10 @@ pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
                     .map(|from| {
                         (
                             (*from.as_ref()).to_owned(),
-                            Inline::from(format!(
-                                "{}Value",
-                                get_input_for_vertex(&vertex_outputs, from)
-                            )),
+                            Inline::from(match get_input_for_vertex(&vertex_outputs, from) {
+                                From::Input => From::Input.to_string(),
+                                channel @ From::Channel(_) => format!("{channel}Value"),
+                            }),
                         )
                     })
                     .collect(),
