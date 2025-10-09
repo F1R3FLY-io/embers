@@ -62,9 +62,9 @@ args = [
 command = "docker"
 workspace = false
 
-[tasks.server]
+[tasks.embers]
 script = '''
-cd packages/server
+cd packages/embers
 cargo make ${1}
 '''
 workspace = false

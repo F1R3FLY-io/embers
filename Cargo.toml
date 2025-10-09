@@ -1,3 +1,3 @@
 [workspace]
-members  = ["packages/events-sync", "packages/firefly-client", "packages/firefly-client-macros", "packages/server", "packages/state-sync"]
+members  = ["packages/embers", "packages/events-sync", "packages/firefly-client", "packages/firefly-client-macros", "packages/state-sync"]
 resolver = "2"

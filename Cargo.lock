@@ -826,6 +826,37 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
+name = "embers"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "askama",
+ "base64",
+ "blake2",
+ "bon",
+ "bs58",
+ "chrono",
+ "derive_more",
+ "figment",
+ "firefly-client",
+ "graphl-parser",
+ "hex",
+ "poem",
+ "poem-openapi",
+ "prost",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "sha3",
+ "structural-convert",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2516,37 +2547,6 @@ dependencies = [
  "ryu",
  "serde",
  "unsafe-libyaml",
-]
-
-[[package]]
-name = "server"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "askama",
- "base64",
- "blake2",
- "bon",
- "bs58",
- "chrono",
- "derive_more",
- "figment",
- "firefly-client",
- "graphl-parser",
- "hex",
- "poem",
- "poem-openapi",
- "prost",
- "secp256k1",
- "serde",
- "serde_json",
- "sha3",
- "structural-convert",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

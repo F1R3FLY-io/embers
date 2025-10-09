@@ -58,7 +58,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: packages/server
+        working-directory: packages/embers
 
     steps:
       - name: Checkout code
@@ -99,14 +99,14 @@ jobs:
       - uses: ./.github/workflows/actions/setup-rust
 
       - name: Generate schema
-        run: cargo make server generate-schema
+        run: cargo make embers generate-schema
 
       - name: Upload build artifact
         id: upload-artifact
         uses: actions/upload-artifact@v4
         with:
           name: schema.json
-          path: packages/server/schema.json
+          path: packages/embers/schema.json
 
       - name: Update frontend with new schema.json
         uses: peter-evans/repository-dispatch@v4
