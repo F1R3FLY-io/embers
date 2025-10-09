@@ -1,10 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use derive_more::Display;
-use firefly_client::rendering::{Inline, Render};
+use firefly_client::rendering::{Inline, Render, Uri};
 
 use crate::ai_agents_teams::compilation::graphl_parsing::Vertex;
 use crate::ai_agents_teams::compilation::{Code, Node};
+use crate::common::models::RegistryDeploy;
 use crate::common::tracing::record_trace;
 
 #[derive(Debug, Clone, Display)]
@@ -67,10 +68,12 @@ enum NodesTemplate<'a> {
 }
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/deploy_agent_team.rho")]
+#[template(path = "ai_agents_teams/deploy_agents_team.rho")]
 struct DeployAgentTeamTemplate<'a> {
-    #[template(direct)]
-    name: &'a str,
+    env_uri: Uri,
+    version: i64,
+    public_key: Vec<u8>,
+    sig: Vec<u8>,
 
     #[template(direct)]
     system_channels: Vec<&'static str>,
@@ -145,7 +148,7 @@ fn get_output_for_vertex<'a, 'b>(
     err(Debug),
     ret(Display, level = "trace")
 )]
-pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
+pub fn render_agent_team(code: Code<'_>, deploy: RegistryDeploy) -> anyhow::Result<String> {
     record_trace!(code);
 
     let vertex_outputs: BTreeMap<_, _> = code
@@ -205,7 +208,10 @@ pub fn render_agent_team(name: &str, code: Code<'_>) -> anyhow::Result<String> {
     let output_channels = vertex_outputs.values().map(AsRef::as_ref).collect();
 
     DeployAgentTeamTemplate {
-        name,
+        env_uri: deploy.uri_pub_key.into(),
+        version: deploy.version.0,
+        public_key: deploy.uri_pub_key.serialize_uncompressed().into(),
+        sig: deploy.signature,
         system_channels: get_all_system_channels(&code.nodes),
         output_channels,
         nodes,

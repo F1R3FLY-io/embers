@@ -1,8 +1,9 @@
 use std::convert::Infallible;
 
 use chrono::{DateTime, Utc};
+use firefly_client::rendering::Uri;
 
-use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
+use crate::common::models::{PositiveNonZero, PreparedContract, RegistryDeploy, WalletAddress};
 
 #[derive(Debug, Clone)]
 pub struct AgentsTeams {
@@ -87,15 +88,28 @@ pub enum DeployAgentsTeamReq {
         version: String,
         address: WalletAddress,
         phlo_limit: PositiveNonZero<i64>,
+        deploy: RegistryDeploy,
     },
     Graph {
         graph: Graph,
         phlo_limit: PositiveNonZero<i64>,
+        deploy: RegistryDeploy,
     },
 }
 
 #[derive(Debug, Clone)]
 pub struct DeployAgentsTeamResp {
-    pub name: String,
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunAgentsTeamReq {
+    pub prompt: String,
+    pub phlo_limit: PositiveNonZero<i64>,
+    pub agents_team: Uri,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunAgentsTeamResp {
     pub contract: PreparedContract,
 }

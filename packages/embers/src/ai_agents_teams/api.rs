@@ -10,7 +10,8 @@ use crate::ai_agents_teams::api::dtos::{
     CreateAgentsTeamResp,
     DeployAgentsTeamReq,
     DeployAgentsTeamResp,
-    RunDemoReq,
+    RunAgentsTeamReq,
+    RunAgentsTeamResp,
     SaveAgentsTeamReq,
     SaveAgentsTeamResp,
 };
@@ -25,16 +26,6 @@ pub struct AIAgentsTeams;
 
 #[OpenApi(prefix_path = "/ai-agents-teams", tag = ApiTags::AIAgentsTeams)]
 impl AIAgentsTeams {
-    #[oai(path = "/run-demo", method = "post")]
-    async fn run_demo(
-        &self,
-        Json(body): Json<RunDemoReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<serde_json::Value>> {
-        let demo_result = agents_teams.run_demo(body.name, body.prompt).await?;
-        Ok(Json(demo_result))
-    }
-
     #[oai(path = "/:address", method = "get")]
     async fn list(
         &self,
@@ -75,11 +66,11 @@ impl AIAgentsTeams {
     #[oai(path = "/create/prepare", method = "post")]
     async fn prepare_create(
         &self,
-        Json(input): Json<CreateAgentsTeamReq>,
+        Json(body): Json<CreateAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<CreateAgentsTeamResp>> {
         let contract = agents_teams
-            .prepare_create_agents_team_contract(input.into())
+            .prepare_create_agents_team_contract(body.into())
             .await?;
         Ok(Json(contract.into()))
     }
@@ -120,15 +111,40 @@ impl AIAgentsTeams {
             .map_err(Into::into)
     }
 
+    #[oai(path = "/run/prepare", method = "post")]
+    async fn prepare_run_agents_team(
+        &self,
+        Json(body): Json<RunAgentsTeamReq>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> poem::Result<Json<RunAgentsTeamResp>> {
+        let contract = agents_teams
+            .prepare_run_agents_team_contract(body.into())
+            .await?;
+        Ok(Json(contract.into()))
+    }
+
+    #[oai(path = "/run/send", method = "post")]
+    async fn run_agents_team(
+        &self,
+        Json(body): Json<SignedContract>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> poem::Result<Json<serde_json::Value>> {
+        agents_teams
+            .deploy_signed_run_agents_team(body.into())
+            .await
+            .map(Json)
+            .map_err(Into::into)
+    }
+
     #[oai(path = "/:id/save/prepare", method = "post")]
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
-        Json(input): Json<SaveAgentsTeamReq>,
+        Json(body): Json<SaveAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SaveAgentsTeamResp>> {
         let contract = agents_teams
-            .prepare_save_agents_team_contract(id, input.into())
+            .prepare_save_agents_team_contract(id, body.into())
             .await?;
         Ok(Json(contract.into()))
     }

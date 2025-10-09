@@ -1,3 +1,0 @@
-new deployId(`rho:rchain:deployId`) in {
-    @{{ name }}!({{ prompt }}, (*deployId).toString())
-}
