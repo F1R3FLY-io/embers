@@ -11,9 +11,7 @@ from tests.conftest import ECHO_TEAM, insert_signed_deploy, public_key_to_uri, w
 @pytest.mark.parametrize("graph", [ECHO_TEAM])
 def test_run_agents_team(client: ApiClient, funded_wallet: Wallet, graph: str):
     private_key = ec.generate_private_key(ec.SECP256K1())
-    timestamp = datetime.now(UTC)
-    version = 0
-    deploy = insert_signed_deploy(private_key, timestamp, funded_wallet, version)
+    deploy = insert_signed_deploy(private_key, datetime.now(UTC), funded_wallet, version=0)
 
     resp = client.ai_agents_teams.deploy_graph(
         funded_wallet,
