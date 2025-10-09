@@ -11,20 +11,20 @@ RUN apt-get update && \
 
 COPY packages/firefly-client-macros firefly-client-macros
 COPY packages/firefly-client firefly-client
-COPY packages/server server
-COPY .cargo server/.cargo
+COPY packages/embers embers
+COPY .cargo embers/.cargo
 
-WORKDIR /app/server
+WORKDIR /app/embers
 
 ARG TARGETPLATFORM
 RUN \
     ( [ "$TARGETPLATFORM" = "linux/arm64" ] && \
     cargo build --release --target aarch64-unknown-linux-gnu && \
-    mv target/aarch64-unknown-linux-gnu/release/server /app/server-release \
+    mv target/aarch64-unknown-linux-gnu/release/embers /app/embers-release \
     ) || \
     ( [ "$TARGETPLATFORM" = "linux/amd64" ] && \
     cargo build --release --target x86_64-unknown-linux-gnu && \
-    mv target/x86_64-unknown-linux-gnu/release/server /app/server-release \
+    mv target/x86_64-unknown-linux-gnu/release/embers /app/embers-release \
     ) || \
     { echo "Error: Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" >&2; exit 1; }
 
@@ -32,7 +32,7 @@ FROM debian:bookworm-slim AS runtime
 
 WORKDIR /app
 
-COPY --from=builder /app/server-release ./server
+COPY --from=builder /app/embers-release ./embers
 
 EXPOSE 3000
 
@@ -41,4 +41,4 @@ ENV EMBERS__ADDRESS="::"
 ENV EMBERS__LOG_LEVEL="info"
 
 STOPSIGNAL SIGINT
-ENTRYPOINT ["/app/server"]
+ENTRYPOINT ["/app/embers"]

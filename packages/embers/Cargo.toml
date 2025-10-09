@@ -1,6 +1,6 @@
 [package]
 edition = "2024"
-name    = "server"
+name    = "embers"
 publish = false
 version = "0.1.0"
 
@@ -9,7 +9,7 @@ name = "generate_schema"
 path = "src/generate_schema.rs"
 
 [[bin]]
-name = "server"
+name = "embers"
 path = "src/main.rs"
 
 [dependencies]
