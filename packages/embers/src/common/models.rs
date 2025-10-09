@@ -15,7 +15,7 @@ pub struct PreparedContract(pub Vec<u8>);
 #[derive(Debug, Clone)]
 pub struct RegistryDeploy {
     pub timestamp: DateTime<Utc>,
-    pub version: PositiveNonZero<i64>,
+    pub version: i64,
     pub uri_pub_key: PublicKey,
     pub signature: Vec<u8>,
 }

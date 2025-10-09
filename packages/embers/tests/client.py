@@ -226,7 +226,7 @@ class AiAgentsTeamsApi:
 
         return resp
 
-    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int) -> Responce:
+    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int, deploy: dict) -> Responce:
         resp = self._client.post(
             "/ai-agents-teams/deploy/prepare",
             json={
@@ -235,6 +235,7 @@ class AiAgentsTeamsApi:
                 "version": agents_team.version,
                 "address": wallet.address,
                 "phlo_limit": phlo_limit,
+                "deploy": deploy,
             },
         )
         assert resp.status == 200
@@ -244,10 +245,10 @@ class AiAgentsTeamsApi:
 
         return resp
 
-    def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int) -> Responce:
+    def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int, deploy: dict) -> Responce:
         resp = self._client.post(
             "/ai-agents-teams/deploy/prepare",
-            json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit},
+            json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit, "deploy": deploy},
         )
         assert resp.status == 200
 
@@ -255,6 +256,18 @@ class AiAgentsTeamsApi:
         assert resp_next.status == 200
 
         return resp
+
+    def run(self, wallet: Wallet, prompt: str, phlo_limit: int, agents_team: str) -> Responce:
+        resp = self._client.post(
+            "/ai-agents-teams/run/prepare",
+            json={"prompt": prompt, "phlo_limit": phlo_limit, "agents_team": agents_team},
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post("/ai-agents-teams/run/send", json=sing_contract(wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return resp_next
 
     def save(
         self,

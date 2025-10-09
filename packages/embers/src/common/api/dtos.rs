@@ -100,15 +100,15 @@ trait Format {
 impl Format for DateTime<Utc> {
     type Alias = Self;
     fn format() -> &'static str {
-        "unix-timestamp"
+        "timestamp-millis"
     }
 }
 
 impl ParseFromJSON for Stringified<DateTime<Utc>> {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
-        let seconds = value.parse::<i64>().map_err(ParseError::custom)?;
-        let datetime = DateTime::<Utc>::from_timestamp(seconds, 0)
+        let millis = value.parse::<i64>().map_err(ParseError::custom)?;
+        let datetime = DateTime::<Utc>::from_timestamp_millis(millis)
             .ok_or_else(|| ParseError::custom("invalid timestamp"))?;
 
         Ok(Self(datetime))
@@ -117,7 +117,7 @@ impl ParseFromJSON for Stringified<DateTime<Utc>> {
 
 impl ToJSON for Stringified<DateTime<Utc>> {
     fn to_json(&self) -> Option<serde_json::Value> {
-        self.0.timestamp().to_string().to_json()
+        self.0.timestamp_millis().to_string().to_json()
     }
 }
 
@@ -157,6 +157,25 @@ impl Format for i64 {
     type Alias = Self;
     fn format() -> &'static str {
         "int64"
+    }
+}
+
+impl ParseFromJSON for Stringified<i64> {
+    fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
+        let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
+        value.parse::<i64>().map(Self).map_err(ParseError::custom)
+    }
+}
+
+impl ToJSON for Stringified<i64> {
+    fn to_json(&self) -> Option<serde_json::Value> {
+        self.0.to_string().to_json()
+    }
+}
+
+impl From<Stringified<Self>> for i64 {
+    fn from(value: Stringified<Self>) -> Self {
+        value.0
     }
 }
 
@@ -372,7 +391,7 @@ impl From<SignedContract> for firefly_client::models::SignedCode {
 #[derive(Debug, Clone, Object)]
 pub struct RegistryDeploy {
     pub timestamp: Stringified<DateTime<Utc>>,
-    pub version: Stringified<models::PositiveNonZero<i64>>,
+    pub version: Stringified<i64>,
     pub uri_pub_key: Stringified<PublicKey>,
     pub signature: Base64<Vec<u8>>,
 }
@@ -381,7 +400,7 @@ impl From<RegistryDeploy> for models::RegistryDeploy {
     fn from(value: RegistryDeploy) -> Self {
         Self {
             timestamp: value.timestamp.into(),
-            version: value.version.into(),
+            version: value.version.0,
             uri_pub_key: value.uri_pub_key.into(),
             signature: value.signature.0,
         }

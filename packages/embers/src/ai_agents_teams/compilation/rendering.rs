@@ -209,7 +209,7 @@ pub fn render_agent_team(code: Code<'_>, deploy: RegistryDeploy) -> anyhow::Resu
 
     DeployAgentTeamTemplate {
         env_uri: deploy.uri_pub_key.into(),
-        version: deploy.version.0,
+        version: deploy.version,
         public_key: deploy.uri_pub_key.serialize_uncompressed().into(),
         sig: deploy.signature,
         system_channels: get_all_system_channels(&code.nodes),

@@ -26,10 +26,12 @@ pub fn prepare_for_signing(
     phlo_limit: Option<PositiveNonZero<i64>>,
     timestamp: Option<DateTime<Utc>>,
 ) -> PreparedContract {
-    let timestamp = timestamp.unwrap_or_else(|| chrono::Utc::now());
+    let timestamp = timestamp
+        .unwrap_or_else(chrono::Utc::now)
+        .timestamp_millis();
     let contract = DeployDataProto {
         term: code,
-        timestamp: timestamp.timestamp_millis(),
+        timestamp,
         phlo_price: 1,
         phlo_limit: phlo_limit.map_or(500_000, |v| v.0),
         valid_after_block_number: valid_after_block_number as _,
