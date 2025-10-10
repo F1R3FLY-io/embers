@@ -1,5 +1,4 @@
 import base64
-import hashlib
 from datetime import datetime
 from hashlib import blake2b
 from time import sleep
@@ -8,12 +7,10 @@ import pytest
 import requests
 import zbase32
 from crc import Calculator, Configuration
-from cryptography.hazmat.primitives.asymmetric import ec
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from ecdsa import SECP256k1, SigningKey
-from ecdsa.util import sigencode_der_canonize
+from ecdsa import VerifyingKey
 
 from tests.client import Agent, AgentsTeam, ApiClient, Wallet
+from tests.key import SECP256k1
 from tests.protobuf.rhoapi import ETuple, Expr, Par
 
 ECHO_TEAM = 'context "{}" for A8f132a6a0f9340b59053b2689b8e040b in let A8f132a6a0f9340b59053b2689b8e040b = context "{\\"type\\":\\"input\\"}" for a7e2c4e97cb7145aea7ae4af15ba6789f in let a7e2c4e97cb7145aea7ae4af15ba6789f = < a7e2c4e97cb7145aea7ae4af15ba6789f > in < a7e2c4e97cb7145aea7ae4af15ba6789f > | {context "{\\"type\\":\\"output\\"}" for a02b50756f24f45f793b84b3d33e965c7 in let a02b50756f24f45f793b84b3d33e965c7 = < a02b50756f24f45f793b84b3d33e965c7 > in < a02b50756f24f45f793b84b3d33e965c7 > | 0} in 0 * {(let a7e2c4e97cb7145aea7ae4af15ba6789f = < a7e2c4e97cb7145aea7ae4af15ba6789f > in 0, let a02b50756f24f45f793b84b3d33e965c7 = < a02b50756f24f45f793b84b3d33e965c7 > in 0) * 0} '  # noqa: E501
@@ -47,18 +44,17 @@ def wait_for_test_read_node_sync():
 
 @pytest.fixture
 def prepopulated_wallet() -> Wallet:
-    private_key_bytes = bytes.fromhex("0B4E12EC24D2F42F3FC826194750E3168A5F03071F382375C29A5E801DBBE8A5")
-    return Wallet(private_key=ec.derive_private_key(int.from_bytes(private_key_bytes), ec.SECP256K1()))
+    return Wallet(key=SECP256k1.from_hex("0B4E12EC24D2F42F3FC826194750E3168A5F03071F382375C29A5E801DBBE8A5"))
 
 
 @pytest.fixture
 def wallet() -> Wallet:
-    return Wallet(private_key=ec.generate_private_key(ec.SECP256K1()))
+    return Wallet(key=SECP256k1.generate())
 
 
 @pytest.fixture
 def funded_wallet(client: ApiClient, prepopulated_wallet: Wallet, request: pytest.FixtureRequest) -> Wallet:
-    wallet = Wallet(private_key=ec.generate_private_key(ec.SECP256K1()))
+    wallet = Wallet(key=SECP256k1.generate())
 
     resp = client.wallets.transfer(from_wallet=prepopulated_wallet, to_wallet=wallet, amount=request.param)
     assert resp.status == 200
@@ -75,8 +71,7 @@ def test_wallet(client: ApiClient) -> Wallet:
 
     wait_for_test_read_node_sync()
 
-    private_key_bytes = bytes.fromhex(resp.json["key"])
-    return Wallet(private_key=ec.derive_private_key(int.from_bytes(private_key_bytes), ec.SECP256K1()))
+    return Wallet(key=SECP256k1.from_hex(resp.json["key"]))
 
 
 def assert_match_transfer(transfer: dict, match: dict):
@@ -165,12 +160,7 @@ def assert_match_agents_team(team: dict, match: AgentsTeam):
     assert team.get("graph") == match.graph
 
 
-def insert_signed_signature(
-    key: ec.EllipticCurvePrivateKey,
-    timestamp: int,
-    wallet: Wallet,
-    version: int,
-) -> bytes:
+def insert_signed_signature(key: SECP256k1, timestamp: int, wallet: Wallet, version: int) -> bytes:
     to_sign = bytes(
         Par(
             exprs=[
@@ -178,7 +168,7 @@ def insert_signed_signature(
                     e_tuple_body=ETuple(
                         ps=[
                             Par(exprs=[Expr(g_int=timestamp)]),
-                            Par(exprs=[Expr(g_byte_array=wallet.public_key_bytes)]),
+                            Par(exprs=[Expr(g_byte_array=wallet.key.public_key_bytes)]),
                             Par(exprs=[Expr(g_int=version)]),
                         ],
                     ),
@@ -187,35 +177,23 @@ def insert_signed_signature(
         ),
     )
 
-    prehashed = blake2b(to_sign, digest_size=32).digest()
-    private_bytes = key.private_numbers().private_value.to_bytes(32)
-    sk = SigningKey.from_string(private_bytes, curve=SECP256k1)
-    return sk.sign_digest_deterministic(
-        prehashed,
-        hashfunc=hashlib.sha256,
-        sigencode=sigencode_der_canonize,
-        allow_truncate=True,
-    )
+    return key.sign(to_sign)
 
 
-def insert_signed_deploy(key: ec.EllipticCurvePrivateKey, timestamp: datetime, wallet: Wallet, version: int) -> dict:
-    public_key = key.public_key()
+def insert_signed_deploy(key: SECP256k1, timestamp: datetime, wallet: Wallet, version: int) -> dict:
     millis = int(timestamp.timestamp() * 1000)
     signature = insert_signed_signature(key, millis, wallet, version)
 
     return {
         "timestamp": str(millis),
         "version": str(version),
-        "uri_pub_key": public_key.public_bytes(encoding=Encoding.X962, format=PublicFormat.UncompressedPoint).hex(),
+        "uri_pub_key": key.public_key_bytes.hex(),
         "signature": base64.b64encode(signature).decode(),
     }
 
 
-def public_key_to_uri(public_key: ec.EllipticCurvePublicKey) -> str:
-    hash_bytes = blake2b(
-        public_key.public_bytes(encoding=Encoding.X962, format=PublicFormat.UncompressedPoint),
-        digest_size=32,
-    ).digest()
+def public_key_to_uri(public_key: VerifyingKey) -> str:
+    hash_bytes = blake2b(public_key.to_string("uncompressed"), digest_size=32).digest()
 
     crc_config = Configuration(
         width=14,
