@@ -1,3 +1,10 @@
+{% extends "common/insert_signed.rho" %}
+
+{%- block name -%} agentsTeam {%- endblock -%}
+
+{%- block initialization -%}
+{%- filter indent(8) -%}
+
 new devNull(`rho:io:devNull`),
 {%- if !system_channels.is_empty() %}
     {{ system_channels | join(",\n") | indent(4) }},
@@ -5,7 +12,7 @@ new devNull(`rho:io:devNull`),
     agentTeam
 in
 {
-    contract @"{{ name }}"(
+    contract agentsTeam(
         @input,
 {%- if output %}
         return
@@ -21,3 +28,6 @@ in
 {%- endif %}
     }
 }
+
+{%- endfilter -%}
+{%- endblock -%}

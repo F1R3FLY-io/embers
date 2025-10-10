@@ -31,20 +31,20 @@ impl Testnet {
     #[oai(path = "/deploy/prepare", method = "post")]
     async fn prepare_deploy(
         &self,
-        Json(input): Json<DeployTestReq>,
+        Json(body): Json<DeployTestReq>,
         Data(testnet): Data<&TestnetService>,
     ) -> poem::Result<Json<DeployTestResp>> {
-        let contracts = testnet.prepare_test_contract(input.into()).await?;
+        let contracts = testnet.prepare_test_contract(body.into()).await?;
         Ok(Json(contracts.into()))
     }
 
     #[oai(path = "/deploy/send", method = "post")]
     async fn deploy(
         &self,
-        Json(input): Json<DeploySignedTestReq>,
+        Json(body): Json<DeploySignedTestReq>,
         Data(testnet): Data<&TestnetService>,
     ) -> poem::Result<Json<DeploySignedTestResp>> {
-        let result = testnet.deploy_test_contract(input.into()).await?;
+        let result = testnet.deploy_test_contract(body.into()).await?;
         Ok(Json(result.into()))
     }
 }

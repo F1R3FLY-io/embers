@@ -1,14 +1,26 @@
+from datetime import UTC, datetime
+
 import pytest
 
 from tests.client import ApiClient, Wallet
-
-ECHO_TEAM = 'context "{}" for A8f132a6a0f9340b59053b2689b8e040b in let A8f132a6a0f9340b59053b2689b8e040b = context "{\\"type\\":\\"input\\"}" for a7e2c4e97cb7145aea7ae4af15ba6789f in let a7e2c4e97cb7145aea7ae4af15ba6789f = < a7e2c4e97cb7145aea7ae4af15ba6789f > in < a7e2c4e97cb7145aea7ae4af15ba6789f > | {context "{\\"type\\":\\"output\\"}" for a02b50756f24f45f793b84b3d33e965c7 in let a02b50756f24f45f793b84b3d33e965c7 = < a02b50756f24f45f793b84b3d33e965c7 > in < a02b50756f24f45f793b84b3d33e965c7 > | 0} in 0 * {(let a7e2c4e97cb7145aea7ae4af15ba6789f = < a7e2c4e97cb7145aea7ae4af15ba6789f > in 0, let a02b50756f24f45f793b84b3d33e965c7 = < a02b50756f24f45f793b84b3d33e965c7 > in 0) * 0} '  # noqa: E501
-COMPRESS_TEAM = 'context "{}" for A0fe7f81a4a71433c9b708d8c8484f9b2 in let A0fe7f81a4a71433c9b708d8c8484f9b2 = context "{\\"type\\":\\"input\\"}" for a8f6d37c2166f4aa3936a2df6c65dd9af in let a8f6d37c2166f4aa3936a2df6c65dd9af = < a8f6d37c2166f4aa3936a2df6c65dd9af > in < a8f6d37c2166f4aa3936a2df6c65dd9af > | {context "{\\"type\\":\\"output\\"}" for a72f0d65ffc19427c823558d0224cc964 in let a72f0d65ffc19427c823558d0224cc964 = < a72f0d65ffc19427c823558d0224cc964 > in < a72f0d65ffc19427c823558d0224cc964 > | {context "{\\"type\\":\\"compress\\"}" for a5653f99668994404a9a6ae4bf6889b0e in let a5653f99668994404a9a6ae4bf6889b0e = < a5653f99668994404a9a6ae4bf6889b0e > in < a5653f99668994404a9a6ae4bf6889b0e > | 0}} in 0 * {(let a8f6d37c2166f4aa3936a2df6c65dd9af = < a8f6d37c2166f4aa3936a2df6c65dd9af > in 0, let a5653f99668994404a9a6ae4bf6889b0e = < a5653f99668994404a9a6ae4bf6889b0e > in 0) * {(let a5653f99668994404a9a6ae4bf6889b0e = < a5653f99668994404a9a6ae4bf6889b0e > in 0, let a72f0d65ffc19427c823558d0224cc964 = < a72f0d65ffc19427c823558d0224cc964 > in 0) * 0}} '  # noqa: E501
-GPT_COMPRESS_TEAM = 'context "{}" for A005ef27270144757997243d5c7892749 in let A005ef27270144757997243d5c7892749 = context "{\\"type\\":\\"input\\"}" for a2210aecc94d849e38d623251b158a3dd in let a2210aecc94d849e38d623251b158a3dd = < a2210aecc94d849e38d623251b158a3dd > in < a2210aecc94d849e38d623251b158a3dd > | {context "{\\"type\\":\\"output\\"}" for a5822ec2e8030498296ecb192cffc759d in let a5822ec2e8030498296ecb192cffc759d = < a5822ec2e8030498296ecb192cffc759d > in < a5822ec2e8030498296ecb192cffc759d > | {context "{\\"type\\":\\"text-model\\"}" for ad0d3b3ff43b34655807f61eafade165b in let ad0d3b3ff43b34655807f61eafade165b = < ad0d3b3ff43b34655807f61eafade165b > in < ad0d3b3ff43b34655807f61eafade165b > | {context "{\\"type\\":\\"compress\\"}" for a820a9e638bf24771ae6317cf4a9b7d18 in let a820a9e638bf24771ae6317cf4a9b7d18 = < a820a9e638bf24771ae6317cf4a9b7d18 > in < a820a9e638bf24771ae6317cf4a9b7d18 > | 0}}} in 0 * {(let a2210aecc94d849e38d623251b158a3dd = < a2210aecc94d849e38d623251b158a3dd > in 0, let ad0d3b3ff43b34655807f61eafade165b = < ad0d3b3ff43b34655807f61eafade165b > in 0) * {(let ad0d3b3ff43b34655807f61eafade165b = < ad0d3b3ff43b34655807f61eafade165b > in 0, let a820a9e638bf24771ae6317cf4a9b7d18 = < a820a9e638bf24771ae6317cf4a9b7d18 > in 0) * {(let a820a9e638bf24771ae6317cf4a9b7d18 = < a820a9e638bf24771ae6317cf4a9b7d18 > in 0, let a5822ec2e8030498296ecb192cffc759d = < a5822ec2e8030498296ecb192cffc759d > in 0) * 0}}} '  # noqa: E501
+from tests.conftest import COMPRESS_TEAM, ECHO_TEAM, GPT_COMPRESS_TEAM, insert_signed_deploy
+from tests.key import SECP256k1
 
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 @pytest.mark.parametrize("graph", [ECHO_TEAM, COMPRESS_TEAM, GPT_COMPRESS_TEAM])
 def test_deploy_agents_team(client: ApiClient, funded_wallet: Wallet, graph: str):
-    resp = client.ai_agents_teams.deploy_graph(funded_wallet, graph=graph, phlo_limit=5_000_000)
+    deploy = insert_signed_deploy(
+        SECP256k1.generate(),
+        datetime.now(UTC),
+        funded_wallet,
+        version=0,
+    )
+
+    resp = client.ai_agents_teams.deploy_graph(
+        funded_wallet,
+        graph=graph,
+        phlo_limit=5_000_000,
+        deploy=deploy,
+    )
     assert resp.status == 200

@@ -1,4 +1,3 @@
-use firefly_client::models::SignedCode;
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
@@ -33,10 +32,10 @@ impl WalletsApi {
     #[oai(path = "/transfer/prepare", method = "post")]
     async fn prepare_transfer(
         &self,
-        Json(input): Json<TransferReq>,
+        Json(body): Json<TransferReq>,
         Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<Json<TransferResp>> {
-        let input = input.try_into()?;
+        let input = body.try_into()?;
         let result = wallets.prepare_transfer_contract(input).await?;
 
         Ok(Json(TransferResp {
@@ -50,10 +49,8 @@ impl WalletsApi {
         Json(body): Json<SignedContract>,
         Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<()> {
-        let code = SignedCode::from(body);
-
         wallets
-            .deploy_signed_transfer(code)
+            .deploy_signed_transfer(body.into())
             .await
             .map_err(Into::into)
     }

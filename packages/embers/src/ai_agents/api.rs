@@ -58,10 +58,10 @@ impl AIAgents {
     #[oai(path = "/create/prepare", method = "post")]
     async fn prepare_create(
         &self,
-        Json(input): Json<CreateAgentReq>,
+        Json(body): Json<CreateAgentReq>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<CreateAgentResp>> {
-        let contract = agents.prepare_create_agent_contract(input.into()).await?;
+        let contract = agents.prepare_create_agent_contract(body.into()).await?;
         Ok(Json(contract.into()))
     }
 
@@ -103,10 +103,10 @@ impl AIAgents {
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
-        Json(input): Json<SaveAgentReq>,
+        Json(body): Json<SaveAgentReq>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SaveAgentResp>> {
-        let contract = agents.prepare_save_agent_contract(id, input.into()).await?;
+        let contract = agents.prepare_save_agent_contract(id, body.into()).await?;
         Ok(Json(contract.into()))
     }
 

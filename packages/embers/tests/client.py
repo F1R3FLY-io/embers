@@ -10,9 +10,8 @@ from typing import Any
 import base58
 import requests
 from Crypto.Hash import keccak
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ec, utils
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
+from tests.key import SECP256k1
 
 FIRECAP_ID = bytes([0, 0, 0])
 FIRECAP_VERSION = bytes([0])
@@ -73,29 +72,17 @@ class TestnetApi:
 
 @dataclass
 class Wallet:
-    private_key: ec.EllipticCurvePrivateKey
-
-    @cached_property
-    def public_key(self) -> ec.EllipticCurvePublicKey:
-        return self.private_key.public_key()
-
-    @cached_property
-    def public_key_bytes(self) -> bytes:
-        return self.public_key.public_bytes(encoding=Encoding.X962, format=PublicFormat.UncompressedPoint)
+    key: SECP256k1
 
     @cached_property
     def address(self) -> str:
-        key_hash = keccak.new(digest_bits=256).update(self.public_key_bytes[1:]).digest()
+        key_hash = keccak.new(digest_bits=256).update(self.key.public_key_bytes[1:]).digest()
         eth_hash = keccak.new(digest_bits=256).update(key_hash[-20:]).digest()
 
         checksum_hash = blake2b(FIRECAP_ID + FIRECAP_VERSION + eth_hash, digest_size=32).digest()
         checksum = checksum_hash[:4]
 
         return base58.b58encode(FIRECAP_ID + FIRECAP_VERSION + eth_hash + checksum).decode()
-
-    def sign(self, contract: bytes) -> bytes:
-        prehashed = blake2b(contract, digest_size=32).digest()
-        return self.private_key.sign(prehashed, ec.ECDSA(utils.Prehashed(hashes.BLAKE2s(digest_size=32))))
 
 
 class WalletsApi:
@@ -226,7 +213,7 @@ class AiAgentsTeamsApi:
 
         return resp
 
-    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int) -> Responce:
+    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int, deploy: dict) -> Responce:
         resp = self._client.post(
             "/ai-agents-teams/deploy/prepare",
             json={
@@ -235,6 +222,7 @@ class AiAgentsTeamsApi:
                 "version": agents_team.version,
                 "address": wallet.address,
                 "phlo_limit": phlo_limit,
+                "deploy": deploy,
             },
         )
         assert resp.status == 200
@@ -244,10 +232,10 @@ class AiAgentsTeamsApi:
 
         return resp
 
-    def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int) -> Responce:
+    def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int, deploy: dict) -> Responce:
         resp = self._client.post(
             "/ai-agents-teams/deploy/prepare",
-            json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit},
+            json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit, "deploy": deploy},
         )
         assert resp.status == 200
 
@@ -255,6 +243,18 @@ class AiAgentsTeamsApi:
         assert resp_next.status == 200
 
         return resp
+
+    def run(self, wallet: Wallet, prompt: str, phlo_limit: int, agents_team: str) -> Responce:
+        resp = self._client.post(
+            "/ai-agents-teams/run/prepare",
+            json={"prompt": prompt, "phlo_limit": phlo_limit, "agents_team": agents_team},
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post("/ai-agents-teams/run/send", json=sing_contract(wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return resp_next
 
     def save(
         self,
@@ -290,11 +290,11 @@ class ApiClient:
 
 
 def sing_contract(wallet: Wallet, contract: Any) -> dict:
-    signature = wallet.sign(base64.b64decode(contract, validate=True))
+    signature = wallet.key.sign(base64.b64decode(contract, validate=True))
 
     return {
         "contract": contract,
         "sig_algorithm": "secp256k1",
         "sig": base64.b64encode(signature).decode(),
-        "deployer": base64.b64encode(wallet.public_key_bytes).decode(),
+        "deployer": base64.b64encode(wallet.key.public_key_bytes).decode(),
     }

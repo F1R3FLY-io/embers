@@ -1,6 +1,5 @@
 use anyhow::Context;
 use firefly_client::models::SignedCode;
-use uuid::Uuid;
 
 use crate::ai_agents_teams::compilation::{parse, render_agent_team};
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
@@ -22,12 +21,13 @@ impl AgentsTeamsService {
     ) -> anyhow::Result<DeployAgentsTeamResp> {
         record_trace!(request);
 
-        let (graph, phlo_limit) = match request {
+        let (graph, phlo_limit, deploy) = match request {
             DeployAgentsTeamReq::AgentsTeam {
                 id,
                 version,
                 address,
                 phlo_limit,
+                deploy,
             } => {
                 let graph = self
                     .get_agents_team(address, id, version)
@@ -35,22 +35,26 @@ impl AgentsTeamsService {
                     .context("agents team not found")?
                     .graph
                     .context("agents team has no graph")?;
-                (graph, phlo_limit)
+                (graph, phlo_limit, deploy)
             }
-            DeployAgentsTeamReq::Graph { graph, phlo_limit } => (graph, phlo_limit),
+            DeployAgentsTeamReq::Graph {
+                graph,
+                phlo_limit,
+                deploy,
+            } => (graph, phlo_limit, deploy),
         };
 
-        let name = Uuid::new_v4().to_string();
+        let timestamp = deploy.timestamp;
 
         let code = parse(&graph)?;
-        let code = render_agent_team(&name, code)?;
+        let code = render_agent_team(code, deploy)?;
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
         Ok(DeployAgentsTeamResp {
-            name,
             contract: prepare_for_signing()
                 .code(code)
                 .valid_after_block_number(valid_after)
+                .timestamp(timestamp)
                 .phlo_limit(phlo_limit)
                 .call(),
         })

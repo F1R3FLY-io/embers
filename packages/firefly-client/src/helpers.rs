@@ -164,9 +164,9 @@ fn test_insert_signed_signature() {
         SecretKey::from_str("f450b26bac63e5dd9343cd46f5fae1986d367a893cd21eedd98a4cb3ac699abc")
             .unwrap();
     let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-    let nonce = 9223372036854775807;
+    let version = 9223372036854775807;
 
-    let sig = insert_signed_signature(&secret_key, timestamp, &public_key, nonce);
+    let sig = insert_signed_signature(&secret_key, timestamp, &public_key, version);
 
     assert_eq!(
         hex::encode(sig),

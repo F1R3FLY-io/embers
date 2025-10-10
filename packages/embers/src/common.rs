@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use firefly_client::WriteNodeClient;
 use firefly_client::models::casper::DeployDataProto;
 use firefly_client::models::{BlockId, SignedCode};
@@ -23,8 +24,11 @@ pub fn prepare_for_signing(
     code: String,
     valid_after_block_number: u64,
     phlo_limit: Option<PositiveNonZero<i64>>,
+    timestamp: Option<DateTime<Utc>>,
 ) -> PreparedContract {
-    let timestamp = chrono::Utc::now().timestamp_millis();
+    let timestamp = timestamp
+        .unwrap_or_else(chrono::Utc::now)
+        .timestamp_millis();
     let contract = DeployDataProto {
         term: code,
         timestamp,

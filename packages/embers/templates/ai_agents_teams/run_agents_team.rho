@@ -1,0 +1,6 @@
+new deployId(`rho:rchain:deployId`), rl(`rho:registry:lookup`), agentsTeamsCh in {
+    rl!({{ agents_team }}, *agentsTeamsCh) |
+    for(@(_, agentsTeams) <- agentsTeamsCh) {
+        @agentsTeams!({{ prompt }}, (*deployId).toString())
+    }
+}
