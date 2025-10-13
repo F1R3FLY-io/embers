@@ -170,6 +170,18 @@ class AiAgentsApi:
 
         return resp
 
+    def delete(self, wallet: Wallet, agent_id: str) -> Responce:
+        resp = self._client.post(f"/ai-agents/{agent_id}/delete/prepare")
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/ai-agents/{agent_id}/save/send",
+            json=sing_contract(wallet, resp.json["contract"]),
+        )
+        assert resp_next.status == 200
+
+        return resp
+
 
 @dataclass
 class AgentsTeam:
@@ -269,6 +281,18 @@ class AiAgentsTeamsApi:
             f"/ai-agents-teams/{agent_id}/save/prepare",
             json={"name": name, "shard": shard, "logo": logo, "graph": graph},
         )
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/ai-agents-teams/{agent_id}/save/send",
+            json=sing_contract(wallet, resp.json["contract"]),
+        )
+        assert resp_next.status == 200
+
+        return resp
+
+    def delete(self, wallet: Wallet, agent_id: str) -> Responce:
+        resp = self._client.post(f"/ai-agents-teams/{agent_id}/delete/prepare")
         assert resp.status == 200
 
         resp_next = self._client.post(

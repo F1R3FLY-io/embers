@@ -8,6 +8,7 @@ use crate::ai_agents_teams::api::dtos::{
     AgentsTeams,
     CreateAgentsTeamReq,
     CreateAgentsTeamResp,
+    DeleteAgentsTeamResp,
     DeployAgentsTeamReq,
     DeployAgentsTeamResp,
     RunAgentsTeamReq,
@@ -158,6 +159,29 @@ impl AIAgentsTeams {
     ) -> poem::Result<()> {
         agents_teams
             .deploy_signed_save_agents_team(body.into())
+            .await
+            .map_err(Into::into)
+    }
+
+    #[oai(path = "/:id/delete/prepare", method = "post")]
+    async fn prepare_delete(
+        &self,
+        Path(id): Path<String>,
+        Data(agents): Data<&AgentsTeamsService>,
+    ) -> poem::Result<Json<DeleteAgentsTeamResp>> {
+        let contract = agents.prepare_delete_agents_team_contract(id).await?;
+        Ok(Json(contract.into()))
+    }
+
+    #[oai(path = "/:id/delete/send", method = "post")]
+    async fn delete(
+        &self,
+        #[allow(unused_variables)] Path(id): Path<String>,
+        Json(body): Json<SignedContract>,
+        Data(agents): Data<&AgentsTeamsService>,
+    ) -> poem::Result<()> {
+        agents
+            .deploy_signed_delete_agents_team(body.into())
             .await
             .map_err(Into::into)
     }

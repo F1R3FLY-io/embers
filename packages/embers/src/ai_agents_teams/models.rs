@@ -82,6 +82,11 @@ pub struct SaveAgentsTeamResp {
 }
 
 #[derive(Debug, Clone)]
+pub struct DeleteAgentsTeamResp {
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
 pub enum DeployAgentsTeamReq {
     AgentsTeam {
         id: String,
