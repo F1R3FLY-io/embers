@@ -61,6 +61,12 @@ pub struct SaveAgentResp {
     pub contract: PreparedContract,
 }
 
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::DeleteAgentResp))]
+pub struct DeleteAgentResp {
+    pub contract: PreparedContract,
+}
+
 #[derive(Debug, Clone, Object)]
 pub struct DeployAgent {
     id: String,

@@ -13,7 +13,8 @@ new rl(`rho:registry:lookup`),
     treeHashMapCh,
     listOpsCh,
     stackCh,
-    visit
+    visit,
+    notNil
 in {
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
     for(treeHashMap <- treeHashMapCh) {
@@ -58,6 +59,10 @@ in {
                 treeHashMap!("getOrElse", agentVersions, version, *f, *notFound)
             }
         }
+    } |
+
+    contract notNil(@v, ret) = {
+        ret!(v != Nil)
     } |
 
     contract agents(@"create", @id, @version, @created_at, @name, @shard, @logo, @code) = {
@@ -176,6 +181,10 @@ in {
                                 for(@agentLastVersion <- agentLastVersionCh) {
                                     ret!(agentLastVersion.delete("code").set("id", id))
                                 }
+                            } |
+
+                            for(@Nil <- agentContextCh) {
+                                ret!(Nil)
                             }
                         }
                     } |
@@ -183,7 +192,12 @@ in {
                     stack!("toList", agentsIndex, *agentsListCh) |
 
                     for(@agentsList <- agentsListCh) {
-                        listOps!("parMap", agentsList, *toAgentHeader, *ret)
+                        new aggregateCh in {
+                            listOps!("unorderedParMap", agentsList, *toAgentHeader, *aggregateCh) |
+                            for(@aggregate <- aggregateCh) {
+                                listOps!("filter", aggregate, *notNil, *ret)
+                            }
+                        }
                     }
                 }
             } |
@@ -279,6 +293,24 @@ in {
 
             for(<- errCh) {
                 abort!("in saveAiAgent")
+            }
+        }
+    } |
+
+    contract agents(@"delete", @id) = {
+        new deployDataCh, deployerAddressCh, valueCh in {
+            deployData!(*deployDataCh) |
+
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+
+            for(@address <- deployerAddressCh) {
+                visit!("agents", address, *valueCh, *devNull)
+            } |
+
+            for(@(agents, _) <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("delete", agents, id, *devNull)
             }
         }
     }

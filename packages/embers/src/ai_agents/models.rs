@@ -52,6 +52,11 @@ pub struct SaveAgentResp {
 }
 
 #[derive(Debug, Clone)]
+pub struct DeleteAgentResp {
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
 pub enum DeployAgentReq {
     Agent {
         id: String,

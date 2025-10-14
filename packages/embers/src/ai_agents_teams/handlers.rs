@@ -2,6 +2,7 @@ use firefly_client::rendering::Uri;
 use firefly_client::{ReadNodeClient, WriteNodeClient};
 
 mod create_agents_team;
+mod delete_agents_team;
 mod deploy_agents_team;
 mod get_agents_team;
 mod list_agents_team_versions;
