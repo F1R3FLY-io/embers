@@ -9,11 +9,11 @@ version = "0.1.0"
 [dependencies]
 anyhow                = { version = "1.0" }
 askama                = { version = "0.14" }
-async-stream          = { version = "0.3" }
 backon                = { version = "1.6" }
 base64                = { version = "0.22" }
 blake2                = { version = "0.10" }
 bon                   = { version = "3.8" }
+bs58                  = { version = "0.5" }
 chrono                = { version = "0.4" }
 crc                   = { version = "3.3" }
 dashmap               = { version = "6.1" }
@@ -24,11 +24,13 @@ hex                   = { version = "0.4" }
 prost                 = { version = "0.14" }
 reqwest               = { version = "0.12", default-features = false, features = ["charset", "http2", "json", "rustls-tls", "system-proxy"] }
 scopeguard            = { version = "1.2" }
-secp256k1             = { version = "0.31", features = ["hashes"] }
+secp256k1             = { version = "0.31", features = ["hashes", "serde"] }
 serde                 = { version = "1.0", features = ["derive"] }
 serde_json            = { version = "1.0" }
+sha3                  = { version = "0.10" }
 thiserror             = { version = "2.0" }
 tokio                 = { version = "1.48" }
+tokio-stream          = { version = "0.1", features = ["sync"] }
 tokio-tungstenite     = { version = "0.28" }
 tonic                 = { version = "0.14" }
 tonic-prost           = { version = "0.14" }
@@ -48,6 +50,7 @@ implicit_hasher       = "allow"
 match_same_arms       = "allow"
 missing_errors_doc    = "allow"
 must_use_candidate    = "allow"
+needless_for_each     = "allow"
 too_many_lines        = "allow"
 
 [lints.clippy.pedantic]

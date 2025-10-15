@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import pytest
 
 from tests.client import ApiClient, Wallet
-from tests.conftest import ECHO_TEAM, insert_signed_deploy, public_key_to_uri, wait_for_read_node_sync
+from tests.conftest import ECHO_TEAM, insert_signed_deploy, public_key_to_uri
 from tests.key import SECP256k1
 
 
@@ -13,17 +13,13 @@ def test_run_agents_team(client: ApiClient, funded_wallet: Wallet, graph: str):
     private_key = SECP256k1.generate()
     deploy = insert_signed_deploy(private_key, datetime.now(UTC), funded_wallet, version=0)
 
-    resp = client.ai_agents_teams.deploy_graph(
+    client.ai_agents_teams.deploy_graph(
         funded_wallet,
         graph=graph,
         phlo_limit=5_000_000,
         deploy=deploy,
     )
-    assert resp.status == 200
-
-    wait_for_read_node_sync()
 
     agents_team = public_key_to_uri(private_key.public_key)
     resp = client.ai_agents_teams.run(funded_wallet, "echo", phlo_limit=5_000_000, agents_team=agents_team)
-    assert resp.status == 200
     assert resp.json == "echo"

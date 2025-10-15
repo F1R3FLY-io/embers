@@ -1,11 +1,14 @@
-use poem::web::Data;
+use firefly_client::models::WalletAddress;
+use futures::future;
+use futures::sink::SinkExt;
+use poem::web::{Data, websocket};
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
+use poem_openapi::types::ToJSON;
 
-use crate::common::api::dtos::{ApiTags, SignedContract, Stringified};
-use crate::common::models::WalletAddress;
-use crate::wallets::api::dtos::{TransferReq, TransferResp, WalletStateAndHistory};
+use crate::common::api::dtos::{ApiTags, SendResp, SignedContract, Stringified};
+use crate::wallets::api::dtos::{TransferReq, TransferResp, WalletEvent, WalletStateAndHistory};
 use crate::wallets::handlers::WalletsService;
 
 mod dtos;
@@ -48,10 +51,29 @@ impl WalletsApi {
         &self,
         Json(body): Json<SignedContract>,
         Data(wallets): Data<&WalletsService>,
-    ) -> poem::Result<()> {
-        wallets
-            .deploy_signed_transfer(body.into())
-            .await
-            .map_err(Into::into)
+    ) -> poem::Result<Json<SendResp>> {
+        let deploy_id = wallets.deploy_signed_transfer(body.into()).await?;
+        Ok(Json(deploy_id.into()))
+    }
+
+    #[allow(clippy::unused_async)]
+    #[oai(path = "/:address/deploys", method = "get")]
+    async fn deploys(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Data(wallets): Data<&WalletsService>,
+        ws: websocket::WebSocket,
+    ) -> websocket::BoxWebSocketUpgraded {
+        let wallets = wallets.clone();
+
+        ws.on_upgrade(move |socket| {
+            let sink = socket.with(|msg| {
+                let msg = WalletEvent::from(msg).to_json_string();
+                future::ok(websocket::Message::Text(msg))
+            });
+            wallets.subscribe_to_deploys(address.0, sink);
+            future::ready(())
+        })
+        .boxed()
     }
 }

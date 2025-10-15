@@ -1,9 +1,10 @@
 use std::convert::Infallible;
 
 use chrono::{DateTime, Utc};
+use firefly_client::models::WalletAddress;
 use firefly_client::rendering::Uri;
 
-use crate::common::models::{PositiveNonZero, PreparedContract, RegistryDeploy, WalletAddress};
+use crate::common::models::{PositiveNonZero, PreparedContract, RegistryDeploy};
 
 #[derive(Debug, Clone)]
 pub struct AgentsTeams {

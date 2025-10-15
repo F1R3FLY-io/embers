@@ -6,3 +6,4 @@ index.scip
 schema.json
 
 docker/.env
+docker/**/default.conf

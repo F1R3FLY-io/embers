@@ -42,7 +42,7 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let read_client = ReadNodeClient::new(config.mainnet.observer_url);
-    let _validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
+    let validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
     let observer_node_events = NodeEvents::new(&config.mainnet.observer_ws_api_url);
 
     let testnet_read_client = ReadNodeClient::new(config.testnet.observer_url);
@@ -68,7 +68,7 @@ async fn main() -> anyhow::Result<()> {
             let agents_teams_service = AgentsTeamsService::bootstrap(
                 write_client.clone(),
                 read_client.clone(),
-                observer_node_events,
+                observer_node_events.clone(),
                 &config.mainnet.service_key,
                 &config.mainnet.agents_teams_env_key,
             )
@@ -76,7 +76,9 @@ async fn main() -> anyhow::Result<()> {
 
             let wallets_service = WalletsService::bootstrap(
                 write_client.clone(),
-                read_client.clone(),
+                read_client,
+                validator_node_events,
+                observer_node_events,
                 &config.mainnet.service_key,
                 &config.mainnet.wallets_env_key,
             )

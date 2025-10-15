@@ -16,13 +16,12 @@ path = "src/main.rs"
 anyhow             = { version = "1.0", features = ["std"] }
 askama             = { version = "0.14" }
 base64             = { version = "0.22" }
-blake2             = { version = "0.10" }
 bon                = { version = "3.8" }
-bs58               = { version = "0.5" }
 chrono             = { version = "0.4", features = ["serde"] }
 derive_more        = { version = "2.0", features = ["full"] }
 figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }
+futures            = { version = "0.3" }
 graphl-parser      = { git = "https://github.com/F1R3FLY-io/graphl-parser", tag = "0.0.22" }
 hex                = { version = "0.4" }
 poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
@@ -31,7 +30,6 @@ prost              = { version = "0.14" }
 secp256k1          = { version = "0.31", features = ["hashes", "rand", "serde"] }
 serde              = { version = "1.0", features = ["derive"] }
 serde_json         = { version = "1.0" }
-sha3               = { version = "0.10" }
 structural-convert = { version = "0.13" }
 thiserror          = { version = "2.0" }
 tokio              = { version = "1.47", features = ["macros", "rt-multi-thread", "signal"] }
@@ -48,6 +46,7 @@ implicit_hasher       = "allow"
 match_same_arms       = "allow"
 missing_errors_doc    = "allow"
 must_use_candidate    = "allow"
+needless_for_each     = "allow"
 too_many_lines        = "allow"
 
 [lints.clippy.pedantic]

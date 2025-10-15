@@ -1,7 +1,7 @@
+use firefly_client::models::WalletAddress;
 use firefly_client::rendering::Render;
 use secp256k1::{PublicKey, Secp256k1, rand};
 
-use crate::common::models::WalletAddress;
 use crate::testnet::handlers::TestnetService;
 use crate::testnet::models::CreateTestwalletResp;
 

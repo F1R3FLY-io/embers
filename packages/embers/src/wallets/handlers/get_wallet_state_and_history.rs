@@ -1,7 +1,6 @@
-use firefly_client::models::Either;
+use firefly_client::models::{Either, WalletAddress};
 use firefly_client::rendering::{Render, Uri};
 
-use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
 use crate::wallets::blockchain::dtos;
 use crate::wallets::handlers::WalletsService;

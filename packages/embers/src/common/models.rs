@@ -1,12 +1,10 @@
 mod positive_non_zero;
-mod wallet_address;
 
 use chrono::{DateTime, Utc};
 use firefly_client::helpers::ShortHex;
 use secp256k1::PublicKey;
 
 pub use self::positive_non_zero::*;
-pub use self::wallet_address::*;
 
 #[derive(derive_more::Debug, Clone)]
 #[debug("{:?}", _0.short_hex(32))]

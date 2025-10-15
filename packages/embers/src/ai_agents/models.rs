@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
+use firefly_client::models::WalletAddress;
 
-use crate::common::models::{PositiveNonZero, PreparedContract, WalletAddress};
+use crate::common::models::{PositiveNonZero, PreparedContract};
 
 #[derive(Debug, Clone)]
 pub struct Agents {

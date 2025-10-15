@@ -23,4 +23,4 @@ def test_deploy_agents_team(client: ApiClient, funded_wallet: Wallet, graph: str
         phlo_limit=5_000_000,
         deploy=deploy,
     )
-    assert resp.status == 200
+    assert resp.first.status == 200

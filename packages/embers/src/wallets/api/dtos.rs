@@ -1,12 +1,13 @@
 use chrono::{DateTime, Utc};
+use firefly_client::models::WalletAddress;
 use poem::error::ResponseError;
 use poem::http::StatusCode;
-use poem_openapi::{Enum, Object};
+use poem_openapi::{Enum, Object, Union};
 use structural_convert::StructuralConvert;
 use thiserror::Error;
 
 use crate::common::api::dtos::{PreparedContract, Stringified};
-use crate::common::models::{PositiveNonZero, WalletAddress};
+use crate::common::models::PositiveNonZero;
 use crate::wallets::models;
 
 #[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
@@ -108,5 +109,44 @@ impl TryFrom<TransferReq> for models::TransferReq {
             amount: value.amount.0,
             description,
         })
+    }
+}
+
+#[derive(Debug, Clone, Enum, StructuralConvert)]
+#[convert(from(models::NodeType))]
+pub enum NodeType {
+    Validator,
+    Observer,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct DeploySeen {
+    pub deploy_id: String,
+    pub cost: u64,
+    pub errored: bool,
+    pub node_type: NodeType,
+}
+
+#[derive(Debug, Clone, Union)]
+#[oai(discriminator_name = "type")]
+pub enum WalletEvent {
+    DeploySeen(DeploySeen),
+}
+
+impl From<models::WalletEvent> for WalletEvent {
+    fn from(value: models::WalletEvent) -> Self {
+        match value {
+            models::WalletEvent::DeploySeen {
+                deploy_id,
+                cost,
+                errored,
+                node_type,
+            } => Self::DeploySeen(DeploySeen {
+                deploy_id: deploy_id.into(),
+                cost,
+                errored,
+                node_type: node_type.into(),
+            }),
+        }
     }
 }

@@ -1,3 +1,4 @@
+use firefly_client::models::WalletAddress;
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
@@ -17,8 +18,7 @@ use crate::ai_agents_teams::api::dtos::{
     SaveAgentsTeamResp,
 };
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
-use crate::common::api::dtos::{ApiTags, MaybeNotFound, SignedContract, Stringified};
-use crate::common::models::WalletAddress;
+use crate::common::api::dtos::{ApiTags, MaybeNotFound, SendResp, SignedContract, Stringified};
 
 mod dtos;
 
@@ -81,11 +81,11 @@ impl AIAgentsTeams {
         &self,
         Json(body): Json<SignedContract>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<()> {
-        agents_teams
+    ) -> poem::Result<Json<SendResp>> {
+        let deploy_id = agents_teams
             .deploy_signed_create_agents_team(body.into())
-            .await
-            .map_err(Into::into)
+            .await?;
+        Ok(Json(deploy_id.into()))
     }
 
     #[oai(path = "/deploy/prepare", method = "post")]
@@ -105,11 +105,11 @@ impl AIAgentsTeams {
         &self,
         Json(body): Json<SignedContract>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<()> {
-        agents_teams
+    ) -> poem::Result<Json<SendResp>> {
+        let deploy_id = agents_teams
             .deploy_signed_deploy_agents_team(body.into())
-            .await
-            .map_err(Into::into)
+            .await?;
+        Ok(Json(deploy_id.into()))
     }
 
     #[oai(path = "/run/prepare", method = "post")]
@@ -156,11 +156,11 @@ impl AIAgentsTeams {
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<()> {
-        agents_teams
+    ) -> poem::Result<Json<SendResp>> {
+        let deploy_id = agents_teams
             .deploy_signed_save_agents_team(body.into())
-            .await
-            .map_err(Into::into)
+            .await?;
+        Ok(Json(deploy_id.into()))
     }
 
     #[oai(path = "/:id/delete/prepare", method = "post")]
@@ -179,10 +179,8 @@ impl AIAgentsTeams {
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
         Data(agents): Data<&AgentsTeamsService>,
-    ) -> poem::Result<()> {
-        agents
-            .deploy_signed_delete_agents_team(body.into())
-            .await
-            .map_err(Into::into)
+    ) -> poem::Result<Json<SendResp>> {
+        let deploy_id = agents.deploy_signed_delete_agents_team(body.into()).await?;
+        Ok(Json(deploy_id.into()))
     }
 }
