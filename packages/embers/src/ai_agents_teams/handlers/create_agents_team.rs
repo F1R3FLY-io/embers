@@ -1,12 +1,12 @@
 use chrono::Utc;
-use firefly_client::models::SignedCode;
+use firefly_client::models::{DeployId, SignedCode};
 use firefly_client::rendering::{Render, Uri};
 use uuid::Uuid;
 
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::{CreateAgentsTeamReq, CreateAgentsTeamResp, Graph};
+use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
-use crate::common::{deploy_signed_contract, prepare_for_signing};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/create_agents_team.rho")]
@@ -71,10 +71,13 @@ impl AgentsTeamsService {
     pub async fn deploy_signed_create_agents_team(
         &self,
         contract: SignedCode,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<DeployId> {
         record_trace!(contract);
 
-        deploy_signed_contract(&mut self.write_client.clone(), contract).await?;
-        Ok(())
+        let mut write_client = self.write_client.clone();
+
+        let deploy_id = write_client.deploy_signed_contract(contract).await?;
+        write_client.propose().await?;
+        Ok(deploy_id)
     }
 }
