@@ -4,6 +4,7 @@ use std::str::FromStr;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use firefly_client::helpers::ShortHex;
+use firefly_client::models::DeployId;
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
@@ -403,6 +404,19 @@ impl From<RegistryDeploy> for models::RegistryDeploy {
             version: value.version.0,
             uri_pub_key: value.uri_pub_key.into(),
             signature: value.signature.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct SendResp {
+    pub deploy_id: String,
+}
+
+impl From<DeployId> for SendResp {
+    fn from(value: DeployId) -> Self {
+        Self {
+            deploy_id: value.into(),
         }
     }
 }

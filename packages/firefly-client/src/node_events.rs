@@ -6,6 +6,7 @@ use dashmap::DashMap;
 use futures::StreamExt;
 use tokio::sync::{Notify, broadcast};
 use tokio_tungstenite::tungstenite::Message;
+use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::models::{DeployId, NodeEvent};
@@ -15,6 +16,7 @@ type DeploySubscriptions = Arc<DashMap<DeployId, DashMap<Uuid, Arc<Notify>>>>;
 #[derive(Clone)]
 pub struct NodeEvents {
     deploy_subscriptions: DeploySubscriptions,
+    deploys_tx: broadcast::Sender<DeployId>,
 }
 
 impl NodeEvents {
@@ -22,6 +24,7 @@ impl NodeEvents {
         let url = format!("{url}/ws/events");
         let tx = broadcast::Sender::<NodeEvent>::new(32);
         let deploy_subscriptions = DeploySubscriptions::default();
+        let deploys_tx = broadcast::Sender::<DeployId>::new(128);
 
         tokio::spawn({
             let tx = tx.clone();
@@ -57,6 +60,7 @@ impl NodeEvents {
                     }
                 }
             }
+            .in_current_span()
         });
 
         tokio::spawn({
@@ -82,10 +86,34 @@ impl NodeEvents {
                         .for_each(|(_, v)| v.notify_waiters());
                 }
             }
+            .in_current_span()
+        });
+
+        tokio::spawn({
+            let mut rx = tx.subscribe();
+            let deploys_tx = deploys_tx.clone();
+            async move {
+                loop {
+                    let deploy_ids = match rx.recv().await {
+                        Ok(NodeEvent::Started) => continue,
+                        Ok(NodeEvent::BlockCreated { payload }) => payload.deploy_ids,
+                        Ok(NodeEvent::BlockAdded { payload }) => payload.deploy_ids,
+                        Ok(NodeEvent::BlockFinalised { .. }) => continue,
+                        Err(broadcast::error::RecvError::Closed) => return,
+                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    };
+
+                    deploy_ids.into_iter().for_each(|deploy_id| {
+                        let _ = deploys_tx.send(deploy_id);
+                    });
+                }
+            }
+            .in_current_span()
         });
 
         Self {
             deploy_subscriptions,
+            deploys_tx,
         }
     }
 
@@ -123,5 +151,9 @@ impl NodeEvents {
                 _ = tokio::time::sleep(max_wait) => false,
             }
         }
+    }
+
+    pub fn subscribe_for_deploys(&self) -> broadcast::Receiver<DeployId> {
+        self.deploys_tx.subscribe()
     }
 }

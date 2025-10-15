@@ -122,6 +122,8 @@ impl WalletsService {
     pub async fn bootstrap(
         mut write_client: WriteNodeClient,
         read_client: ReadNodeClient,
+        validator_node_events: NodeEvents,
+        observer_node_events: NodeEvents,
         deployer_key: &SecretKey,
         env_key: &SecretKey,
     ) -> anyhow::Result<Self> {
@@ -152,6 +154,8 @@ impl WalletsService {
             uri: env_uri,
             write_client,
             read_client,
+            validator_node_events,
+            observer_node_events,
         })
     }
 }

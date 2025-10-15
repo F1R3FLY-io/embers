@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use poem::error::ResponseError;
 use poem::http::StatusCode;
-use poem_openapi::{Enum, Object};
+use poem_openapi::{Enum, Object, Union};
 use structural_convert::StructuralConvert;
 use thiserror::Error;
 
@@ -108,5 +108,38 @@ impl TryFrom<TransferReq> for models::TransferReq {
             amount: value.amount.0,
             description,
         })
+    }
+}
+
+#[derive(Debug, Clone, Enum, StructuralConvert)]
+#[convert(from(models::NodeType))]
+pub enum NodeType {
+    Validator,
+    Observer,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct DeploySeen {
+    pub deploy_id: String,
+    pub node_type: NodeType,
+}
+
+#[derive(Debug, Clone, Union)]
+#[oai(discriminator_name = "type")]
+pub enum WalletEvent {
+    DeploySeen(DeploySeen),
+}
+
+impl From<models::WalletEvent> for WalletEvent {
+    fn from(value: models::WalletEvent) -> Self {
+        match value {
+            models::WalletEvent::DeploySeen {
+                deploy_id,
+                node_type,
+            } => Self::DeploySeen(DeploySeen {
+                deploy_id: deploy_id.into(),
+                node_type: node_type.into(),
+            }),
+        }
     }
 }

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use firefly_client::models::DeployId;
 
 use crate::common::models::{PositiveNonZero, WalletAddress};
 
@@ -70,4 +71,18 @@ pub struct TransferReq {
     pub to: WalletAddress,
     pub amount: Amount,
     pub description: Option<Description>,
+}
+
+#[derive(Debug, Clone)]
+pub enum NodeType {
+    Validator,
+    Observer,
+}
+
+#[derive(Debug, Clone)]
+pub enum WalletEvent {
+    DeploySeen {
+        deploy_id: DeployId,
+        node_type: NodeType,
+    },
 }

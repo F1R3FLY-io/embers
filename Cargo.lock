@@ -835,6 +835,7 @@ dependencies = [
  "derive_more",
  "figment",
  "firefly-client",
+ "futures",
  "graphl-parser",
  "hex",
  "poem",
@@ -847,6 +848,7 @@ dependencies = [
  "structural-convert",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -2841,6 +2843,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

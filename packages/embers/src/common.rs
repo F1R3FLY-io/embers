@@ -1,7 +1,5 @@
 use chrono::{DateTime, Utc};
-use firefly_client::WriteNodeClient;
 use firefly_client::models::casper::DeployDataProto;
-use firefly_client::models::{BlockId, SignedCode};
 use prost::Message;
 
 use crate::common::models::{PositiveNonZero, PreparedContract};
@@ -10,14 +8,6 @@ pub mod api;
 pub mod blockchain;
 pub mod models;
 pub mod tracing;
-
-pub async fn deploy_signed_contract(
-    client: &mut WriteNodeClient,
-    contract: SignedCode,
-) -> anyhow::Result<BlockId> {
-    client.deploy_signed_contract(contract).await?;
-    client.propose().await
-}
 
 #[bon::builder]
 pub fn prepare_for_signing(
