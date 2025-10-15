@@ -1,5 +1,5 @@
 use firefly_client::rendering::Uri;
-use firefly_client::{ReadNodeClient, WriteNodeClient};
+use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 
 mod create_agents_team;
 mod delete_agents_team;
@@ -15,4 +15,5 @@ pub struct AgentsTeamsService {
     pub uri: Uri,
     pub write_client: WriteNodeClient,
     pub read_client: ReadNodeClient,
+    pub observer_node_events: NodeEvents,
 }

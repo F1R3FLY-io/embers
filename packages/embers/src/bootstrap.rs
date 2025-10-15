@@ -2,7 +2,7 @@ use anyhow::Context;
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::DeployData;
 use firefly_client::rendering::{Render, Uri};
-use firefly_client::{ReadNodeClient, WriteNodeClient};
+use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 use crate::ai_agents::handlers::AgentsService;
@@ -72,6 +72,7 @@ impl AgentsTeamsService {
     pub async fn bootstrap(
         mut write_client: WriteNodeClient,
         read_client: ReadNodeClient,
+        observer_node_events: NodeEvents,
         deployer_key: &SecretKey,
         env_key: &SecretKey,
     ) -> anyhow::Result<Self> {
@@ -102,6 +103,7 @@ impl AgentsTeamsService {
             uri: env_uri,
             write_client,
             read_client,
+            observer_node_events,
         })
     }
 }
@@ -168,6 +170,7 @@ impl TestnetService {
     pub async fn bootstrap(
         mut write_client: WriteNodeClient,
         read_client: ReadNodeClient,
+        observer_node_events: NodeEvents,
         deployer_key: SecretKey,
         env_key: &SecretKey,
     ) -> anyhow::Result<Self> {
@@ -199,6 +202,7 @@ impl TestnetService {
             service_key: deployer_key,
             write_client,
             read_client,
+            observer_node_events,
         })
     }
 }

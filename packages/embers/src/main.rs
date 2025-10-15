@@ -1,5 +1,5 @@
 use anyhow::Context;
-use firefly_client::{ReadNodeClient, WriteNodeClient};
+use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
@@ -41,8 +41,13 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
-    let read_client = ReadNodeClient::new(config.mainnet.read_node_url);
-    let testnet_read_client = ReadNodeClient::new(config.testnet.read_node_url);
+    let read_client = ReadNodeClient::new(config.mainnet.observer_url);
+    let _validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
+    let observer_node_events = NodeEvents::new(&config.mainnet.observer_ws_api_url);
+
+    let testnet_read_client = ReadNodeClient::new(config.testnet.observer_url);
+    let _testnet_validator_node_events = NodeEvents::new(&config.testnet.validator_ws_api_url);
+    let testnet_observer_node_events = NodeEvents::new(&config.testnet.observer_ws_api_url);
 
     let ((agents_service, agents_teams_service, wallets_service), testnet_service) = try_join!(
         async {
@@ -63,6 +68,7 @@ async fn main() -> anyhow::Result<()> {
             let agents_teams_service = AgentsTeamsService::bootstrap(
                 write_client.clone(),
                 read_client.clone(),
+                observer_node_events,
                 &config.mainnet.service_key,
                 &config.mainnet.agents_teams_env_key,
             )
@@ -90,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
             let testnet_service = TestnetService::bootstrap(
                 testnet_write_client.clone(),
                 testnet_read_client,
+                testnet_observer_node_events,
                 config.testnet.service_key,
                 &config.testnet.env_key,
             )

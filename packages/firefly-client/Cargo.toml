@@ -16,19 +16,24 @@ blake2                = { version = "0.10" }
 bon                   = { version = "3.8" }
 chrono                = { version = "0.4" }
 crc                   = { version = "3.3" }
+dashmap               = { version = "6.1" }
 derive_more           = { version = "2.0", features = ["full"] }
 firefly-client-macros = { path = "../firefly-client-macros" }
 futures               = { version = "0.3" }
 hex                   = { version = "0.4" }
 prost                 = { version = "0.14" }
 reqwest               = { version = "0.12", default-features = false, features = ["charset", "http2", "json", "rustls-tls", "system-proxy"] }
+scopeguard            = { version = "1.2" }
 secp256k1             = { version = "0.31", features = ["hashes"] }
 serde                 = { version = "1.0", features = ["derive"] }
 serde_json            = { version = "1.0" }
 thiserror             = { version = "2.0" }
+tokio                 = { version = "1.48" }
+tokio-tungstenite     = { version = "0.28" }
 tonic                 = { version = "0.14" }
 tonic-prost           = { version = "0.14" }
-uuid                  = { version = "1.18" }
+tracing               = { version = "0.1" }
+uuid                  = { version = "1.18", features = ["v7"] }
 zbase32               = { version = "0.1" }
 
 [build-dependencies]
