@@ -1,5 +1,5 @@
 use firefly_client::rendering::Uri;
-use firefly_client::{ReadNodeClient, WriteNodeClient};
+use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use secp256k1::SecretKey;
 
 mod create_test_wallet;
@@ -11,4 +11,5 @@ pub struct TestnetService {
     pub service_key: SecretKey,
     pub write_client: WriteNodeClient,
     pub read_client: ReadNodeClient,
+    pub observer_node_events: NodeEvents,
 }

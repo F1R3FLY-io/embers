@@ -68,12 +68,12 @@ impl AgentsTeamsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
-        let block_id = write_client.propose().await?;
 
-        let finalized = self
-            .read_client
-            .wait_finalization(block_id, Duration::from_secs(1500))
-            .await?;
+        let deploy_waiter = self
+            .observer_node_events
+            .wait_for_deploy(&deploy_id, Duration::from_secs(60));
+        let (_, finalized) =
+            tokio::try_join!(write_client.propose(), async { Ok(deploy_waiter.await) })?;
 
         if !finalized {
             return Err(anyhow!("block is not finalized"));

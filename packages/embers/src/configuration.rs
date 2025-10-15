@@ -8,7 +8,9 @@ use serde::Deserialize;
 pub struct MainNet {
     pub deploy_service_url: String,
     pub propose_service_url: String,
-    pub read_node_url: String,
+    pub validator_ws_api_url: String,
+    pub observer_url: String,
+    pub observer_ws_api_url: String,
     pub service_key: SecretKey,
     pub wallets_env_key: SecretKey,
     pub agents_env_key: SecretKey,
@@ -19,7 +21,9 @@ pub struct MainNet {
 pub struct TestNet {
     pub deploy_service_url: String,
     pub propose_service_url: String,
-    pub read_node_url: String,
+    pub validator_ws_api_url: String,
+    pub observer_url: String,
+    pub observer_ws_api_url: String,
     pub service_key: SecretKey,
     pub env_key: SecretKey,
 }

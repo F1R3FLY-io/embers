@@ -1,12 +1,8 @@
-use std::time::Duration;
-
 use anyhow::Context;
-use backon::{ExponentialBuilder, Retryable};
-use futures::future::Either;
 use serde_json::Value;
 
 use crate::errors::ReadNodeError;
-use crate::models::{BlockId, ReadNodeExpr};
+use crate::models::ReadNodeExpr;
 
 #[derive(Clone)]
 pub struct ReadNodeClient {
@@ -58,43 +54,5 @@ impl ReadNodeClient {
         }
 
         request.json().await.map_err(Into::into)
-    }
-
-    pub async fn wait_finalization(
-        &self,
-        block_id: BlockId,
-        total_delay: Duration,
-    ) -> anyhow::Result<bool> {
-        let result: Result<bool, Either<bool, anyhow::Error>> = (|| async {
-            let finalized: bool = self
-                .client
-                .get(format!("{}/api/is-finalized/{block_id}", self.url))
-                .send()
-                .await
-                .map_err(|err| Either::Right(err.into()))?
-                .error_for_status()
-                .map_err(|err| Either::Right(err.into()))?
-                .json()
-                .await
-                .map_err(|err| Either::Right(err.into()))?;
-
-            if finalized {
-                Ok(finalized)
-            } else {
-                Err(Either::Left(finalized))
-            }
-        })
-        .retry(
-            ExponentialBuilder::default()
-                .without_max_times()
-                .with_total_delay(Some(total_delay)),
-        )
-        .await;
-
-        match result {
-            Ok(finalized) => Ok(finalized),
-            Err(Either::Left(finalized)) => Ok(finalized),
-            Err(Either::Right(err)) => Err(err),
-        }
     }
 }

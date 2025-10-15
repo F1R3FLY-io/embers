@@ -37,7 +37,19 @@ pub mod casper {
 }
 
 #[derive(
-    Debug, Clone, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Into, From, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    AsRef,
+    Into,
+    From,
+    Serialize,
+    Deserialize,
 )]
 pub struct BlockId(String);
 
@@ -48,7 +60,19 @@ impl IntoValue for BlockId {
 }
 
 #[derive(
-    Debug, Clone, Display, PartialEq, Eq, PartialOrd, Ord, AsRef, Into, From, Serialize, Deserialize,
+    Debug,
+    Clone,
+    Display,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    AsRef,
+    Into,
+    From,
+    Serialize,
+    Deserialize,
 )]
 pub struct DeployId(String);
 
@@ -217,4 +241,26 @@ pub struct DeployData {
 
     #[builder(default = ValidAfter::Head)]
     pub valid_after_block_number: ValidAfter,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "event", rename_all = "kebab-case")]
+pub enum NodeEvent {
+    Started,
+    BlockCreated { payload: BlockEventPayload },
+    BlockAdded { payload: BlockEventPayload },
+    BlockFinalised { payload: FinalizedBlockPayload },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct BlockEventPayload {
+    pub block_hash: BlockId,
+    pub deploy_ids: Vec<DeployId>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct FinalizedBlockPayload {
+    pub block_hash: BlockId,
 }
