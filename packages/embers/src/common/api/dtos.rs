@@ -4,6 +4,7 @@ use std::str::FromStr;
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use firefly_client::helpers::ShortHex;
+use firefly_client::models::{DeployId, WalletAddress};
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
@@ -209,33 +210,33 @@ impl From<Stringified<Self>> for models::PositiveNonZero<i64> {
     }
 }
 
-impl Format for models::WalletAddress {
+impl Format for WalletAddress {
     type Alias = String;
     fn format() -> &'static str {
         "blockchain-address"
     }
 }
 
-impl ParseFromParameter for Stringified<models::WalletAddress> {
+impl ParseFromParameter for Stringified<WalletAddress> {
     fn parse_from_parameter(value: &str) -> ParseResult<Self> {
         value.to_owned().try_into().map(Self).map_err(Into::into)
     }
 }
 
-impl ParseFromJSON for Stringified<models::WalletAddress> {
+impl ParseFromJSON for Stringified<WalletAddress> {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
         value.try_into().map(Self).map_err(Into::into)
     }
 }
 
-impl ToJSON for Stringified<models::WalletAddress> {
+impl ToJSON for Stringified<WalletAddress> {
     fn to_json(&self) -> Option<serde_json::Value> {
         self.0.as_ref().to_json()
     }
 }
 
-impl From<Stringified<Self>> for models::WalletAddress {
+impl From<Stringified<Self>> for WalletAddress {
     fn from(value: Stringified<Self>) -> Self {
         value.0
     }
@@ -403,6 +404,19 @@ impl From<RegistryDeploy> for models::RegistryDeploy {
             version: value.version.0,
             uri_pub_key: value.uri_pub_key.into(),
             signature: value.signature.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct SendResp {
+    pub deploy_id: String,
+}
+
+impl From<DeployId> for SendResp {
+    fn from(value: DeployId) -> Self {
+        Self {
+            deploy_id: value.into(),
         }
     }
 }

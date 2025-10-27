@@ -1,8 +1,9 @@
 use chrono::{DateTime, Utc};
+use firefly_client::models::{ParseWalletAddressError, WalletAddress};
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::common::models::{ParseWalletAddressError, PositiveNonZeroParsingError, WalletAddress};
+use crate::common::models::PositiveNonZeroParsingError;
 use crate::wallets::models::{Amount, Description, DescriptionError, Id};
 
 #[derive(Debug, Clone, Deserialize)]

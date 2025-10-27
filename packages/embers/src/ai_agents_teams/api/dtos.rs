@@ -1,10 +1,11 @@
 use chrono::{DateTime, Utc};
+use firefly_client::models::WalletAddress;
 use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents_teams::models;
 use crate::common::api::dtos::{PreparedContract, RegistryDeploy, Stringified};
-use crate::common::models::{PositiveNonZero, WalletAddress};
+use crate::common::models::PositiveNonZero;
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::AgentsTeams))]

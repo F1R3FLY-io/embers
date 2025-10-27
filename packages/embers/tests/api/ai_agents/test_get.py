@@ -7,7 +7,6 @@ from tests.conftest import assert_match_agent
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_get_agent(client: ApiClient, funded_wallet: Wallet, agent: Agent):
     resp = client.ai_agents.get(funded_wallet.address, agent.id, agent.version)
-
     assert resp.status == 200
     assert_match_agent(resp.json, agent)
 

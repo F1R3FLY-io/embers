@@ -1,10 +1,8 @@
 import base64
 from datetime import datetime
 from hashlib import blake2b
-from time import sleep
 
 import pytest
-import requests
 import zbase32
 from crc import Calculator, Configuration
 from ecdsa import VerifyingKey
@@ -20,26 +18,7 @@ GPT_COMPRESS_TEAM = 'context "{}" for A005ef27270144757997243d5c7892749 in let A
 
 @pytest.fixture
 def client() -> ApiClient:
-    return ApiClient("http://[::1]:8080/api")
-
-
-def _wait_for_read_node_sync(write_node: str, read_node: str):
-    resp = requests.get(f"http://{write_node}/api/blocks", timeout=15)
-    head_hash = resp.json()[0]["blockHash"]
-
-    while True:
-        resp = requests.get(f"http://{read_node}/api/block/{head_hash}", timeout=15)
-        if resp.status_code == 200:
-            break
-        sleep(0.2)
-
-
-def wait_for_read_node_sync():
-    _wait_for_read_node_sync("localhost:14403", "localhost:14413")
-
-
-def wait_for_test_read_node_sync():
-    _wait_for_read_node_sync("localhost:15403", "localhost:15413")
+    return ApiClient("[::1]:8080")
 
 
 @pytest.fixture
@@ -55,22 +34,13 @@ def wallet() -> Wallet:
 @pytest.fixture
 def funded_wallet(client: ApiClient, prepopulated_wallet: Wallet, request: pytest.FixtureRequest) -> Wallet:
     wallet = Wallet(key=SECP256k1.generate())
-
-    resp = client.wallets.transfer(from_wallet=prepopulated_wallet, to_wallet=wallet, amount=request.param)
-    assert resp.status == 200
-
-    wait_for_read_node_sync()
-
+    client.wallets.transfer(from_wallet=prepopulated_wallet, to_wallet=wallet, amount=request.param).wait_for_sync()
     return wallet
 
 
 @pytest.fixture
 def test_wallet(client: ApiClient) -> Wallet:
     resp = client.testnet.test_wallet()
-    assert resp.status == 200
-
-    wait_for_test_read_node_sync()
-
     return Wallet(key=SECP256k1.from_hex(resp.json["key"]))
 
 
@@ -87,14 +57,11 @@ def agent(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureReque
         name="my_agent",
         logo="http://nice-logo",
         code='@Nil!("foo")' if not hasattr(request, "param") else request.param,
-    )
-    assert resp.status == 200
-
-    wait_for_read_node_sync()
+    ).wait_for_sync()
 
     return Agent(
-        id=resp.json["id"],
-        version=resp.json["version"],
+        id=resp.first.json["id"],
+        version=resp.first.json["version"],
         name="my_agent",
         logo="http://nice-logo",
         code='@Nil!("foo")',
@@ -127,14 +94,11 @@ def agents_team(client: ApiClient, funded_wallet: Wallet, request: pytest.Fixtur
         name="my_agents_team",
         logo="http://nice-logo",
         graph="< foo > | 0 " if not hasattr(request, "param") else request.param,
-    )
-    assert resp.status == 200
-
-    wait_for_read_node_sync()
+    ).wait_for_sync()
 
     return AgentsTeam(
-        id=resp.json["id"],
-        version=resp.json["version"],
+        id=resp.first.json["id"],
+        version=resp.first.json["version"],
         name="my_agents_team",
         logo="http://nice-logo",
         graph="< foo > | 0 ",

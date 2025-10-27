@@ -7,6 +7,7 @@ dependencies = [
     "pytest (>=8.4,<9.0.0)",
     "python-zbase32 (>=0.1,<0.2.0)",
     "requests (>=2.32,<3.0.0)",
+    "websocket-client (>=1.9,<2.0.0)",
 ]
 name = "embers-tests"
 requires-python = ">=3.13,<4"

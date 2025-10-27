@@ -2,19 +2,47 @@ from __future__ import annotations
 
 import base64
 import json
+import queue
+import threading
 from dataclasses import dataclass
 from functools import cached_property
 from hashlib import blake2b
-from typing import Any
+from typing import Any, Self
 
 import base58
 import requests
+import websocket
 from Crypto.Hash import keccak
 
 from tests.key import SECP256k1
 
+DEFAULT_TIMEOUT = 15
+
 FIRECAP_ID = bytes([0, 0, 0])
 FIRECAP_VERSION = bytes([0])
+
+
+class ApiSync:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._seen = set()
+        self._waiting = {}
+
+    def register(self, deploy_id: str) -> threading.Event:
+        event = threading.Event()
+        with self._lock:
+            if deploy_id in self._seen:
+                event.set()
+                return event
+            self._waiting[deploy_id] = event
+            return event
+
+    def notify(self, deploy_id: str):
+        with self._lock:
+            self._seen.add(deploy_id)
+            event = self._waiting.get(deploy_id)
+            if event is not None:
+                event.set()
 
 
 @dataclass
@@ -31,17 +59,29 @@ class Responce:
         return json.loads(self.body)
 
 
+class UpdateResponce:
+    def __init__(self, first: Responce, second: Responce, accepted: threading.Event):
+        self.first = first
+        self.second = second
+        self._accepted = accepted
+
+    def wait_for_sync(self) -> Self:
+        self._accepted.wait(timeout=DEFAULT_TIMEOUT)
+        return self
+
+
 class HttpClient:
     def __init__(self, base_url: str):
-        self._base_url = base_url
+        self.base_url = base_url
+        self.api_sync = ApiSync()
 
-    def get(self, url: str, timeout: int = 15) -> Responce:
-        url = self._base_url + url
+    def get(self, url: str, timeout: int = DEFAULT_TIMEOUT) -> Responce:
+        url = f"http://{self.base_url}/api/{url}"
         r = requests.get(url, timeout=timeout)
         return Responce(r)
 
-    def post(self, url: str, json: Any | None = None, timeout: int = 15) -> Responce:
-        url = self._base_url + url
+    def post(self, url: str, json: Any | None = None, timeout: int = DEFAULT_TIMEOUT) -> Responce:
+        url = f"http://{self.base_url}/api/{url}"
         r = requests.post(url, json=json, timeout=timeout)
         return Responce(r)
 
@@ -51,7 +91,9 @@ class TestnetApi:
         self._client = client
 
     def test_wallet(self) -> Responce:
-        return self._client.post("/testnet/wallet")
+        resp = self._client.post("/testnet/wallet")
+        assert resp.status == 200
+        return resp
 
     def deploy(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
         resp = self._client.post("/testnet/deploy/prepare", json={"test": test, "env": env})
@@ -88,11 +130,30 @@ class Wallet:
 class WalletsApi:
     def __init__(self, client: HttpClient):
         self._client = client
+        self._messages = queue.Queue()
+
+        def on_message(_: Any, msg: str):
+            event = json.loads(msg)
+            if event.get("node_type") == "Observer":
+                self._client.api_sync.notify(event["deploy_id"])
+
+        self._ws = websocket.WebSocketApp(
+            url=f"ws://{client.base_url}/api/wallets/11117Jv1oQo1qkxrKrHXumDZu183yoPRhRXJgqy2D3Gh53bUUZYqY/deploys",
+            on_message=on_message,
+        )
+        self._thread = threading.Thread(target=self._ws.run_forever, daemon=True)
+        self._thread.start()
 
     def get_wallet_state_and_history(self, address: str) -> Responce:
         return self._client.get(f"/wallets/{address}/state")
 
-    def transfer(self, from_wallet: Wallet, to_wallet: Wallet, amount: int, description: str | None = None) -> Responce:
+    def transfer(
+        self,
+        from_wallet: Wallet,
+        to_wallet: Wallet,
+        amount: int,
+        description: str | None = None,
+    ) -> UpdateResponce:
         resp = self._client.post(
             "/wallets/transfer/prepare",
             json={"from": from_wallet.address, "to": to_wallet.address, "amount": amount, "description": description},
@@ -102,7 +163,11 @@ class WalletsApi:
         resp_next = self._client.post("/wallets/transfer/send", json=sing_contract(from_wallet, resp.json["contract"]))
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
 
 @dataclass
@@ -135,7 +200,7 @@ class AiAgentsApi:
         shard: str | None = None,
         logo: str | None = None,
         code: str | None = None,
-    ) -> Responce:
+    ) -> UpdateResponce:
         resp = self._client.post(
             "/ai-agents/create/prepare",
             json={"name": name, "shard": shard, "logo": logo, "code": code},
@@ -145,7 +210,11 @@ class AiAgentsApi:
         resp_next = self._client.post("/ai-agents/create/send", json=sing_contract(wallet, resp.json["contract"]))
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
     def save(
         self,
@@ -155,7 +224,7 @@ class AiAgentsApi:
         shard: str | None = None,
         logo: str | None = None,
         code: str | None = None,
-    ) -> Responce:
+    ) -> UpdateResponce:
         resp = self._client.post(
             f"/ai-agents/{agent_id}/save/prepare",
             json={"name": name, "shard": shard, "logo": logo, "code": code},
@@ -168,9 +237,13 @@ class AiAgentsApi:
         )
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
-    def delete(self, wallet: Wallet, agent_id: str) -> Responce:
+    def delete(self, wallet: Wallet, agent_id: str) -> UpdateResponce:
         resp = self._client.post(f"/ai-agents/{agent_id}/delete/prepare")
         assert resp.status == 200
 
@@ -180,7 +253,11 @@ class AiAgentsApi:
         )
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
 
 @dataclass
@@ -213,7 +290,7 @@ class AiAgentsTeamsApi:
         shard: str | None = None,
         logo: str | None = None,
         graph: str | None = None,
-    ) -> Responce:
+    ) -> UpdateResponce:
         resp = self._client.post(
             "/ai-agents-teams/create/prepare",
             json={"name": name, "shard": shard, "logo": logo, "graph": graph},
@@ -223,9 +300,13 @@ class AiAgentsTeamsApi:
         resp_next = self._client.post("/ai-agents-teams/create/send", json=sing_contract(wallet, resp.json["contract"]))
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
-    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int, deploy: dict) -> Responce:
+    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int, deploy: dict) -> UpdateResponce:
         resp = self._client.post(
             "/ai-agents-teams/deploy/prepare",
             json={
@@ -242,9 +323,13 @@ class AiAgentsTeamsApi:
         resp_next = self._client.post("/ai-agents-teams/deploy/send", json=sing_contract(wallet, resp.json["contract"]))
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
-    def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int, deploy: dict) -> Responce:
+    def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int, deploy: dict) -> UpdateResponce:
         resp = self._client.post(
             "/ai-agents-teams/deploy/prepare",
             json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit, "deploy": deploy},
@@ -254,7 +339,11 @@ class AiAgentsTeamsApi:
         resp_next = self._client.post("/ai-agents-teams/deploy/send", json=sing_contract(wallet, resp.json["contract"]))
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
     def run(self, wallet: Wallet, prompt: str, phlo_limit: int, agents_team: str) -> Responce:
         resp = self._client.post(
@@ -276,7 +365,7 @@ class AiAgentsTeamsApi:
         shard: str | None = None,
         logo: str | None = None,
         graph: str | None = None,
-    ) -> Responce:
+    ) -> UpdateResponce:
         resp = self._client.post(
             f"/ai-agents-teams/{agent_id}/save/prepare",
             json={"name": name, "shard": shard, "logo": logo, "graph": graph},
@@ -289,9 +378,13 @@ class AiAgentsTeamsApi:
         )
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
-    def delete(self, wallet: Wallet, agent_id: str) -> Responce:
+    def delete(self, wallet: Wallet, agent_id: str) -> UpdateResponce:
         resp = self._client.post(f"/ai-agents-teams/{agent_id}/delete/prepare")
         assert resp.status == 200
 
@@ -301,7 +394,11 @@ class AiAgentsTeamsApi:
         )
         assert resp_next.status == 200
 
-        return resp
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+        )
 
 
 class ApiClient:

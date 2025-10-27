@@ -1,9 +1,9 @@
+use firefly_client::models::WalletAddress;
 use firefly_client::rendering::{Render, Uri};
 
 use crate::ai_agents::blockchain::dtos;
 use crate::ai_agents::handlers::AgentsService;
 use crate::ai_agents::models::Agents;
-use crate::common::models::WalletAddress;
 use crate::common::tracing::record_trace;
 
 #[derive(Debug, Clone, Render)]
