@@ -103,7 +103,7 @@ jobs:
 
       - name: Upload build artifact
         id: upload-artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: schema.json
           path: packages/embers/schema.json
