@@ -43,6 +43,9 @@ impl AgentsService {
             sig,
         }
         .render()?;
+
+        tracing::debug!("code = {code}");
+
         let deploy_data = DeployData::builder(code).timestamp(timestamp).build();
 
         write_client
@@ -92,6 +95,9 @@ impl AgentsTeamsService {
             sig,
         }
         .render()?;
+
+        tracing::debug!("code = {code}");
+
         let deploy_data = DeployData::builder(code).timestamp(timestamp).build();
 
         write_client
@@ -143,6 +149,9 @@ impl WalletsService {
             sig,
         }
         .render()?;
+
+        tracing::debug!("code = {code}");
+
         let deploy_data = DeployData::builder(code).timestamp(timestamp).build();
 
         write_client
@@ -194,6 +203,9 @@ impl TestnetService {
             sig,
         }
         .render()?;
+
+        tracing::debug!("code = {code}");
+
         let deploy_data = DeployData::builder(code).timestamp(timestamp).build();
 
         write_client

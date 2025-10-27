@@ -328,7 +328,7 @@ in {
     } |
 
     contract agents(@"recordDeploy", @id, @version, @last_deploy) = {
-        new deployDataCh, deployerAddressCh, valueCh, errCh, updateLastDeploy in {
+        new deployDataCh, deployerAddressCh, valueCh, errCh, latestCh in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
@@ -340,10 +340,18 @@ in {
             } |
 
             for(@(agentVersions, _) <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
-                treeHashMap!("getOrElse", agentVersions, version, *updateLastDeploy, *errCh)
+                treeHashMap!("getOrElse", agentVersions, version, *valueCh, *errCh) |
 
-                for(@agent <- updateLastDeploy) {
+                for(@agent <- valueCh) {
                     treeHashMap!("set", agentVersions, version, agent.union({"last_deploy": last_deploy}), *devNull)
+                } |
+
+                treeHashMap!("getOrElse", agentVersions, "latest", *latestCh, *errCh) |
+
+                for(@agent <- latestCh) {
+                    if(agent.get("version") == version) {
+                        treeHashMap!("set", agentVersions, "latest", agent.union({"last_deploy": last_deploy}), *devNull)
+                    }
                 }
             } |
 
