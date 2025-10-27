@@ -55,7 +55,6 @@ def agent(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureReque
     resp = client.ai_agents.create(
         funded_wallet,
         name="my_agent",
-        logo="http://nice-logo",
         code='@Nil!("foo")' if not hasattr(request, "param") else request.param,
     ).wait_for_sync()
 
@@ -63,7 +62,6 @@ def agent(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureReque
         id=resp.first.json["id"],
         version=resp.first.json["version"],
         name="my_agent",
-        logo="http://nice-logo",
         code='@Nil!("foo")',
     )
 
@@ -92,7 +90,6 @@ def agents_team(client: ApiClient, funded_wallet: Wallet, request: pytest.Fixtur
     resp = client.ai_agents_teams.create(
         funded_wallet,
         name="my_agents_team",
-        logo="http://nice-logo",
         graph="< foo > | 0 " if not hasattr(request, "param") else request.param,
     ).wait_for_sync()
 
@@ -100,7 +97,6 @@ def agents_team(client: ApiClient, funded_wallet: Wallet, request: pytest.Fixtur
         id=resp.first.json["id"],
         version=resp.first.json["version"],
         name="my_agents_team",
-        logo="http://nice-logo",
         graph="< foo > | 0 ",
     )
 

@@ -20,6 +20,7 @@ pub struct AgentsTeamHeader {
     pub version: String,
     pub created_at: Stringified<DateTime<Utc>>,
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
 }
@@ -28,6 +29,7 @@ pub struct AgentsTeamHeader {
 #[convert(into(models::CreateAgentsTeamReq))]
 pub struct CreateAgentsTeamReq {
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Stringified<models::Graph>>,
@@ -40,6 +42,7 @@ pub struct AgentsTeam {
     pub version: String,
     pub created_at: Stringified<DateTime<Utc>>,
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Stringified<models::Graph>>,

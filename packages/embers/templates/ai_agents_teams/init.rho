@@ -65,7 +65,7 @@ in {
         ret!(v != Nil)
     } |
 
-    contract agentsTeams(@"create", @id, @version, @created_at, @name, @shard, @logo, @graph) = {
+    contract agentsTeams(@"create", @id, @version, @created_at, @name, @description, @shard, @logo, @graph) = {
         new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
             deployData!(*deployDataCh) |
 
@@ -94,6 +94,7 @@ in {
                                     {
                                         "created_at": created_at,
                                         "name": name,
+                                        "description": description,
                                         "shard": shard,
                                         "logo": logo,
                                         "graph": graph,
@@ -104,6 +105,7 @@ in {
                                         "version": version,
                                         "created_at": created_at,
                                         "name": name,
+                                        "description": description,
                                         "shard": shard,
                                         "logo": logo,
                                         "graph": graph,
@@ -140,6 +142,7 @@ in {
                                 {
                                     "created_at": created_at,
                                     "name": name,
+                                    "description": description,
                                     "shard": shard,
                                     "logo": logo,
                                     "graph": graph,
@@ -150,6 +153,7 @@ in {
                                     "version": version,
                                     "created_at": created_at,
                                     "name": name,
+                                    "description": description,
                                     "shard": shard,
                                     "logo": logo,
                                     "graph": graph,
@@ -252,7 +256,7 @@ in {
         }
     } |
 
-    contract agentsTeams(@"save", @id, @version, @created_at, @name, @shard, @logo, @graph) = {
+    contract agentsTeams(@"save", @id, @version, @created_at, @name, @description, @shard, @logo, @graph) = {
         new deployDataCh, deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
             deployData!(*deployDataCh) |
 
@@ -272,6 +276,7 @@ in {
                         {
                             "created_at": created_at,
                             "name": name,
+                            "description": description,
                             "shard": shard,
                             "logo": logo,
                             "graph": graph,
@@ -282,6 +287,7 @@ in {
                             "version": version,
                             "created_at": created_at,
                             "name": name,
+                            "description": description,
                             "shard": shard,
                             "logo": logo,
                             "graph": graph,

@@ -14,6 +14,7 @@ pub struct AgentHeader {
     pub version: String,
     pub created_at: DateTime<Utc>,
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
 }
@@ -21,6 +22,7 @@ pub struct AgentHeader {
 #[derive(Debug, Clone)]
 pub struct CreateAgentReq {
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub code: Option<String>,
@@ -32,6 +34,7 @@ pub struct Agent {
     pub version: String,
     pub created_at: DateTime<Utc>,
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub code: Option<String>,
