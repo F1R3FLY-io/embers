@@ -18,6 +18,7 @@ pub struct AgentsTeamHeader {
     pub version: String,
     pub created_at: blockchain::dtos::DateTime,
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
 }
@@ -44,6 +45,7 @@ pub struct AgentsTeam {
     pub version: String,
     pub created_at: blockchain::dtos::DateTime,
     pub name: String,
+    pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Graph>,

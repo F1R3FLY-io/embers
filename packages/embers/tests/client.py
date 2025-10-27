@@ -175,6 +175,7 @@ class Agent:
     id: str
     version: str
     name: str
+    description: str | None = None
     shard: str | None = None
     logo: str | None = None
     code: str | None = None
@@ -197,13 +198,14 @@ class AiAgentsApi:
         self,
         wallet: Wallet,
         name: str,
+        description: str | None = None,
         shard: str | None = None,
         logo: str | None = None,
         code: str | None = None,
     ) -> UpdateResponce:
         resp = self._client.post(
             "/ai-agents/create/prepare",
-            json={"name": name, "shard": shard, "logo": logo, "code": code},
+            json={"name": name, "description": description, "shard": shard, "logo": logo, "code": code},
         )
         assert resp.status == 200
 
@@ -221,13 +223,14 @@ class AiAgentsApi:
         wallet: Wallet,
         agent_id: str,
         name: str,
+        description: str | None = None,
         shard: str | None = None,
         logo: str | None = None,
         code: str | None = None,
     ) -> UpdateResponce:
         resp = self._client.post(
             f"/ai-agents/{agent_id}/save/prepare",
-            json={"name": name, "shard": shard, "logo": logo, "code": code},
+            json={"name": name, "description": description, "shard": shard, "logo": logo, "code": code},
         )
         assert resp.status == 200
 
@@ -265,6 +268,7 @@ class AgentsTeam:
     id: str
     version: str
     name: str
+    description: str | None = None
     shard: str | None = None
     logo: str | None = None
     graph: str | None = None
@@ -287,13 +291,14 @@ class AiAgentsTeamsApi:
         self,
         wallet: Wallet,
         name: str,
+        description: str | None = None,
         shard: str | None = None,
         logo: str | None = None,
         graph: str | None = None,
     ) -> UpdateResponce:
         resp = self._client.post(
             "/ai-agents-teams/create/prepare",
-            json={"name": name, "shard": shard, "logo": logo, "graph": graph},
+            json={"name": name, "description": description, "shard": shard, "logo": logo, "graph": graph},
         )
         assert resp.status == 200
 
@@ -362,13 +367,14 @@ class AiAgentsTeamsApi:
         wallet: Wallet,
         agent_id: str,
         name: str,
+        description: str | None = None,
         shard: str | None = None,
         logo: str | None = None,
         graph: str | None = None,
     ) -> UpdateResponce:
         resp = self._client.post(
             f"/ai-agents-teams/{agent_id}/save/prepare",
-            json={"name": name, "shard": shard, "logo": logo, "graph": graph},
+            json={"name": name, "description": description, "shard": shard, "logo": logo, "graph": graph},
         )
         assert resp.status == 200
 
