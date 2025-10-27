@@ -1,0 +1,6 @@
+new rl(`rho:registry:lookup`), agentsCh in {
+    rl!({{ env_uri }}, *agentsCh) |
+    for(@(_, agents) <- agentsCh) {
+        @agents!("recordDeploy", {{ id }}, {{ version }}, {{ last_deploy }})
+    }
+}

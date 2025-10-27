@@ -93,6 +93,7 @@ in {
                                 treeHashMap!("set", agentsTeamVersions, version,
                                     {
                                         "created_at": created_at,
+                                        "last_deploy": Nil,
                                         "name": name,
                                         "description": description,
                                         "shard": shard,
@@ -104,6 +105,7 @@ in {
                                     {
                                         "version": version,
                                         "created_at": created_at,
+                                        "last_deploy": Nil,
                                         "name": name,
                                         "description": description,
                                         "shard": shard,
@@ -141,6 +143,7 @@ in {
                             treeHashMap!("set", agentsTeamVersions, version,
                                 {
                                     "created_at": created_at,
+                                    "last_deploy": Nil,
                                     "name": name,
                                     "description": description,
                                     "shard": shard,
@@ -152,6 +155,7 @@ in {
                                 {
                                     "version": version,
                                     "created_at": created_at,
+                                    "last_deploy": Nil,
                                     "name": name,
                                     "description": description,
                                     "shard": shard,
@@ -275,6 +279,7 @@ in {
                     treeHashMap!("set", agentsTeamVersions, version,
                         {
                             "created_at": created_at,
+                            "last_deploy": Nil,
                             "name": name,
                             "description": description,
                             "shard": shard,
@@ -286,6 +291,7 @@ in {
                         {
                             "version": version,
                             "created_at": created_at,
+                            "last_deploy": Nil,
                             "name": name,
                             "description": description,
                             "shard": shard,
@@ -317,6 +323,32 @@ in {
 
             for(@(agentsTeams, _) <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("delete", agentsTeams, id, *devNull)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"recordDeploy", @id, @version, @last_deploy) = {
+        new deployDataCh, deployerAddressCh, valueCh, errCh, updateLastDeploy in {
+            deployData!(*deployDataCh) |
+
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+
+            for(@address <- deployerAddressCh) {
+                visit!("agentsTeamVersions", address, id, *valueCh, *errCh)
+            } |
+
+            for(@(agentsTeamVersions, _) <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", agentsTeamVersions, version, *updateLastDeploy, *errCh)
+
+                for(@agentsTeams <- updateLastDeploy) {
+                    treeHashMap!("set", agentsTeamVersions, version, agentsTeams.union({"last_deploy": last_deploy}), *devNull)
+                }
+            } |
+
+            for(<- errCh) {
+                abort!("in recordDeployAiAgentsTeam")
             }
         }
     }

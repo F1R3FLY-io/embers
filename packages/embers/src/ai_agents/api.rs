@@ -12,6 +12,7 @@ use crate::ai_agents::api::dtos::{
     DeleteAgentResp,
     DeployAgentReq,
     DeployAgentResp,
+    DeploySignedAgentReq,
     SaveAgentReq,
     SaveAgentResp,
 };
@@ -89,7 +90,7 @@ impl AIAgents {
     #[oai(path = "/deploy/send", method = "post")]
     async fn deploy_agent(
         &self,
-        Json(body): Json<SignedContract>,
+        Json(body): Json<DeploySignedAgentReq>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents.deploy_signed_deploy_agent(body.into()).await?;

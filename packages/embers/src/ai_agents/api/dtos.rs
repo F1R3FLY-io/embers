@@ -4,7 +4,7 @@ use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents::models;
-use crate::common::api::dtos::{PreparedContract, Stringified};
+use crate::common::api::dtos::{PreparedContract, SignedContract, Stringified};
 use crate::common::models::PositiveNonZero;
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -19,6 +19,7 @@ pub struct AgentHeader {
     pub id: String,
     pub version: String,
     pub created_at: Stringified<DateTime<Utc>>,
+    pub last_deploy: Option<Stringified<DateTime<Utc>>>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -41,6 +42,7 @@ pub struct Agent {
     pub id: String,
     pub version: String,
     pub created_at: Stringified<DateTime<Utc>>,
+    pub last_deploy: Option<Stringified<DateTime<Utc>>>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -113,4 +115,12 @@ impl From<DeployAgentReq> for models::DeployAgentReq {
 #[convert(from(models::DeployAgentResp))]
 pub struct DeployAgentResp {
     pub contract: PreparedContract,
+    pub system: Option<PreparedContract>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(into(models::DeploySignedAgentReq))]
+pub struct DeploySignedAgentReq {
+    pub contract: SignedContract,
+    pub system: Option<SignedContract>,
 }

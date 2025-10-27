@@ -12,6 +12,7 @@ use crate::ai_agents_teams::api::dtos::{
     DeleteAgentsTeamResp,
     DeployAgentsTeamReq,
     DeployAgentsTeamResp,
+    DeploySignedAgentsTeamtReq,
     RunAgentsTeamReq,
     RunAgentsTeamResp,
     SaveAgentsTeamReq,
@@ -103,7 +104,7 @@ impl AIAgentsTeams {
     #[oai(path = "/deploy/send", method = "post")]
     async fn deploy_agents_team(
         &self,
-        Json(body): Json<SignedContract>,
+        Json(body): Json<DeploySignedAgentsTeamtReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams

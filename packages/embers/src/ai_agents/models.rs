@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use firefly_client::models::WalletAddress;
+use firefly_client::models::{SignedCode, WalletAddress};
 
 use crate::common::models::{PositiveNonZero, PreparedContract};
 
@@ -13,6 +13,7 @@ pub struct AgentHeader {
     pub id: String,
     pub version: String,
     pub created_at: DateTime<Utc>,
+    pub last_deploy: Option<DateTime<Utc>>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -33,6 +34,7 @@ pub struct Agent {
     pub id: String,
     pub version: String,
     pub created_at: DateTime<Utc>,
+    pub last_deploy: Option<DateTime<Utc>>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -77,4 +79,11 @@ pub enum DeployAgentReq {
 #[derive(Debug, Clone)]
 pub struct DeployAgentResp {
     pub contract: PreparedContract,
+    pub system: Option<PreparedContract>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedAgentReq {
+    pub contract: SignedCode,
+    pub system: Option<SignedCode>,
 }

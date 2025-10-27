@@ -4,7 +4,7 @@ use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents_teams::models;
-use crate::common::api::dtos::{PreparedContract, RegistryDeploy, Stringified};
+use crate::common::api::dtos::{PreparedContract, RegistryDeploy, SignedContract, Stringified};
 use crate::common::models::PositiveNonZero;
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
@@ -19,6 +19,7 @@ pub struct AgentsTeamHeader {
     pub id: String,
     pub version: String,
     pub created_at: Stringified<DateTime<Utc>>,
+    pub last_deploy: Option<Stringified<DateTime<Utc>>>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -41,6 +42,7 @@ pub struct AgentsTeam {
     pub id: String,
     pub version: String,
     pub created_at: Stringified<DateTime<Utc>>,
+    pub last_deploy: Option<Stringified<DateTime<Utc>>>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -117,6 +119,14 @@ impl From<DeployAgentsTeamReq> for models::DeployAgentsTeamReq {
 #[convert(from(models::DeployAgentsTeamResp))]
 pub struct DeployAgentsTeamResp {
     pub contract: PreparedContract,
+    pub system: Option<PreparedContract>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(into(models::DeploySignedAgentsTeamtReq))]
+pub struct DeploySignedAgentsTeamtReq {
+    pub contract: SignedContract,
+    pub system: Option<SignedContract>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
