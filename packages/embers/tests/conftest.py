@@ -22,8 +22,10 @@ def client() -> ApiClient:
 
 
 @pytest.fixture
-def prepopulated_wallet() -> Wallet:
-    return Wallet(key=SECP256k1.from_hex("0B4E12EC24D2F42F3FC826194750E3168A5F03071F382375C29A5E801DBBE8A5"))
+def prepopulated_wallet(client: ApiClient) -> Wallet:
+    wallet = Wallet(key=SECP256k1.from_hex("0B4E12EC24D2F42F3FC826194750E3168A5F03071F382375C29A5E801DBBE8A5"))
+    client.wallets.listen_for_deploys(wallet)
+    return wallet
 
 
 @pytest.fixture
@@ -34,6 +36,7 @@ def wallet() -> Wallet:
 @pytest.fixture
 def funded_wallet(client: ApiClient, prepopulated_wallet: Wallet, request: pytest.FixtureRequest) -> Wallet:
     wallet = Wallet(key=SECP256k1.generate())
+    client.wallets.listen_for_deploys(wallet)
     client.wallets.transfer(from_wallet=prepopulated_wallet, to_wallet=wallet, amount=request.param).wait_for_sync()
     return wallet
 

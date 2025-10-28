@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import json
-import queue
 import threading
 from dataclasses import dataclass
 from functools import cached_property
@@ -66,14 +65,14 @@ class UpdateResponce:
         self._accepted = accepted
 
     def wait_for_sync(self) -> Self:
-        self._accepted.wait(timeout=DEFAULT_TIMEOUT)
+        assert self._accepted.wait(timeout=DEFAULT_TIMEOUT)
         return self
 
 
 class HttpClient:
     def __init__(self, base_url: str):
         self.base_url = base_url
-        self.api_sync = ApiSync()
+        self.listeners: dict[str, ApiSync] = {}
 
     def get(self, url: str, timeout: int = DEFAULT_TIMEOUT) -> Responce:
         url = f"http://{self.base_url}/api/{url}"
@@ -130,19 +129,6 @@ class Wallet:
 class WalletsApi:
     def __init__(self, client: HttpClient):
         self._client = client
-        self._messages = queue.Queue()
-
-        def on_message(_: Any, msg: str):
-            event = json.loads(msg)
-            if event.get("node_type") == "Observer":
-                self._client.api_sync.notify(event["deploy_id"])
-
-        self._ws = websocket.WebSocketApp(
-            url=f"ws://{client.base_url}/api/wallets/11117Jv1oQo1qkxrKrHXumDZu183yoPRhRXJgqy2D3Gh53bUUZYqY/deploys",
-            on_message=on_message,
-        )
-        self._thread = threading.Thread(target=self._ws.run_forever, daemon=True)
-        self._thread.start()
 
     def get_wallet_state_and_history(self, address: str) -> Responce:
         return self._client.get(f"/wallets/{address}/state")
@@ -166,8 +152,26 @@ class WalletsApi:
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[from_wallet.address].register(resp_next.json["deploy_id"]),
         )
+
+    def listen_for_deploys(self, wallet: Wallet):
+        api_sync = ApiSync()
+
+        def on_message(_: Any, msg: str):
+            event = json.loads(msg)
+            if event.get("node_type") == "Observer":
+                api_sync.notify(event["deploy_id"])
+
+        ws = websocket.WebSocketApp(
+            url=f"ws://{self._client.base_url}/api/wallets/{wallet.address}/deploys",
+            on_message=on_message,
+        )
+
+        thread = threading.Thread(target=ws.run_forever, daemon=True)
+        thread.start()
+
+        self._client.listeners[wallet.address] = api_sync
 
 
 @dataclass
@@ -215,7 +219,7 @@ class AiAgentsApi:
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
     def save(
@@ -243,7 +247,7 @@ class AiAgentsApi:
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
     def delete(self, wallet: Wallet, agent_id: str) -> UpdateResponce:
@@ -259,7 +263,7 @@ class AiAgentsApi:
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
 
@@ -308,7 +312,7 @@ class AiAgentsTeamsApi:
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
     def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int, deploy: dict) -> UpdateResponce:
@@ -325,13 +329,19 @@ class AiAgentsTeamsApi:
         )
         assert resp.status == 200
 
-        resp_next = self._client.post("/ai-agents-teams/deploy/send", json=sing_contract(wallet, resp.json["contract"]))
+        resp_next = self._client.post(
+            "/ai-agents-teams/deploy/send",
+            json={
+                "contract": sing_contract(wallet, resp.json["contract"]),
+                "system": sing_contract(wallet, resp.json["system"]) if resp.json.get("system") is not None else None,
+            },
+        )
         assert resp_next.status == 200
 
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
     def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int, deploy: dict) -> UpdateResponce:
@@ -341,13 +351,19 @@ class AiAgentsTeamsApi:
         )
         assert resp.status == 200
 
-        resp_next = self._client.post("/ai-agents-teams/deploy/send", json=sing_contract(wallet, resp.json["contract"]))
+        resp_next = self._client.post(
+            "/ai-agents-teams/deploy/send",
+            json={
+                "contract": sing_contract(wallet, resp.json["contract"]),
+                "system": sing_contract(wallet, resp.json["system"]) if resp.json.get("system") is not None else None,
+            },
+        )
         assert resp_next.status == 200
 
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
     def run(self, wallet: Wallet, prompt: str, phlo_limit: int, agents_team: str) -> Responce:
@@ -387,7 +403,7 @@ class AiAgentsTeamsApi:
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
     def delete(self, wallet: Wallet, agent_id: str) -> UpdateResponce:
@@ -403,7 +419,7 @@ class AiAgentsTeamsApi:
         return UpdateResponce(
             first=resp,
             second=resp_next,
-            accepted=self._client.api_sync.register(resp_next.json["deploy_id"]),
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
 
