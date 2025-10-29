@@ -8,7 +8,7 @@ use poem_openapi::payload::Json;
 use poem_openapi::types::ToJSON;
 
 use crate::common::api::dtos::{ApiTags, SendResp, SignedContract, Stringified};
-use crate::wallets::api::dtos::{TransferReq, TransferResp, WalletEvent, WalletStateAndHistory};
+use crate::wallets::api::dtos::{DeployEvent, TransferReq, TransferResp, WalletStateAndHistory};
 use crate::wallets::handlers::WalletsService;
 
 mod dtos;
@@ -68,7 +68,7 @@ impl WalletsApi {
 
         ws.on_upgrade(move |socket| {
             let sink = socket.with(|msg| {
-                let msg = WalletEvent::from(msg).to_json_string();
+                let msg = DeployEvent::from(msg).to_json_string();
                 future::ok(websocket::Message::Text(msg))
             });
             wallets.subscribe_to_deploys(address.0, sink);

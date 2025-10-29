@@ -80,11 +80,14 @@ pub enum NodeType {
 }
 
 #[derive(Debug, Clone)]
-pub enum WalletEvent {
-    DeploySeen {
-        deploy_id: DeployId,
-        cost: u64,
-        errored: bool,
-        node_type: NodeType,
-    },
+pub struct DeployDescription {
+    pub deploy_id: DeployId,
+    pub cost: u64,
+    pub errored: bool,
+    pub node_type: NodeType,
+}
+
+#[derive(Debug, Clone)]
+pub enum DeployEvent {
+    Finalized(DeployDescription),
 }

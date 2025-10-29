@@ -14,10 +14,12 @@ use uuid::Uuid;
 use crate::models::{BlockEventDeploy, DeployId, NodeEvent, WalletAddress};
 
 #[derive(Debug, Clone)]
-pub struct DeployEvent {
-    pub id: DeployId,
-    pub cost: u64,
-    pub errored: bool,
+pub enum DeployEvent {
+    Finalized {
+        id: DeployId,
+        cost: u64,
+        errored: bool,
+    },
 }
 
 type DeploySubscriptions = Arc<DashMap<DeployId, DashMap<Uuid, Arc<Notify>>>>;
@@ -168,7 +170,7 @@ impl NodeEvents {
 
 impl From<BlockEventDeploy> for DeployEvent {
     fn from(value: BlockEventDeploy) -> Self {
-        Self {
+        Self::Finalized {
             id: value.id,
             cost: value.cost,
             errored: value.errored,

@@ -119,34 +119,18 @@ pub enum NodeType {
     Observer,
 }
 
-#[derive(Debug, Clone, Object)]
-pub struct DeploySeen {
+#[derive(Debug, Clone, Object, StructuralConvert)]
+#[convert(from(models::DeployDescription))]
+pub struct DeployDescription {
     pub deploy_id: String,
-    pub cost: u64,
+    pub cost: Stringified<u64>,
     pub errored: bool,
     pub node_type: NodeType,
 }
 
-#[derive(Debug, Clone, Union)]
+#[derive(Debug, Clone, Union, StructuralConvert)]
 #[oai(discriminator_name = "type")]
-pub enum WalletEvent {
-    DeploySeen(DeploySeen),
-}
-
-impl From<models::WalletEvent> for WalletEvent {
-    fn from(value: models::WalletEvent) -> Self {
-        match value {
-            models::WalletEvent::DeploySeen {
-                deploy_id,
-                cost,
-                errored,
-                node_type,
-            } => Self::DeploySeen(DeploySeen {
-                deploy_id: deploy_id.into(),
-                cost,
-                errored,
-                node_type: node_type.into(),
-            }),
-        }
-    }
+#[convert(from(models::DeployEvent))]
+pub enum DeployEvent {
+    Finalized(DeployDescription),
 }
