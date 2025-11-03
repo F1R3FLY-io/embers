@@ -22,7 +22,7 @@ derive_more        = { version = "2.0", features = ["full"] }
 figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }
 futures            = { version = "0.3" }
-graphl-parser      = { git = "https://github.com/F1R3FLY-io/graphl-parser", tag = "0.0.22" }
+graphl-parser      = { git = "https://github.com/F1R3FLY-io/graphl-parser", tag = "0.0.24" }
 hex                = { version = "0.4" }
 poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
 poem-openapi       = { version = "5.1", features = ["chrono", "swagger-ui", "websocket"] }
