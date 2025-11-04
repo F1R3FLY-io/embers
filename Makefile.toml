@@ -3,6 +3,7 @@ args          = ["clippy", "--workspace", "--all-targets", "--all-features"]
 command       = "cargo"
 install_crate = "clippy"
 toolchain     = "nightly"
+workspace     = false
 
 [tasks.generate-schema]
 args      = ["run", "--bin", "generate_schema"]

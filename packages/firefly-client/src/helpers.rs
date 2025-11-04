@@ -159,12 +159,12 @@ fn test_insert_signed_signature() {
     use std::str::FromStr;
 
     let secp = Secp256k1::new();
-    let timestamp = DateTime::from_timestamp_millis(1559156356769).unwrap();
+    let timestamp = DateTime::from_timestamp_millis(1_559_156_356_769).unwrap();
     let secret_key =
         SecretKey::from_str("f450b26bac63e5dd9343cd46f5fae1986d367a893cd21eedd98a4cb3ac699abc")
             .unwrap();
     let public_key = PublicKey::from_secret_key(&secp, &secret_key);
-    let version = 9223372036854775807;
+    let version = 9_223_372_036_854_775_807;
 
     let sig = insert_signed_signature(&secret_key, timestamp, &public_key, version);
 

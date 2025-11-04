@@ -116,10 +116,10 @@ impl From<ReadNodeExprUnforg> for serde_json::Value {
 
 #[derive(Debug, Clone, Deserialize)]
 pub enum ReadNodeExpr {
-    ExprTuple { data: Vec<ReadNodeExpr> },
-    ExprList { data: Vec<ReadNodeExpr> },
-    ExprSet { data: Vec<ReadNodeExpr> },
-    ExprMap { data: HashMap<String, ReadNodeExpr> },
+    ExprTuple { data: Vec<Self> },
+    ExprList { data: Vec<Self> },
+    ExprSet { data: Vec<Self> },
+    ExprMap { data: HashMap<String, Self> },
 
     ExprNil {},
     ExprBool { data: bool },

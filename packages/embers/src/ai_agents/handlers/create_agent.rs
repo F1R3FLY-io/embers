@@ -1,5 +1,3 @@
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
 use chrono::Utc;
 use firefly_client::models::{DeployId, SignedCode};
 use firefly_client::rendering::{Render, Uri};
@@ -50,7 +48,7 @@ impl AgentsService {
             description: request.description,
             shard: request.shard,
             logo: request.logo,
-            code: request.code.map(|v| BASE64_STANDARD.encode(v)),
+            code: request.code,
         }
         .render()?;
 

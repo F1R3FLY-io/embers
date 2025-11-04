@@ -13,10 +13,10 @@ use crate::models::{DeployData, DeployDataBuilder};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Value {
-    Tuple(Vec<Value>),
-    List(Vec<Value>),
-    Set(BTreeSet<Value>),
-    Map(BTreeMap<String, Value>),
+    Tuple(Vec<Self>),
+    List(Vec<Self>),
+    Set(BTreeSet<Self>),
+    Map(BTreeMap<String, Self>),
 
     Nil,
     Bool(bool),
