@@ -205,7 +205,7 @@ impl IntoValue for Uuid {
 
 impl<Tz: chrono::TimeZone> IntoValue for chrono::DateTime<Tz> {
     fn into_value(self) -> Value {
-        self.to_rfc3339().into_value()
+        self.timestamp().into_value()
     }
 }
 
