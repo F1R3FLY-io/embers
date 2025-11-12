@@ -32,13 +32,14 @@ pub struct Boost {
     pub to: WalletAddress,
     pub amount: Amount,
     pub description: Option<String>,
-    pub post: Option<String>,
+    pub post_author_did: String,
+    pub post_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
 pub struct Request {
     pub id: String,
-    pub date: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
     pub amount: Amount,
     pub status: RequestStatus,
 }
@@ -68,7 +69,8 @@ pub struct BoostReq {
     pub to: WalletAddress,
     pub amount: Amount,
     pub description: Option<String>,
-    pub post: Option<String>,
+    pub post_author_did: String,
+    pub post_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]

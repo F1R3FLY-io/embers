@@ -160,8 +160,9 @@ class WalletsApi:
         from_wallet: Wallet,
         to_wallet: Wallet,
         amount: int,
+        post_author_did: str,
         description: str | None = None,
-        post: str | None = None,
+        post_id: str | None = None,
     ) -> UpdateResponce:
         resp = self._client.post(
             "/wallets/boost/prepare",
@@ -170,7 +171,8 @@ class WalletsApi:
                 "to": to_wallet.address,
                 "amount": amount,
                 "description": description,
-                "post": post,
+                "post_author_did": post_author_did,
+                "post_id": post_id,
             },
         )
         assert resp.status == 200

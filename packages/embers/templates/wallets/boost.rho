@@ -8,7 +8,8 @@ new rl(`rho:registry:lookup`), walletsCh in {
             {{ wallet_address_to }},
             {{ amount }},
             {{ description }},
-            {{ post }},
+            {{ post_author_did }},
+            {{ post_id }},
         )
     }
 }

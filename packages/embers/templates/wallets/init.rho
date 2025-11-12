@@ -124,7 +124,7 @@ in {
         }
     } |
 
-    contract updateBoostHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description, @post) = {
+    contract updateBoostHistory(@walletOwner, @id, @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description, @post_author_did, @post_id) = {
         new userHistoryCh in {
             getOrCreateHistoryEntry!(walletOwner, *userHistoryCh) |
 
@@ -136,13 +136,14 @@ in {
                     "to": walletAddressTo,
                     "amount": amount,
                     "description": description,
-                    "post": post,
+                    "post_author_did": post_author_did,
+                    "post_id": post_id,
                 }, *devNull)
             }
         }
     } |
 
-    contract wallets(@"boost", @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description, @post) = {
+    contract wallets(@"boost", @timestamp, @walletAddressFrom, @walletAddressTo, @amount, @description, @post_author_did, @post_id) = {
         new deployDataCh, transferResultCh, updateHistory in {
             deployData!(*deployDataCh) |
             for(either <<- eitherCh; _, @deployerId, @deployId <- deployDataCh) {
@@ -150,8 +151,8 @@ in {
                 okOrAbort!(*transferResultCh, *updateHistory, "boost failed") |
 
                 for(_ <- updateHistory) {
-                    updateBoostHistory!(walletAddressFrom, deployId, timestamp, walletAddressFrom, walletAddressTo, amount, description, post) |
-                    updateBoostHistory!(walletAddressTo  , deployId, timestamp, walletAddressFrom, walletAddressTo, amount, description, post)
+                    updateBoostHistory!(walletAddressFrom, deployId, timestamp, walletAddressFrom, walletAddressTo, amount, description, post_author_did, post_id) |
+                    updateBoostHistory!(walletAddressTo  , deployId, timestamp, walletAddressFrom, walletAddressTo, amount, description, post_author_did, post_id)
                 }
             }
         }

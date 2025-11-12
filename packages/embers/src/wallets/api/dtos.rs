@@ -8,6 +8,17 @@ use crate::common::models::PositiveNonZero;
 use crate::wallets::models;
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
+#[convert(from(models::Transfer))]
+pub struct Transfer {
+    pub id: String,
+    pub timestamp: Stringified<DateTime<Utc>>,
+    pub from: Stringified<WalletAddress>,
+    pub to: Stringified<WalletAddress>,
+    pub amount: Stringified<PositiveNonZero<i64>>,
+    pub description: Option<String>,
+}
+
+#[derive(Debug, Clone, Object, StructuralConvert)]
 #[convert(from(models::Boost))]
 pub struct Boost {
     pub id: String,
@@ -16,7 +27,8 @@ pub struct Boost {
     pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
     pub description: Option<String>,
-    pub post: Option<String>,
+    pub post_author_did: String,
+    pub post_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
@@ -36,20 +48,9 @@ pub enum RequestStatus {
 #[convert(from(models::Request))]
 pub struct Request {
     pub id: String,
-    pub date: Stringified<DateTime<Utc>>,
+    pub timestamp: Stringified<DateTime<Utc>>,
     pub amount: Stringified<PositiveNonZero<i64>>,
     pub status: RequestStatus,
-}
-
-#[derive(Debug, Clone, Object, StructuralConvert)]
-#[convert(from(models::Transfer))]
-pub struct Transfer {
-    pub id: String,
-    pub timestamp: Stringified<DateTime<Utc>>,
-    pub from: Stringified<WalletAddress>,
-    pub to: Stringified<WalletAddress>,
-    pub amount: Stringified<PositiveNonZero<i64>>,
-    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
@@ -83,7 +84,8 @@ pub struct BoostReq {
     pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
     pub description: Option<String>,
-    pub post: Option<String>,
+    pub post_author_did: String,
+    pub post_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Object)]

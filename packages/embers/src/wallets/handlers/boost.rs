@@ -17,7 +17,8 @@ struct BoostContract {
     wallet_address_to: WalletAddress,
     amount: i64,
     description: Option<String>,
-    post: Option<String>,
+    post_author_did: String,
+    post_id: Option<String>,
 }
 
 impl WalletsService {
@@ -41,7 +42,8 @@ impl WalletsService {
             wallet_address_to: request.to,
             amount: request.amount.0,
             description: request.description,
-            post: request.post,
+            post_author_did: request.post_author_did,
+            post_id: request.post_id,
         }
         .render()?;
 

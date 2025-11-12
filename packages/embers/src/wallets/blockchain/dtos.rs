@@ -24,7 +24,8 @@ pub struct BoostRecord {
     pub to: String,
     pub amount: i64,
     pub description: Option<String>,
-    pub post: Option<String>,
+    pub post_author_did: String,
+    pub post_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Error)]
@@ -85,7 +86,8 @@ impl TryFrom<BoostRecord> for Boost {
             to,
             amount,
             description: record.description,
-            post: record.post,
+            post_author_did: record.post_author_did,
+            post_id: record.post_id,
         })
     }
 }
