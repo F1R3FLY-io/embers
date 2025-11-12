@@ -253,7 +253,7 @@ pub enum NodeEvent {
     Started,
     BlockAdded { payload: BlockEventPayload },
     BlockCreated { payload: BlockEventPayload },
-    BlockFinalised { payload: FinalizedBlockPayload },
+    BlockFinalised { payload: BlockEventPayload },
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -269,12 +269,6 @@ pub struct BlockEventDeploy {
     pub cost: u64,
     pub deployer: PublicKey,
     pub errored: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct FinalizedBlockPayload {
-    pub block_hash: BlockId,
 }
 
 pub const FIRECAP_ID: [u8; 3] = [0, 0, 0];
