@@ -6,7 +6,7 @@ use crate::common::models::PreparedContract;
 use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
 use crate::wallets::handlers::WalletsService;
-use crate::wallets::models::{BoostReq, Description};
+use crate::wallets::models::BoostReq;
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "wallets/boost.rho")]
@@ -16,7 +16,7 @@ struct BoostContract {
     wallet_address_from: WalletAddress,
     wallet_address_to: WalletAddress,
     amount: i64,
-    description: Option<Description>,
+    description: Option<String>,
     post: Option<String>,
 }
 

@@ -3,10 +3,6 @@ use firefly_client::models::{DeployId, WalletAddress};
 
 use crate::common::models::PositiveNonZero;
 
-mod description;
-
-pub use description::*;
-
 pub type Amount = PositiveNonZero<i64>;
 
 #[derive(Debug, Clone)]
@@ -16,7 +12,7 @@ pub struct Transfer {
     pub from: WalletAddress,
     pub to: WalletAddress,
     pub amount: Amount,
-    pub description: Option<Description>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -35,7 +31,7 @@ pub struct Boost {
     pub from: WalletAddress,
     pub to: WalletAddress,
     pub amount: Amount,
-    pub description: Option<Description>,
+    pub description: Option<String>,
     pub post: Option<String>,
 }
 
@@ -63,7 +59,7 @@ pub struct TransferReq {
     pub from: WalletAddress,
     pub to: WalletAddress,
     pub amount: Amount,
-    pub description: Option<Description>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -71,7 +67,7 @@ pub struct BoostReq {
     pub from: WalletAddress,
     pub to: WalletAddress,
     pub amount: Amount,
-    pub description: Option<Description>,
+    pub description: Option<String>,
     pub post: Option<String>,
 }
 

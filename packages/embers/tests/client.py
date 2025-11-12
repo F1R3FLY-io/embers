@@ -155,6 +155,35 @@ class WalletsApi:
             accepted=self._client.listeners[from_wallet.address].register(resp_next.json["deploy_id"]),
         )
 
+    def boost(
+        self,
+        from_wallet: Wallet,
+        to_wallet: Wallet,
+        amount: int,
+        description: str | None = None,
+        post: str | None = None,
+    ) -> UpdateResponce:
+        resp = self._client.post(
+            "/wallets/boost/prepare",
+            json={
+                "from": from_wallet.address,
+                "to": to_wallet.address,
+                "amount": amount,
+                "description": description,
+                "post": post,
+            },
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post("/wallets/boost/send", json=sing_contract(from_wallet, resp.json["contract"]))
+        assert resp_next.status == 200
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.listeners[from_wallet.address].register(resp_next.json["deploy_id"]),
+        )
+
     def listen_for_deploys(self, wallet: Wallet):
         api_sync = ApiSync()
 

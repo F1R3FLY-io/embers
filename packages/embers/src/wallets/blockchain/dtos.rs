@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use crate::common::blockchain;
 use crate::common::models::PositiveNonZeroParsingError;
-use crate::wallets::models::{Boost, DescriptionError, Transfer};
+use crate::wallets::models::{Boost, Transfer};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TransferRecord {
@@ -35,8 +35,6 @@ pub enum HistoryValidationError {
     WrongReceiverAddressFormat(ParseWalletAddressError),
     #[error("sender wallet adress has wrong format: {0}")]
     WrongSenderAddressFormat(ParseWalletAddressError),
-    #[error("description format error: {0}")]
-    DescriptionError(#[from] DescriptionError),
 }
 
 impl TryFrom<TransferRecord> for Transfer {
@@ -53,7 +51,6 @@ impl TryFrom<TransferRecord> for Transfer {
             .map_err(Self::Error::WrongReceiverAddressFormat)?;
 
         let amount = record.amount.try_into()?;
-        let description = record.description.map(TryFrom::try_from).transpose()?;
 
         Ok(Self {
             id: record.id,
@@ -61,7 +58,7 @@ impl TryFrom<TransferRecord> for Transfer {
             from,
             to,
             amount,
-            description,
+            description: record.description,
         })
     }
 }
@@ -80,7 +77,6 @@ impl TryFrom<BoostRecord> for Boost {
             .map_err(Self::Error::WrongReceiverAddressFormat)?;
 
         let amount = record.amount.try_into()?;
-        let description = record.description.map(TryFrom::try_from).transpose()?;
 
         Ok(Self {
             id: record.id,
@@ -88,7 +84,7 @@ impl TryFrom<BoostRecord> for Boost {
             from,
             to,
             amount,
-            description,
+            description: record.description,
             post: record.post,
         })
     }

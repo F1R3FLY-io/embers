@@ -5,7 +5,7 @@ use structural_convert::StructuralConvert;
 
 use crate::common::api::dtos::{PreparedContract, Stringified};
 use crate::common::models::PositiveNonZero;
-use crate::wallets::models::{self, Description};
+use crate::wallets::models;
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
 #[convert(from(models::Boost))]
@@ -15,7 +15,7 @@ pub struct Boost {
     pub from: Stringified<WalletAddress>,
     pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub description: Option<Stringified<Description>>,
+    pub description: Option<String>,
     pub post: Option<String>,
 }
 
@@ -49,7 +49,7 @@ pub struct Transfer {
     pub from: Stringified<WalletAddress>,
     pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub description: Option<Stringified<Description>>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
@@ -68,7 +68,7 @@ pub struct TransferReq {
     pub from: Stringified<WalletAddress>,
     pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub description: Option<Stringified<Description>>,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Object)]
@@ -82,7 +82,7 @@ pub struct BoostReq {
     pub from: Stringified<WalletAddress>,
     pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub description: Option<Stringified<Description>>,
+    pub description: Option<String>,
     pub post: Option<String>,
 }
 
