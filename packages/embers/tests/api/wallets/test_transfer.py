@@ -8,7 +8,7 @@ def test_transfer(client: ApiClient, prepopulated_wallet: Wallet, wallet: Wallet
     resp = client.wallets.get_wallet_state_and_history(prepopulated_wallet.address)
     assert_match_transfer(
         resp.json["transfers"][-1],
-        {"direction": "outgoing", "amount": "10000", "to_address": wallet.address},
+        {"from": prepopulated_wallet.address, "to": wallet.address, "amount": "10000"},
     )
 
     resp = client.wallets.get_wallet_state_and_history(wallet.address)
@@ -20,5 +20,5 @@ def test_transfer(client: ApiClient, prepopulated_wallet: Wallet, wallet: Wallet
     assert len(resp.json["transfers"]) == 1
     assert_match_transfer(
         resp.json["transfers"][0],
-        {"direction": "incoming", "amount": "10000", "to_address": wallet.address},
+        {"from": prepopulated_wallet.address, "to": wallet.address, "amount": "10000"},
     )

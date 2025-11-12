@@ -6,17 +6,18 @@ use crate::common::models::PreparedContract;
 use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
 use crate::wallets::handlers::WalletsService;
-use crate::wallets::models::{Description, TransferReq};
+use crate::wallets::models::{BoostReq, Description};
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "wallets/transfer.rho")]
-struct TransferContract {
+#[template(path = "wallets/boost.rho")]
+struct BoostContract {
     env_uri: Uri,
     timestamp: DateTime<Utc>,
     wallet_address_from: WalletAddress,
     wallet_address_to: WalletAddress,
     amount: i64,
     description: Option<Description>,
+    post: Option<String>,
 }
 
 impl WalletsService {
@@ -27,19 +28,20 @@ impl WalletsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn prepare_transfer_contract(
+    pub async fn prepare_boost_contract(
         &self,
-        request: TransferReq,
+        request: BoostReq,
     ) -> anyhow::Result<PreparedContract> {
         record_trace!(request);
 
-        let contract = TransferContract {
+        let contract = BoostContract {
             env_uri: self.uri.clone(),
             timestamp: Utc::now(),
             wallet_address_from: request.from,
             wallet_address_to: request.to,
             amount: request.amount.0,
             description: request.description,
+            post: request.post,
         }
         .render()?;
 
@@ -57,7 +59,7 @@ impl WalletsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn deploy_signed_transfer(&self, contract: SignedCode) -> anyhow::Result<DeployId> {
+    pub async fn deploy_boost_transfer(&self, contract: SignedCode) -> anyhow::Result<DeployId> {
         record_trace!(contract);
 
         let mut write_client = self.write_client.clone();

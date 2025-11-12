@@ -9,22 +9,14 @@ pub use description::*;
 
 pub type Amount = PositiveNonZero<i64>;
 
-pub type Id = String;
-
 #[derive(Debug, Clone)]
 pub struct Transfer {
-    pub id: Id,
-    pub direction: Direction,
-    pub date: DateTime<Utc>,
+    pub id: String,
+    pub timestamp: DateTime<Utc>,
+    pub from: WalletAddress,
+    pub to: WalletAddress,
     pub amount: Amount,
-    pub to_address: WalletAddress,
-    pub cost: u64,
-}
-
-#[derive(Debug, Clone)]
-pub enum Direction {
-    Incoming,
-    Outgoing,
+    pub description: Option<Description>,
 }
 
 #[derive(Debug, Clone)]
@@ -39,11 +31,12 @@ pub struct WalletStateAndHistory {
 #[derive(Debug, Clone)]
 pub struct Boost {
     pub id: String,
-    pub username: String,
-    pub direction: Direction,
-    pub date: DateTime<Utc>,
+    pub timestamp: DateTime<Utc>,
+    pub from: WalletAddress,
+    pub to: WalletAddress,
     pub amount: Amount,
-    pub post: String,
+    pub description: Option<Description>,
+    pub post: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -71,6 +64,15 @@ pub struct TransferReq {
     pub to: WalletAddress,
     pub amount: Amount,
     pub description: Option<Description>,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoostReq {
+    pub from: WalletAddress,
+    pub to: WalletAddress,
+    pub amount: Amount,
+    pub description: Option<Description>,
+    pub post: Option<String>,
 }
 
 #[derive(Debug, Clone)]

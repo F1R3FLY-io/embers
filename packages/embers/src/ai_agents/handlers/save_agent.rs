@@ -1,4 +1,4 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, SignedCode};
 use firefly_client::rendering::{Render, Uri};
 use uuid::Uuid;
@@ -14,7 +14,7 @@ struct SaveAgent {
     env_uri: Uri,
     id: String,
     version: Uuid,
-    created_at: i64,
+    created_at: DateTime<Utc>,
     name: String,
     description: Option<String>,
     shard: Option<String>,
@@ -43,7 +43,7 @@ impl AgentsService {
             env_uri: self.uri.clone(),
             id,
             version,
-            created_at: Utc::now().timestamp(),
+            created_at: Utc::now(),
             name: request.name,
             description: request.description,
             shard: request.shard,

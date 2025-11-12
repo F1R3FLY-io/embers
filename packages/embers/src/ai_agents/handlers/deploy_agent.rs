@@ -1,5 +1,5 @@
 use anyhow::Context;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use firefly_client::models::DeployId;
 use firefly_client::rendering::{Render, Uri};
 
@@ -14,7 +14,7 @@ struct UpdateLastDeploy {
     env_uri: Uri,
     id: String,
     version: String,
-    last_deploy: i64,
+    last_deploy: DateTime<Utc>,
 }
 
 impl AgentsService {
@@ -50,7 +50,7 @@ impl AgentsService {
                     env_uri: self.uri.clone(),
                     id,
                     version,
-                    last_deploy: Utc::now().timestamp(),
+                    last_deploy: Utc::now(),
                 }
                 .render()?;
 

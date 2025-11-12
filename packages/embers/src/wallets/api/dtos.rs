@@ -1,32 +1,22 @@
 use chrono::{DateTime, Utc};
 use firefly_client::models::WalletAddress;
-use poem::error::ResponseError;
-use poem::http::StatusCode;
 use poem_openapi::{Enum, Object, Union};
 use structural_convert::StructuralConvert;
-use thiserror::Error;
 
 use crate::common::api::dtos::{PreparedContract, Stringified};
 use crate::common::models::PositiveNonZero;
-use crate::wallets::models;
-
-#[derive(Debug, Clone, Eq, PartialEq, StructuralConvert, Enum)]
-#[convert(from(models::Direction))]
-#[oai(rename_all = "lowercase")]
-pub enum Direction {
-    Incoming,
-    Outgoing,
-}
+use crate::wallets::models::{self, Description};
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
 #[convert(from(models::Boost))]
 pub struct Boost {
     pub id: String,
-    pub username: String,
-    pub direction: Direction,
-    pub date: Stringified<DateTime<Utc>>,
+    pub timestamp: Stringified<DateTime<Utc>>,
+    pub from: Stringified<WalletAddress>,
+    pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub post: String,
+    pub description: Option<Stringified<Description>>,
+    pub post: Option<String>,
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
@@ -55,11 +45,11 @@ pub struct Request {
 #[convert(from(models::Transfer))]
 pub struct Transfer {
     pub id: String,
-    pub direction: Direction,
-    pub date: Stringified<DateTime<Utc>>,
+    pub timestamp: Stringified<DateTime<Utc>>,
+    pub from: Stringified<WalletAddress>,
+    pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub to_address: Stringified<WalletAddress>,
-    pub cost: Stringified<u64>,
+    pub description: Option<Stringified<Description>>,
 }
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
@@ -72,12 +62,13 @@ pub struct WalletStateAndHistory {
     pub transfers: Vec<Transfer>,
 }
 
-#[derive(Debug, Clone, Object)]
+#[derive(Debug, Clone, Object, StructuralConvert)]
+#[convert(into(models::TransferReq))]
 pub struct TransferReq {
     pub from: Stringified<WalletAddress>,
     pub to: Stringified<WalletAddress>,
     pub amount: Stringified<PositiveNonZero<i64>>,
-    pub description: Option<String>,
+    pub description: Option<Stringified<Description>>,
 }
 
 #[derive(Debug, Clone, Object)]
@@ -85,31 +76,19 @@ pub struct TransferResp {
     pub contract: PreparedContract,
 }
 
-#[derive(Debug, Clone, Error)]
-pub enum TransferValidationError {
-    #[error("description format error: {0}")]
-    DescriptionError(#[from] models::DescriptionError),
+#[derive(Debug, Clone, Object, StructuralConvert)]
+#[convert(into(models::BoostReq))]
+pub struct BoostReq {
+    pub from: Stringified<WalletAddress>,
+    pub to: Stringified<WalletAddress>,
+    pub amount: Stringified<PositiveNonZero<i64>>,
+    pub description: Option<Stringified<Description>>,
+    pub post: Option<String>,
 }
 
-impl ResponseError for TransferValidationError {
-    fn status(&self) -> poem::http::StatusCode {
-        StatusCode::BAD_REQUEST
-    }
-}
-
-impl TryFrom<TransferReq> for models::TransferReq {
-    type Error = TransferValidationError;
-
-    fn try_from(value: TransferReq) -> Result<Self, Self::Error> {
-        let description = value.description.map(TryFrom::try_from).transpose()?;
-
-        Ok(Self {
-            from: value.from.0,
-            to: value.to.0,
-            amount: value.amount.0,
-            description,
-        })
-    }
+#[derive(Debug, Clone, Object)]
+pub struct BoostResp {
+    pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, Enum, StructuralConvert)]

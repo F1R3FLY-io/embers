@@ -21,6 +21,7 @@ use secp256k1::PublicKey;
 
 use crate::ai_agents_teams::models::Graph;
 use crate::common::models;
+use crate::wallets::models::Description;
 
 impl<T> Type for models::PositiveNonZero<T>
 where
@@ -295,6 +296,38 @@ impl ToJSON for Stringified<PublicKey> {
 }
 
 impl From<Stringified<Self>> for PublicKey {
+    fn from(value: Stringified<Self>) -> Self {
+        value.0
+    }
+}
+
+impl Format for Description {
+    type Alias = String;
+    fn format() -> &'static str {
+        "description"
+    }
+}
+
+impl ParseFromParameter for Stringified<Description> {
+    fn parse_from_parameter(value: &str) -> ParseResult<Self> {
+        value.to_owned().try_into().map(Self).map_err(Into::into)
+    }
+}
+
+impl ParseFromJSON for Stringified<Description> {
+    fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
+        let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
+        value.try_into().map(Self).map_err(Into::into)
+    }
+}
+
+impl ToJSON for Stringified<Description> {
+    fn to_json(&self) -> Option<serde_json::Value> {
+        self.0.as_ref().to_json()
+    }
+}
+
+impl From<Stringified<Self>> for Description {
     fn from(value: Stringified<Self>) -> Self {
         value.0
     }
