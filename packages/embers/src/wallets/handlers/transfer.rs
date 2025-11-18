@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use firefly_client::models::{DeployId, SignedCode, WalletAddress};
-use firefly_client::rendering::{Render, Uri};
+use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
+use firefly_client::rendering::Render;
 
 use crate::common::models::PreparedContract;
 use crate::common::prepare_for_signing;

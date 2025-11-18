@@ -1,7 +1,7 @@
 use anyhow::Context;
 use chrono::{DateTime, Utc};
-use firefly_client::models::DeployId;
-use firefly_client::rendering::{Render, Uri};
+use firefly_client::models::{DeployId, Uri};
+use firefly_client::rendering::Render;
 
 use crate::ai_agents::handlers::AgentsService;
 use crate::ai_agents::models::{DeployAgentReq, DeployAgentResp, DeploySignedAgentReq};
