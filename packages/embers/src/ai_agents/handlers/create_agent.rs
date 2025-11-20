@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc};
-use firefly_client::models::{DeployId, SignedCode};
-use firefly_client::rendering::{Render, Uri};
+use firefly_client::models::{DeployId, SignedCode, Uri};
+use firefly_client::rendering::Render;
 use uuid::Uuid;
 
 use crate::ai_agents::handlers::AgentsService;
