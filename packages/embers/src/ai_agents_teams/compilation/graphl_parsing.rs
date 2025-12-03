@@ -154,9 +154,9 @@ impl<'a> graphl_parser::Visitor<'a, FlatGraph<'a>, anyhow::Error> for Visitor {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type")]
 enum NodeContext {
-    #[serde(rename = "input")]
+    #[serde(rename = "input-node")]
     Input,
-    #[serde(rename = "output")]
+    #[serde(rename = "output-node")]
     Output,
     #[serde(rename = "compress")]
     Compress,
@@ -223,7 +223,7 @@ fn resolve_context<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result
         (Some(_), Some(_)) => return Err(anyhow!("node {node} has multiple contexts")),
     };
 
-    serde_json::from_str(context).with_context(|| "node {node} has invalid context")
+    serde_json::from_str(context).with_context(|| format!("node {node} has invalid context"))
 }
 
 fn resolve_froms<'a>(
