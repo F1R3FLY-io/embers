@@ -354,7 +354,7 @@ impl From<PublicKey> for WalletAddress {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Into, AsRef)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Into, AsRef)]
 pub struct Uri(String);
 
 const CRC14: crc::Algorithm<u16> = crc::Algorithm {

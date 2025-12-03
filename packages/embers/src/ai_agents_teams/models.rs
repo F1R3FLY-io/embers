@@ -145,3 +145,16 @@ pub struct PublishAgentsTeamToFireskyReq {
 pub struct PublishAgentsTeamToFireskyResp {
     pub contract: PreparedContract,
 }
+
+#[derive(Debug, Clone)]
+pub struct FireskyCredentials {
+    pub pds_url: String,
+    pub email: String,
+    pub token: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedRunAgentsTeamFireskyReq {
+    pub contract: SignedCode,
+    pub agents_team: Uri,
+}

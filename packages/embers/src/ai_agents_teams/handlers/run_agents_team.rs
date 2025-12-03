@@ -3,6 +3,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
+use futures::FutureExt;
 
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::{RunAgentsTeamReq, RunAgentsTeamResp};
@@ -72,8 +73,7 @@ impl AgentsTeamsService {
         let deploy_waiter = self
             .observer_node_events
             .wait_for_deploy(&deploy_id, Duration::from_secs(60));
-        let (_, finalized) =
-            tokio::try_join!(write_client.propose(), async { Ok(deploy_waiter.await) })?;
+        let (_, finalized) = tokio::try_join!(write_client.propose(), deploy_waiter.map(Ok))?;
 
         if !finalized {
             return Err(anyhow!("block is not finalized"));

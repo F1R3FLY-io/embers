@@ -453,6 +453,52 @@ class AiAgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
+    def publish_to_firesky(self, wallet: Wallet, agent_id: str) -> UpdateResponce:
+        resp = self._client.post(
+            f"/ai-agents-teams/{wallet.address}/{agent_id}/publish-to-firesky/prepare",
+            json={
+                "pds_url": "http://localhost:2583",
+                "email": "bar@bar.com",
+                "handle": "bar.test",
+                "password": "hunter22",
+            },
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/ai-agents-teams/{wallet.address}/{agent_id}/publish-to-firesky/send",
+            json=sing_contract(wallet, resp.json["contract"]),
+        )
+        assert resp_next.status == 200
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
+        )
+
+    def run_on_firesky(self, wallet: Wallet, prompt: str, uri: str) -> UpdateResponce:
+        resp = self._client.post(
+            "/ai-agents-teams/run-on-firesky/prepare",
+            json={"prompt": prompt, "phlo_limit": "50000000", "agents_team": uri},
+        )
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            "/ai-agents-teams/run-on-firesky/send",
+            json={"contract": sing_contract(wallet, resp.json["contract"]), "agents_team": uri},
+        )
+        assert resp_next.status == 200
+
+        accepted = threading.Event()
+        accepted.set()
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=accepted,
+        )
+
 
 class ApiClient:
     def __init__(self, backend_url: str):
