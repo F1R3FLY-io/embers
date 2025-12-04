@@ -1,4 +1,8 @@
-use anyhow::Context;
+use std::sync::Arc;
+
+use aes_gcm::{Aes256Gcm, Key};
+use anyhow::{Context, anyhow};
+use firefly_client::errors::ReadNodeError;
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::{DeployData, Uri};
 use firefly_client::rendering::Render;
@@ -6,7 +10,10 @@ use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 use crate::ai_agents::handlers::AgentsService;
+use crate::ai_agents_teams::blockchain;
+use crate::ai_agents_teams::common::{EncryptedMsg, deserialize_decrypted};
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
+use crate::ai_agents_teams::models::FireskyCredentials;
 use crate::testnet::handlers::TestnetService;
 use crate::wallets::handlers::WalletsService;
 
@@ -70,6 +77,12 @@ struct InitAgentsTeamsEnv {
     sig: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Render)]
+#[template(path = "ai_agents_teams/get_firesky_tokens.rho")]
+struct GetFireskyTokens {
+    env_uri: Uri,
+}
+
 impl AgentsTeamsService {
     #[tracing::instrument(level = "info", skip_all, err(Debug))]
     pub async fn bootstrap(
@@ -78,7 +91,7 @@ impl AgentsTeamsService {
         observer_node_events: NodeEvents,
         deployer_key: &SecretKey,
         env_key: &SecretKey,
-        aes_encryption_key: [u8; 32],
+        aes_encryption_key: Key<Aes256Gcm>,
     ) -> anyhow::Result<Self> {
         let secp = Secp256k1::new();
         let env_public_key = PublicKey::from_secret_key(&secp, env_key);
@@ -106,12 +119,51 @@ impl AgentsTeamsService {
             .await
             .context("failed to deploy agents teams env")?;
 
+        let code = GetFireskyTokens {
+            env_uri: env_uri.clone(),
+        }
+        .render()?;
+
+        let encrypted_accounts: Result<Vec<EncryptedMsg>, _> = read_client.get_data(code).await;
+
+        let firesky_accounts = match encrypted_accounts {
+            Ok(encrypted_accounts) => encrypted_accounts
+                .into_iter()
+                .map(|account| {
+                    deserialize_decrypted::<blockchain::dtos::FireskyCredentials>(
+                        account,
+                        &aes_encryption_key,
+                    )
+                })
+                .inspect(|decrypted| {
+                    if let Err(err) = decrypted {
+                        tracing::info!("failed to decrypt entry: {err}");
+                    }
+                })
+                .flatten()
+                .map(|cred| {
+                    let uri = cred.uri.try_into()?;
+                    Ok((
+                        uri,
+                        FireskyCredentials {
+                            pds_url: cred.pds_url,
+                            email: cred.email,
+                            token: cred.token,
+                        },
+                    ))
+                })
+                .collect::<anyhow::Result<_>>()?,
+            Err(ReadNodeError::ReturnValueMissing) => Default::default(),
+            Err(err) => return Err(anyhow!(err)),
+        };
+
         Ok(Self {
             uri: env_uri,
             write_client,
             read_client,
             observer_node_events,
-            aes_encryption_key: aes_encryption_key.into(),
+            aes_encryption_key,
+            firesky_accounts: Arc::new(firesky_accounts),
         })
     }
 }

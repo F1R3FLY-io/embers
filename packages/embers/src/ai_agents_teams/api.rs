@@ -13,6 +13,7 @@ use crate::ai_agents_teams::api::dtos::{
     DeployAgentsTeamReq,
     DeployAgentsTeamResp,
     DeploySignedAgentsTeamtReq,
+    DeploySignedRunAgentsTeamFireskyReq,
     PublishAgentsTeamToFireskyReq,
     PublishAgentsTeamToFireskyResp,
     RunAgentsTeamReq,
@@ -138,6 +139,30 @@ impl AIAgentsTeams {
             .await
             .map(Json)
             .map_err(Into::into)
+    }
+
+    #[oai(path = "/run-on-firesky/prepare", method = "post")]
+    async fn prepare_run_agents_team_on_firesky(
+        &self,
+        Json(body): Json<RunAgentsTeamReq>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> poem::Result<Json<RunAgentsTeamResp>> {
+        let contract = agents_teams
+            .prepare_run_agents_team_firesky_contract(body.into())
+            .await?;
+        Ok(Json(contract.into()))
+    }
+
+    #[oai(path = "/run-on-firesky/send", method = "post")]
+    async fn run_agents_team_on_firesky(
+        &self,
+        Json(body): Json<DeploySignedRunAgentsTeamFireskyReq>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> poem::Result<()> {
+        agents_teams
+            .deploy_signed_run_agents_team_firesky(body.into())
+            .await?;
+        Ok(())
     }
 
     #[oai(path = "/:id/save/prepare", method = "post")]

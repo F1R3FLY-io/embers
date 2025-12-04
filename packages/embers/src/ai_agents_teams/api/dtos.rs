@@ -159,3 +159,10 @@ pub struct PublishAgentsTeamToFireskyReq {
 pub struct PublishAgentsTeamToFireskyResp {
     pub contract: PreparedContract,
 }
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(into(models::DeploySignedRunAgentsTeamFireskyReq))]
+pub struct DeploySignedRunAgentsTeamFireskyReq {
+    pub contract: SignedContract,
+    pub agents_team: Stringified<Uri>,
+}

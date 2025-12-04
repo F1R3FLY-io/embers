@@ -1,6 +1,11 @@
+use std::sync::Arc;
+
 use aes_gcm::{Aes256Gcm, Key};
+use dashmap::DashMap;
 use firefly_client::models::Uri;
 use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
+
+use crate::ai_agents_teams::models::FireskyCredentials;
 
 mod create_agents_team;
 mod delete_agents_team;
@@ -10,6 +15,7 @@ mod list_agents_team_versions;
 mod list_agents_teams;
 mod publish_agents_team_to_firesky;
 mod run_agents_team;
+mod run_agents_team_firesky;
 mod save_agents_team;
 
 #[derive(Clone)]
@@ -19,4 +25,5 @@ pub struct AgentsTeamsService {
     pub read_client: ReadNodeClient,
     pub observer_node_events: NodeEvents,
     pub aes_encryption_key: Key<Aes256Gcm>,
+    pub firesky_accounts: Arc<DashMap<Uri, FireskyCredentials>>,
 }

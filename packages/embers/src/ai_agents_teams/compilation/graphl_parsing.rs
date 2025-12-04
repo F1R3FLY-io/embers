@@ -11,8 +11,46 @@ use crate::common::tracing::record_trace;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, From, AsRef, Display)]
 pub struct Vertex<'a>(&'a str);
 
+impl<'a> TryFrom<&'a graphl_parser::ast::Name> for Vertex<'a> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'a graphl_parser::ast::Name) -> Result<Self, Self::Error> {
+        match value {
+            graphl_parser::ast::Name::Wildcard => {
+                Err(anyhow!("Wildcar is not supported in vertex name"))
+            }
+            graphl_parser::ast::Name::VVar { value } => Ok(Vertex(value)),
+            graphl_parser::ast::Name::GVar { value } => Ok(Vertex(value)),
+            graphl_parser::ast::Name::QuoteGraph { .. } => {
+                Err(anyhow!("QuoteGraph is not supported in vertex name"))
+            }
+            graphl_parser::ast::Name::QuoteVertex { .. } => {
+                Err(anyhow!("QuoteVertex is not supported in vertex name"))
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, From, AsRef, Display)]
 pub struct Name<'a>(&'a str);
+
+impl<'a> TryFrom<&'a graphl_parser::ast::Name> for Name<'a> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &'a graphl_parser::ast::Name) -> Result<Self, Self::Error> {
+        match value {
+            graphl_parser::ast::Name::Wildcard => Err(anyhow!("Wildcar is not supported in name")),
+            graphl_parser::ast::Name::VVar { value } => Ok(Name(value)),
+            graphl_parser::ast::Name::GVar { value } => Ok(Name(value)),
+            graphl_parser::ast::Name::QuoteGraph { .. } => {
+                Err(anyhow!("QuoteGraph is not supported in name"))
+            }
+            graphl_parser::ast::Name::QuoteVertex { .. } => {
+                Err(anyhow!("QuoteVertex is not supported in name"))
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 struct FlatGraph<'a> {
@@ -32,20 +70,7 @@ impl<'a> graphl_parser::Visitor<'a, FlatGraph<'a>, anyhow::Error> for Visitor {
         mut acc: FlatGraph<'a>,
         vertex: &'a graphl_parser::ast::GVertex,
     ) -> Result<FlatGraph<'a>, anyhow::Error> {
-        let name = match &vertex.vertex.name {
-            graphl_parser::ast::Name::Wildcard => {
-                return Err(anyhow!("Wildcar is not supported in vertex name"));
-            }
-            graphl_parser::ast::Name::VVar { value } => Vertex(value),
-            graphl_parser::ast::Name::GVar { value } => Vertex(value),
-            graphl_parser::ast::Name::QuoteGraph { .. } => {
-                return Err(anyhow!("QuoteGraph is not supported in vertex name"));
-            }
-            graphl_parser::ast::Name::QuoteVertex { .. } => {
-                return Err(anyhow!("QuoteVertex is not supported in vertex name"));
-            }
-        };
-
+        let name = (&vertex.vertex.name).try_into()?;
         acc.vertexes.insert(name);
         Ok(acc)
     }
@@ -55,23 +80,8 @@ impl<'a> graphl_parser::Visitor<'a, FlatGraph<'a>, anyhow::Error> for Visitor {
         mut acc: FlatGraph<'a>,
         binding: &'a graphl_parser::ast::Binding,
     ) -> Result<FlatGraph<'a>, anyhow::Error> {
-        let (binding, name) = match &binding.vertex.name {
-            graphl_parser::ast::Name::Wildcard => {
-                return Err(anyhow!("Wildcar is not supported in binding vertex name"));
-            }
-            graphl_parser::ast::Name::VVar { value } => (Name(&binding.var), Vertex(value)),
-            graphl_parser::ast::Name::GVar { value } => (Name(&binding.var), Vertex(value)),
-            graphl_parser::ast::Name::QuoteGraph { .. } => {
-                return Err(anyhow!(
-                    "QuoteGraph is not supported in binding vertex name"
-                ));
-            }
-            graphl_parser::ast::Name::QuoteVertex { .. } => {
-                return Err(anyhow!(
-                    "QuoteVertex is not supported in binding vertex name"
-                ));
-            }
-        };
+        let name = (&binding.vertex.name).try_into()?;
+        let binding = Name(&binding.var);
 
         acc.vertexes.insert(name);
         match acc.bindings.entry(binding) {
@@ -121,19 +131,7 @@ impl<'a> graphl_parser::Visitor<'a, FlatGraph<'a>, anyhow::Error> for Visitor {
         mut acc: FlatGraph<'a>,
         context: &'a graphl_parser::ast::GContext,
     ) -> Result<FlatGraph<'a>, anyhow::Error> {
-        let name = match &context.name {
-            graphl_parser::ast::Name::Wildcard => {
-                return Err(anyhow!("Wildcar is not supported in context name"));
-            }
-            graphl_parser::ast::Name::VVar { value } => Name(value),
-            graphl_parser::ast::Name::GVar { value } => Name(value),
-            graphl_parser::ast::Name::QuoteGraph { .. } => {
-                return Err(anyhow!("QuoteGraph is not supported in context name"));
-            }
-            graphl_parser::ast::Name::QuoteVertex { .. } => {
-                return Err(anyhow!("QuoteVertex is not supported in context name"));
-            }
-        };
+        let name = (&context.name).try_into()?;
 
         match acc.contexts.entry(name) {
             Entry::Vacant(vacant_entry) => {

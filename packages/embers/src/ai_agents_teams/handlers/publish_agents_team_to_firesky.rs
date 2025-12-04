@@ -1,5 +1,3 @@
-use aes_gcm::Aes256Gcm;
-use aes_gcm::aead::{Aead, AeadCore, KeyInit, OsRng};
 use atrium_api::agent::Agent;
 use atrium_api::agent::atp_agent::CredentialSession;
 use atrium_api::agent::atp_agent::store::MemorySessionStore;
@@ -10,8 +8,11 @@ use atrium_xrpc_client::reqwest::ReqwestClient;
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
+use crate::ai_agents_teams::blockchain;
+use crate::ai_agents_teams::common::{EncryptedMsg, serialize_encrypted};
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::{
+    FireskyCredentials,
     PublishAgentsTeamToFireskyReq,
     PublishAgentsTeamToFireskyResp,
 };
@@ -24,7 +25,6 @@ struct SaveFireskyToken {
     env_uri: Uri,
     nonce: Vec<u8>,
     ciphertext: Vec<u8>,
-    uri: Uri,
 }
 
 impl AgentsTeamsService {
@@ -44,7 +44,7 @@ impl AgentsTeamsService {
             .uri
             .ok_or_else(|| anyhow::anyhow!("agents team not deployed"))?;
 
-        let http_client = ReqwestClient::new(request.pds_url);
+        let http_client = ReqwestClient::new(request.pds_url.clone());
         let client = AtpServiceClient::new(http_client.clone());
 
         client
@@ -69,7 +69,7 @@ impl AgentsTeamsService {
             .await?;
 
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
-        session.login(request.email, request.password).await?;
+        session.login(&request.email, request.password).await?;
         let agent = Agent::new(session);
 
         let result = agent
@@ -86,15 +86,28 @@ impl AgentsTeamsService {
             )
             .await?;
 
-        let cipher = Aes256Gcm::new(&self.aes_encryption_key);
-        let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-        let ciphertext = cipher.encrypt(&nonce, result.password.as_ref())?;
+        let payload = blockchain::dtos::FireskyCredentials {
+            uri: uri.clone().into(),
+            pds_url: request.pds_url.clone(),
+            email: request.email.clone(),
+            token: result.data.password.clone(),
+        };
+        let EncryptedMsg { ciphertext, nonce } =
+            serialize_encrypted(payload, &self.aes_encryption_key)?;
+
+        self.firesky_accounts.insert(
+            uri,
+            FireskyCredentials {
+                pds_url: request.pds_url,
+                email: request.email,
+                token: result.data.password,
+            },
+        );
 
         let contract = SaveFireskyToken {
             env_uri: self.uri.clone(),
-            nonce: nonce.to_vec(),
+            nonce,
             ciphertext,
-            uri,
         }
         .render()?;
 

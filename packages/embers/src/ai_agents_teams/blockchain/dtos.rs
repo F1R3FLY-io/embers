@@ -1,5 +1,5 @@
 use derive_more::Into;
-use serde::{Deserialize, de};
+use serde::{Deserialize, Serialize, de};
 use structural_convert::StructuralConvert;
 
 use crate::ai_agents_teams::models;
@@ -52,4 +52,12 @@ pub struct AgentsTeam {
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Graph>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FireskyCredentials {
+    pub uri: String,
+    pub pds_url: String,
+    pub email: String,
+    pub token: String,
 }

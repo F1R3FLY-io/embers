@@ -362,7 +362,7 @@ in {
         }
     } |
 
-    contract agentsTeams(@"saveFireskyToken", @uri, @nonce, @ciphertext) = {
+    contract agentsTeams(@"saveFireskyToken", @nonce, @ciphertext) = {
         for(@tokens <<- tokensCh; stack <<- stackCh) {
             stack!("push", tokens, {"nonce": nonce, "ciphertext": ciphertext}, *devNull)
         }
