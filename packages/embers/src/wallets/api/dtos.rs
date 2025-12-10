@@ -63,7 +63,7 @@ pub struct WalletStateAndHistory {
     pub transfers: Vec<Transfer>,
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
+#[derive(Debug, Clone, Hash, Object, StructuralConvert)]
 #[convert(into(models::TransferReq))]
 pub struct TransferReq {
     pub from: Stringified<WalletAddress>,
@@ -72,12 +72,13 @@ pub struct TransferReq {
     pub description: Option<String>,
 }
 
-#[derive(Debug, Clone, Object)]
+#[derive(Debug, Clone, Hash, Object, StructuralConvert)]
+#[convert(from(models::TransferResp))]
 pub struct TransferResp {
     pub contract: PreparedContract,
 }
 
-#[derive(Debug, Clone, Object, StructuralConvert)]
+#[derive(Debug, Clone, Hash, Object, StructuralConvert)]
 #[convert(into(models::BoostReq))]
 pub struct BoostReq {
     pub from: Stringified<WalletAddress>,
@@ -88,7 +89,8 @@ pub struct BoostReq {
     pub post_id: Option<String>,
 }
 
-#[derive(Debug, Clone, Object)]
+#[derive(Debug, Clone, Hash, Object, StructuralConvert)]
+#[convert(from(models::BoostResp))]
 pub struct BoostResp {
     pub contract: PreparedContract,
 }

@@ -4,6 +4,8 @@ use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
 use poem::{EndpointExt, Route, Server};
 use poem_openapi::OpenApiService;
+use secp256k1::rand;
+use secp256k1::rand::distr::{Alphanumeric, SampleString};
 use tokio::try_join;
 
 use crate::ai_agents::api::AIAgents;
@@ -111,6 +113,8 @@ async fn main() -> anyhow::Result<()> {
         },
     )?;
 
+    let secret = Alphanumeric.sample_string(&mut rand::rng(), 20);
+
     let api = OpenApiService::new(
         (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams),
         "Embers API",
@@ -127,6 +131,8 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/index.html", ui)
         .nest("/swagger-ui/openapi.json", spec)
         .nest("/swagger-ui/openapi.yaml", spec_yaml)
+        .data(jsonwebtoken::EncodingKey::from_secret(secret.as_ref()))
+        .data(jsonwebtoken::DecodingKey::from_secret(secret.as_ref()))
         .data(agents_service)
         .data(agents_teams_service)
         .data(wallets_service)

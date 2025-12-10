@@ -17,7 +17,7 @@ impl From<models::CreateTestwalletResp> for CreateTestwalletResp {
     }
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::DeployTestResp))]
 pub struct DeployTestResp {
     pub env_contract: Option<PreparedContract>,
@@ -31,7 +31,7 @@ pub struct DeploySignedTestReq {
     pub test: SignedContract,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(into(models::DeployTestReq))]
 pub struct DeployTestReq {
     pub env: Option<String>,

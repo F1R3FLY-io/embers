@@ -2,11 +2,10 @@ use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
-use crate::common::models::PreparedContract;
 use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
 use crate::wallets::handlers::WalletsService;
-use crate::wallets::models::BoostReq;
+use crate::wallets::models::{BoostReq, BoostResp};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "wallets/boost.rho")]
@@ -29,10 +28,7 @@ impl WalletsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn prepare_boost_contract(
-        &self,
-        request: BoostReq,
-    ) -> anyhow::Result<PreparedContract> {
+    pub async fn prepare_boost_contract(&self, request: BoostReq) -> anyhow::Result<BoostResp> {
         record_trace!(request);
 
         let contract = BoostContract {
@@ -48,10 +44,12 @@ impl WalletsService {
         .render()?;
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
-        Ok(prepare_for_signing()
+        let contract = prepare_for_signing()
             .code(contract)
             .valid_after_block_number(valid_after)
-            .call())
+            .call();
+
+        Ok(BoostResp { contract })
     }
 
     #[tracing::instrument(

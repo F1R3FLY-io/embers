@@ -2,7 +2,7 @@ use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::payload::Json;
 
-use crate::common::api::dtos::ApiTags;
+use crate::common::api::dtos::{ApiTags, PrepareResponse, SendRequest};
 use crate::testnet::api::dtos::{
     CreateTestwalletResp,
     DeploySignedTestReq,
@@ -33,18 +33,23 @@ impl Testnet {
         &self,
         Json(body): Json<DeployTestReq>,
         Data(testnet): Data<&TestnetService>,
-    ) -> poem::Result<Json<DeployTestResp>> {
-        let contracts = testnet.prepare_test_contract(body.into()).await?;
-        Ok(Json(contracts.into()))
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<DeployTestResp>>> {
+        let contracts = testnet.prepare_test_contract(body.clone().into()).await?;
+        Ok(Json(PrepareResponse::new(
+            &body,
+            contracts.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/deploy/send", method = "post")]
     async fn deploy(
         &self,
-        Json(body): Json<DeploySignedTestReq>,
+        SendRequest(body): SendRequest<DeploySignedTestReq, DeployTestReq, DeployTestResp>,
         Data(testnet): Data<&TestnetService>,
     ) -> poem::Result<Json<DeploySignedTestResp>> {
-        let result = testnet.deploy_test_contract(body.into()).await?;
+        let result = testnet.deploy_test_contract(body.request.into()).await?;
         Ok(Json(result.into()))
     }
 }

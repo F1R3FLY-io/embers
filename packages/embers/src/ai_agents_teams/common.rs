@@ -32,6 +32,7 @@ where
     T: for<'de> Deserialize<'de>,
 {
     let cipher = Aes256Gcm::new(key);
+    #[allow(deprecated)]
     let nonce = Nonce::<Aes256Gcm>::from_exact_iter(nonce)
         .ok_or_else(|| anyhow::anyhow!("invalid nonce length"))?;
     let data = cipher.decrypt(&nonce, ciphertext.as_ref())?;

@@ -2,11 +2,10 @@ use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
-use crate::common::models::PreparedContract;
 use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
 use crate::wallets::handlers::WalletsService;
-use crate::wallets::models::TransferReq;
+use crate::wallets::models::{TransferReq, TransferResp};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "wallets/transfer.rho")]
@@ -30,7 +29,7 @@ impl WalletsService {
     pub async fn prepare_transfer_contract(
         &self,
         request: TransferReq,
-    ) -> anyhow::Result<PreparedContract> {
+    ) -> anyhow::Result<TransferResp> {
         record_trace!(request);
 
         let contract = TransferContract {
@@ -44,10 +43,11 @@ impl WalletsService {
         .render()?;
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
-        Ok(prepare_for_signing()
+        let contract = prepare_for_signing()
             .code(contract)
             .valid_after_block_number(valid_after)
-            .call())
+            .call();
+        Ok(TransferResp { contract })
     }
 
     #[tracing::instrument(

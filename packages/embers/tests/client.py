@@ -95,14 +95,21 @@ class TestnetApi:
         return resp
 
     def deploy(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
-        resp = self._client.post("/testnet/deploy/prepare", json={"test": test, "env": env})
+        prepare_request = {"test": test, "env": env}
+
+        resp = self._client.post("/testnet/deploy/prepare", json=prepare_request)
         assert resp.status == 200
 
         json = {
-            "test": sing_contract(wallet, resp.json["test_contract"]),
-            "env": sing_contract(wallet, resp.json["env_contract"])
-            if resp.json.get("env_contract") is not None
-            else None,
+            "prepare_request": prepare_request,
+            "prepare_response": resp.json["response"],
+            "request": {
+                "test": sing_contract(wallet, resp.json["response"]["test_contract"]),
+                "env": sing_contract(wallet, resp.json["response"]["env_contract"])
+                if resp.json["response"].get("env_contract") is not None
+                else None,
+            },
+            "token": resp.json["token"],
         }
 
         resp_next = self._client.post("/testnet/deploy/send", json=json)
@@ -140,13 +147,24 @@ class WalletsApi:
         amount: int,
         description: str | None = None,
     ) -> UpdateResponce:
-        resp = self._client.post(
-            "/wallets/transfer/prepare",
-            json={"from": from_wallet.address, "to": to_wallet.address, "amount": amount, "description": description},
-        )
+        prepare_request = {
+            "from": from_wallet.address,
+            "to": to_wallet.address,
+            "amount": amount,
+            "description": description,
+        }
+        resp = self._client.post("/wallets/transfer/prepare", json=prepare_request)
         assert resp.status == 200
 
-        resp_next = self._client.post("/wallets/transfer/send", json=sing_contract(from_wallet, resp.json["contract"]))
+        resp_next = self._client.post(
+            "/wallets/transfer/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(from_wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+        )
         assert resp_next.status == 200
 
         return UpdateResponce(
@@ -164,20 +182,26 @@ class WalletsApi:
         description: str | None = None,
         post_id: str | None = None,
     ) -> UpdateResponce:
-        resp = self._client.post(
-            "/wallets/boost/prepare",
-            json={
-                "from": from_wallet.address,
-                "to": to_wallet.address,
-                "amount": amount,
-                "description": description,
-                "post_author_did": post_author_did,
-                "post_id": post_id,
-            },
-        )
+        prepare_request = {
+            "from": from_wallet.address,
+            "to": to_wallet.address,
+            "amount": amount,
+            "description": description,
+            "post_author_did": post_author_did,
+            "post_id": post_id,
+        }
+        resp = self._client.post("/wallets/boost/prepare", json=prepare_request)
         assert resp.status == 200
 
-        resp_next = self._client.post("/wallets/boost/send", json=sing_contract(from_wallet, resp.json["contract"]))
+        resp_next = self._client.post(
+            "/wallets/boost/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(from_wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+        )
         assert resp_next.status == 200
 
         return UpdateResponce(

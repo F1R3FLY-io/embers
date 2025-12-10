@@ -1,10 +1,14 @@
+use std::any::TypeId;
 use std::borrow::Cow;
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
 use derive_more::From;
 use firefly_client::helpers::ShortHex;
 use firefly_client::models::{DeployId, Uri, WalletAddress};
+use poem::FromRequest;
+use poem::web::Data;
 use poem_openapi::payload::Json;
 use poem_openapi::registry::{MetaSchema, MetaSchemaRef, Registry};
 use poem_openapi::types::{
@@ -16,8 +20,9 @@ use poem_openapi::types::{
     ToJSON,
     Type,
 };
-use poem_openapi::{ApiResponse, NewType, Object, Tags};
+use poem_openapi::{ApiExtractor, ApiResponse, NewType, Object, Tags};
 use secp256k1::PublicKey;
+use serde::{Deserialize, Serialize};
 
 use crate::ai_agents_teams::models::Graph;
 use crate::common::models;
@@ -57,7 +62,7 @@ where
 
 /// Transforms T to [`String`] before serialization/deserialization
 /// and keeps original format in `OpenApi` model.
-#[derive(Debug, Clone, From)]
+#[derive(Debug, Clone, Hash, From)]
 pub struct Stringified<T>(pub T);
 
 impl<T> Type for Stringified<T>
@@ -388,7 +393,7 @@ where
     }
 }
 
-#[derive(derive_more::Debug, Clone, NewType)]
+#[derive(derive_more::Debug, Clone, Hash, NewType)]
 #[oai(to_header = false, from_multipart = false)]
 #[debug("{:?}", _0.0.short_hex(32))]
 pub struct PreparedContract(pub Base64<Vec<u8>>);
@@ -450,5 +455,123 @@ impl From<DeployId> for SendResp {
         Self {
             deploy_id: value.into(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claims {
+    pub exp: u64,
+    pub hash: u64,
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct PrepareResponse<T>
+where
+    T: Type + ParseFromJSON + ToJSON,
+{
+    pub response: T,
+    pub token: String,
+}
+
+impl<T> PrepareResponse<T>
+where
+    T: Type + ParseFromJSON + ToJSON,
+{
+    pub fn new<R>(request: &R, response: T, secret: &jsonwebtoken::EncodingKey) -> Self
+    where
+        R: Hash + 'static,
+        T: Hash + 'static,
+    {
+        let exp = (Utc::now() + chrono::Days::new(1)).timestamp() as _;
+
+        let mut h = DefaultHasher::new();
+        (request, TypeId::of::<R>(), &response, TypeId::of::<T>()).hash(&mut h);
+        let hash = h.finish();
+
+        Self {
+            response,
+            token: jsonwebtoken::encode(&Default::default(), &Claims { exp, hash }, secret)
+                .unwrap(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Object)]
+pub struct SendRequestBody<T, R, C>
+where
+    T: Type + ParseFromJSON + ToJSON,
+    R: Type + ParseFromJSON + ToJSON,
+    C: Type + ParseFromJSON + ToJSON,
+{
+    pub prepare_request: R,
+    pub prepare_response: C,
+    pub request: T,
+    pub token: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SendRequest<T, R, C>(pub SendRequestBody<T, R, C>)
+where
+    T: Type + ParseFromJSON + ToJSON,
+    R: Type + ParseFromJSON + ToJSON,
+    C: Type + ParseFromJSON + ToJSON;
+
+impl<'a, T, R, C> ApiExtractor<'a> for SendRequest<T, R, C>
+where
+    T: Type + ParseFromJSON + ToJSON,
+    R: Type + ParseFromJSON + ToJSON + Hash + 'static,
+    C: Type + ParseFromJSON + ToJSON + Hash + 'static,
+{
+    const TYPES: &'static [poem_openapi::ApiExtractorType] =
+        &[poem_openapi::ApiExtractorType::RequestObject];
+    const PARAM_IS_REQUIRED: bool = true;
+
+    type ParamType = ();
+    type ParamRawType = ();
+
+    fn register(registry: &mut Registry) {
+        SendRequestBody::<T, R, C>::register(registry);
+    }
+
+    fn request_meta() -> Option<poem_openapi::registry::MetaRequest> {
+        Json::<SendRequestBody<T, R, C>>::request_meta()
+    }
+
+    async fn from_request(
+        request: &'a poem::Request,
+        body: &mut poem::RequestBody,
+        param_opts: poem_openapi::ExtractParamOptions<Self::ParamType>,
+    ) -> poem::Result<Self> {
+        let payload = Json::<SendRequestBody<T, R, C>>::from_request(request, body, param_opts)
+            .await?
+            .0;
+
+        let key = <Data<&jsonwebtoken::DecodingKey> as FromRequest>::from_request(request, body)
+            .await?
+            .0;
+
+        let claims = jsonwebtoken::decode::<Claims>(&payload.token, key, &Default::default())
+            .map_err(|err| poem_openapi::error::ParseRequestPayloadError {
+                reason: err.to_string(),
+            })?;
+
+        let mut h = DefaultHasher::new();
+        (
+            &payload.prepare_request,
+            TypeId::of::<R>(),
+            &payload.prepare_response,
+            TypeId::of::<C>(),
+        )
+            .hash(&mut h);
+        let hash = h.finish();
+
+        if hash != claims.claims.hash {
+            return Err(poem_openapi::error::ParseRequestPayloadError {
+                reason: "invalid token or request payloads".into(),
+            }
+            .into());
+        }
+
+        Ok(Self(payload))
     }
 }

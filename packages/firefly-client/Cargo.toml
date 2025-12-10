@@ -36,7 +36,7 @@ tokio-tungstenite     = { version = "0.28" }
 tonic                 = { version = "0.14" }
 tonic-prost           = { version = "0.14" }
 tracing               = { version = "0.1" }
-uuid                  = { version = "1.18", features = ["v7"] }
+uuid                  = { version = "1.19", features = ["v7"] }
 zbase32               = { version = "0.1" }
 
 [build-dependencies]

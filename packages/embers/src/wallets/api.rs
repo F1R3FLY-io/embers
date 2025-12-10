@@ -7,7 +7,14 @@ use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 use poem_openapi::types::ToJSON;
 
-use crate::common::api::dtos::{ApiTags, SendResp, SignedContract, Stringified};
+use crate::common::api::dtos::{
+    ApiTags,
+    PrepareResponse,
+    SendRequest,
+    SendResp,
+    SignedContract,
+    Stringified,
+};
 use crate::wallets::api::dtos::{
     BoostReq,
     BoostResp,
@@ -44,20 +51,25 @@ impl WalletsApi {
         &self,
         Json(body): Json<TransferReq>,
         Data(wallets): Data<&WalletsService>,
-    ) -> poem::Result<Json<TransferResp>> {
-        let result = wallets.prepare_transfer_contract(body.into()).await?;
-        Ok(Json(TransferResp {
-            contract: result.into(),
-        }))
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<TransferResp>>> {
+        let result = wallets
+            .prepare_transfer_contract(body.clone().into())
+            .await?;
+        Ok(Json(PrepareResponse::new(
+            &body,
+            result.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/transfer/send", method = "post")]
     async fn transfer(
         &self,
-        Json(body): Json<SignedContract>,
+        SendRequest(body): SendRequest<SignedContract, TransferReq, TransferResp>,
         Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = wallets.deploy_signed_transfer(body.into()).await?;
+        let deploy_id = wallets.deploy_signed_transfer(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 
@@ -66,20 +78,23 @@ impl WalletsApi {
         &self,
         Json(body): Json<BoostReq>,
         Data(wallets): Data<&WalletsService>,
-    ) -> poem::Result<Json<BoostResp>> {
-        let result = wallets.prepare_boost_contract(body.into()).await?;
-        Ok(Json(BoostResp {
-            contract: result.into(),
-        }))
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<BoostResp>>> {
+        let result = wallets.prepare_boost_contract(body.clone().into()).await?;
+        Ok(Json(PrepareResponse::new(
+            &body,
+            result.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/boost/send", method = "post")]
     async fn boost(
         &self,
-        Json(body): Json<SignedContract>,
+        SendRequest(body): SendRequest<SignedContract, BoostReq, BoostResp>,
         Data(wallets): Data<&WalletsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = wallets.deploy_boost_transfer(body.into()).await?;
+        let deploy_id = wallets.deploy_boost_transfer(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 

@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, WalletAddress};
 
-use crate::common::models::PositiveNonZero;
+use crate::common::models::{PositiveNonZero, PreparedContract};
 
 pub type Amount = PositiveNonZero<i64>;
 
@@ -90,4 +90,14 @@ pub struct DeployDescription {
 #[derive(Debug, Clone)]
 pub enum DeployEvent {
     Finalized(DeployDescription),
+}
+
+#[derive(Debug, Clone)]
+pub struct TransferResp {
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
+pub struct BoostResp {
+    pub contract: PreparedContract,
 }
