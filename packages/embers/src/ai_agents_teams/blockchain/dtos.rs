@@ -4,6 +4,7 @@ use structural_convert::StructuralConvert;
 
 use crate::ai_agents_teams::models;
 use crate::common::blockchain;
+use crate::common::blockchain::dtos::Hex;
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::AgentsTeams))]
@@ -60,4 +61,11 @@ pub struct FireskyCredentials {
     pub pds_url: String,
     pub email: String,
     pub token: String,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::EncryptedMsg))]
+pub struct EncryptedMsg {
+    pub ciphertext: Hex,
+    pub nonce: Hex,
 }

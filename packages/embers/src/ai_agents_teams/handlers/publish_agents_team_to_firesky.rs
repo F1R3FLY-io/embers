@@ -9,9 +9,10 @@ use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
 use crate::ai_agents_teams::blockchain;
-use crate::ai_agents_teams::common::{EncryptedMsg, serialize_encrypted};
+use crate::ai_agents_teams::common::serialize_encrypted;
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::{
+    EncryptedMsg,
     FireskyCredentials,
     PublishAgentsTeamToFireskyReq,
     PublishAgentsTeamToFireskyResp,

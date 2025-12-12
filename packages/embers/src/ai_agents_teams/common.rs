@@ -2,11 +2,7 @@ use aes_gcm::aead::{Aead, AeadCore, KeyInit, Nonce, OsRng};
 use aes_gcm::{Aes256Gcm, Key};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EncryptedMsg {
-    pub ciphertext: Vec<u8>,
-    pub nonce: Vec<u8>,
-}
+use crate::ai_agents_teams::models::EncryptedMsg;
 
 pub fn serialize_encrypted<T>(val: T, key: &Key<Aes256Gcm>) -> anyhow::Result<EncryptedMsg>
 where

@@ -31,3 +31,16 @@ impl<'de> Deserialize<'de> for Uri {
             .map_err(de::Error::custom)
     }
 }
+
+#[derive(Debug, Clone, Into)]
+pub struct Hex(Vec<u8>);
+
+impl<'de> Deserialize<'de> for Hex {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = String::deserialize(deserializer)?;
+        hex::decode(value).map(Self).map_err(de::Error::custom)
+    }
+}

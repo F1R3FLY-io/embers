@@ -158,3 +158,9 @@ pub struct DeploySignedRunAgentsTeamFireskyReq {
     pub contract: SignedCode,
     pub agents_team: Uri,
 }
+
+#[derive(Debug, Clone)]
+pub struct EncryptedMsg {
+    pub ciphertext: Vec<u8>,
+    pub nonce: Vec<u8>,
+}

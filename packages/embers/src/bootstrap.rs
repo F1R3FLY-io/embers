@@ -11,7 +11,7 @@ use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 use crate::ai_agents::handlers::AgentsService;
 use crate::ai_agents_teams::blockchain;
-use crate::ai_agents_teams::common::{EncryptedMsg, deserialize_decrypted};
+use crate::ai_agents_teams::common::deserialize_decrypted;
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::FireskyCredentials;
 use crate::testnet::handlers::TestnetService;
@@ -124,14 +124,15 @@ impl AgentsTeamsService {
         }
         .render()?;
 
-        let encrypted_accounts: Result<Vec<EncryptedMsg>, _> = read_client.get_data(code).await;
+        let encrypted_accounts: Result<Vec<blockchain::dtos::EncryptedMsg>, _> =
+            read_client.get_data(code).await;
 
         let firesky_accounts = match encrypted_accounts {
             Ok(encrypted_accounts) => encrypted_accounts
                 .into_iter()
                 .map(|account| {
                     deserialize_decrypted::<blockchain::dtos::FireskyCredentials>(
-                        account,
+                        account.into(),
                         &aes_encryption_key,
                     )
                 })

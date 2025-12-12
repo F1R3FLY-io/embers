@@ -2,12 +2,13 @@ use anyhow::anyhow;
 use atrium_api::agent::Agent;
 use atrium_api::agent::atp_agent::CredentialSession;
 use atrium_api::agent::atp_agent::store::MemorySessionStore;
-use atrium_api::app::bsky::feed;
+use atrium_api::app::bsky::{embed, feed};
 use atrium_api::com::atproto::repo::create_record;
 use atrium_api::record::KnownRecord;
 use atrium_api::types::string::{AtIdentifier, Datetime};
-use atrium_api::types::{Collection, TryIntoUnknown};
+use atrium_api::types::{Collection, TryIntoUnknown, Union};
 use atrium_xrpc_client::reqwest::ReqwestClient;
+use futures::{StreamExt, stream};
 
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::{
@@ -67,17 +68,24 @@ impl AgentsTeamsService {
             .create_record(
                 create_record::InputData {
                     collection: feed::Post::nsid(),
-                    record: KnownRecord::from(feed::post::RecordData {
-                        created_at: Datetime::now(),
-                        embed: None,
-                        entities: None,
-                        facets: None,
-                        labels: None,
-                        langs: None,
-                        reply: None,
-                        tags: None,
-                        text: serde_json::to_string(&resp)?,
-                    })
+                    record: KnownRecord::from(
+                        transform_to_post(
+                            feed::post::RecordData {
+                                created_at: Datetime::now(),
+                                embed: None,
+                                entities: None,
+                                facets: None,
+                                labels: None,
+                                langs: None,
+                                reply: None,
+                                tags: None,
+                                text: Default::default(),
+                            },
+                            &agent,
+                            resp,
+                        )
+                        .await,
+                    )
                     .try_into_unknown()?,
                     repo: AtIdentifier::Did(did),
                     rkey: None,
@@ -89,5 +97,79 @@ impl AgentsTeamsService {
             .await?;
 
         Ok(())
+    }
+}
+
+async fn transform_to_post<S>(
+    mut acc: feed::post::RecordData,
+    agent: &Agent<S>,
+    value: serde_json::Value,
+) -> feed::post::RecordData
+where
+    S: atrium_api::agent::SessionManager + Send + Sync,
+{
+    match value {
+        serde_json::Value::Null => acc,
+        serde_json::Value::Bool(b) => {
+            acc.text.push_str(&b.to_string());
+            acc
+        }
+        serde_json::Value::Number(number) => {
+            acc.text.push_str(&number.to_string());
+            acc
+        }
+        serde_json::Value::String(string) => {
+            if string.chars().take(50).all(|c| c.is_ascii_hexdigit()) {
+                // ignore tts for now
+            } else if string.starts_with("http") {
+                // tti
+                let Ok(resp) = reqwest::get(string).await else {
+                    return acc;
+                };
+
+                let Ok(bytes) = resp.bytes().await else {
+                    return acc;
+                };
+
+                let Ok(blob_ref) = agent.api.com.atproto.repo.upload_blob(bytes.to_vec()).await
+                else {
+                    return acc;
+                };
+
+                acc.embed = Some(Union::Refs(
+                    feed::post::RecordEmbedRefs::AppBskyEmbedImagesMain(Box::new(
+                        embed::images::MainData {
+                            images: vec![
+                                embed::images::ImageData {
+                                    alt: Default::default(),
+                                    aspect_ratio: None,
+                                    image: blob_ref.data.blob,
+                                }
+                                .into(),
+                            ],
+                        }
+                        .into(),
+                    )),
+                ));
+            } else {
+                acc.text.push_str(&string);
+            }
+
+            acc
+        }
+        serde_json::Value::Array(values) => {
+            stream::iter(values)
+                .fold(acc, |acc, value| {
+                    Box::pin(transform_to_post(acc, agent, value))
+                })
+                .await
+        }
+        serde_json::Value::Object(map) => {
+            stream::iter(map)
+                .fold(acc, |acc, (_, value)| {
+                    Box::pin(transform_to_post(acc, agent, value))
+                })
+                .await
+        }
     }
 }
