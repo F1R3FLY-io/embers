@@ -3,7 +3,7 @@ use atrium_api::agent::Agent;
 use atrium_api::agent::atp_agent::CredentialSession;
 use atrium_api::agent::atp_agent::store::MemorySessionStore;
 use atrium_api::app::bsky::{embed, feed};
-use atrium_api::com::atproto::repo::create_record;
+use atrium_api::com::atproto::repo::{create_record, strong_ref};
 use atrium_api::record::KnownRecord;
 use atrium_api::types::string::{AtIdentifier, Datetime};
 use atrium_api::types::{Collection, TryIntoUnknown, Union};
@@ -60,6 +60,38 @@ impl AgentsTeamsService {
 
         let agent = Agent::new(session);
 
+        let reply = request
+            .reply_to
+            .map(|reply_to| {
+                let parent_cid = reply_to
+                    .parent
+                    .cid
+                    .parse()
+                    .map_err(|err| anyhow::anyhow!("invalid parent cid: {err:?}"))?;
+                let root_cid = reply_to
+                    .root
+                    .cid
+                    .parse()
+                    .map_err(|err| anyhow::anyhow!("invalid root cid: {err:?}"))?;
+
+                anyhow::Ok(
+                    feed::post::ReplyRefData {
+                        parent: strong_ref::MainData {
+                            cid: parent_cid,
+                            uri: reply_to.parent.uri,
+                        }
+                        .into(),
+                        root: strong_ref::MainData {
+                            cid: root_cid,
+                            uri: reply_to.root.uri,
+                        }
+                        .into(),
+                    }
+                    .into(),
+                )
+            })
+            .transpose()?;
+
         agent
             .api
             .com
@@ -77,7 +109,7 @@ impl AgentsTeamsService {
                                 facets: None,
                                 labels: None,
                                 langs: None,
-                                reply: None,
+                                reply,
                                 tags: None,
                                 text: Default::default(),
                             },

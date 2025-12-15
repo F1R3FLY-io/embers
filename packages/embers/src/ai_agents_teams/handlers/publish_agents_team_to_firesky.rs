@@ -1,9 +1,11 @@
 use atrium_api::agent::Agent;
 use atrium_api::agent::atp_agent::CredentialSession;
 use atrium_api::agent::atp_agent::store::MemorySessionStore;
+use atrium_api::app::bsky::actor::{Profile, profile};
 use atrium_api::client::AtpServiceClient;
 use atrium_api::com::atproto::{repo, server};
-use atrium_api::types::string::{AtIdentifier, Handle, RecordKey};
+use atrium_api::record::KnownRecord;
+use atrium_api::types::string::{AtIdentifier, Datetime, Handle, RecordKey};
 use atrium_api::types::{Collection, TryIntoUnknown};
 use atrium_xrpc_client::reqwest::ReqwestClient;
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
@@ -76,6 +78,44 @@ impl AgentsTeamsService {
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
         session.login(&request.email, request.password).await?;
         let agent = Agent::new(session);
+        let self_key = RecordKey::new("self".into()).unwrap();
+        let agent_repo = AtIdentifier::Did(did);
+
+        if let Some(description) = agent_team.description {
+            agent
+                .api
+                .com
+                .atproto
+                .repo
+                .put_record(
+                    repo::put_record::InputData {
+                        collection: Profile::nsid(),
+                        record: KnownRecord::AppBskyActorProfile(Box::new(
+                            profile::RecordData {
+                                avatar: None,
+                                banner: None,
+                                created_at: Some(Datetime::now()),
+                                description: Some(description),
+                                display_name: None,
+                                joined_via_starter_pack: None,
+                                labels: None,
+                                pinned_post: None,
+                                pronouns: None,
+                                website: None,
+                            }
+                            .into(),
+                        ))
+                        .try_into_unknown()?,
+                        repo: agent_repo.clone(),
+                        rkey: self_key.clone(),
+                        swap_record: None,
+                        swap_commit: None,
+                        validate: None,
+                    }
+                    .into(),
+                )
+                .await?;
+        }
 
         agent
             .api
@@ -89,8 +129,8 @@ impl AgentsTeamsService {
                         uri: uri.clone().into(),
                     }
                     .try_into_unknown()?,
-                    repo: AtIdentifier::Did(did),
-                    rkey: Some(RecordKey::new("self".into()).unwrap()),
+                    repo: agent_repo,
+                    rkey: Some(self_key),
                     swap_commit: None,
                     validate: None,
                 }

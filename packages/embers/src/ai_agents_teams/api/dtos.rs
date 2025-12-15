@@ -165,4 +165,19 @@ pub struct PublishAgentsTeamToFireskyResp {
 pub struct DeploySignedRunAgentsTeamFireskyReq {
     pub contract: SignedContract,
     pub agents_team: Stringified<Uri>,
+    pub reply_to: Option<FireskyReply>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(into(models::FireskyReply))]
+pub struct FireskyReply {
+    pub parent: PostRef,
+    pub root: PostRef,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(into(models::PostRef))]
+pub struct PostRef {
+    pub cid: String,
+    pub uri: String,
 }

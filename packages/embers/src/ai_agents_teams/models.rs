@@ -157,6 +157,19 @@ pub struct FireskyCredentials {
 pub struct DeploySignedRunAgentsTeamFireskyReq {
     pub contract: SignedCode,
     pub agents_team: Uri,
+    pub reply_to: Option<FireskyReply>,
+}
+
+#[derive(Debug, Clone)]
+pub struct FireskyReply {
+    pub parent: PostRef,
+    pub root: PostRef,
+}
+
+#[derive(Debug, Clone)]
+pub struct PostRef {
+    pub cid: String,
+    pub uri: String,
 }
 
 #[derive(Debug, Clone)]
