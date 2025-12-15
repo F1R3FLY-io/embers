@@ -2,11 +2,13 @@ use atrium_api::agent::Agent;
 use atrium_api::agent::atp_agent::CredentialSession;
 use atrium_api::agent::atp_agent::store::MemorySessionStore;
 use atrium_api::client::AtpServiceClient;
-use atrium_api::com::atproto::server;
-use atrium_api::types::string::Handle;
+use atrium_api::com::atproto::{repo, server};
+use atrium_api::types::string::{AtIdentifier, Handle, RecordKey};
+use atrium_api::types::{Collection, TryIntoUnknown};
 use atrium_xrpc_client::reqwest::ReqwestClient;
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use serde::{Deserialize, Serialize};
 
 use crate::ai_agents_teams::blockchain;
 use crate::ai_agents_teams::common::serialize_encrypted;
@@ -48,7 +50,7 @@ impl AgentsTeamsService {
         let http_client = ReqwestClient::new(request.pds_url.clone());
         let client = AtpServiceClient::new(http_client.clone());
 
-        client
+        let did = client
             .service
             .com
             .atproto
@@ -67,11 +69,34 @@ impl AgentsTeamsService {
                 }
                 .into(),
             )
-            .await?;
+            .await?
+            .data
+            .did;
 
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
         session.login(&request.email, request.password).await?;
         let agent = Agent::new(session);
+
+        agent
+            .api
+            .com
+            .atproto
+            .repo
+            .create_record(
+                repo::create_record::InputData {
+                    collection: BotConfig::nsid(),
+                    record: BotConfig {
+                        uri: uri.clone().into(),
+                    }
+                    .try_into_unknown()?,
+                    repo: AtIdentifier::Did(did),
+                    rkey: Some(RecordKey::new("self".into()).unwrap()),
+                    swap_commit: None,
+                    validate: None,
+                }
+                .into(),
+            )
+            .await?;
 
         let result = agent
             .api
@@ -140,4 +165,14 @@ impl AgentsTeamsService {
         write_client.propose().await?;
         Ok(deploy_id)
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct BotConfig {
+    uri: String,
+}
+
+impl Collection for BotConfig {
+    const NSID: &'static str = "com.f1r3sky.bot.config";
+    type Record = Self;
 }
