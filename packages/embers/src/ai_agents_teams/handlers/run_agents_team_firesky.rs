@@ -10,6 +10,7 @@ use atrium_api::types::{Collection, TryIntoUnknown, Union};
 use atrium_xrpc_client::reqwest::ReqwestClient;
 use futures::{StreamExt, stream};
 
+use crate::ai_agents_teams::common::upload_blob_from_url;
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::{
     DeploySignedRunAgentsTeamFireskyReq,
@@ -155,16 +156,7 @@ where
                 // ignore tts for now
             } else if string.starts_with("http") {
                 // tti
-                let Ok(resp) = reqwest::get(string).await else {
-                    return acc;
-                };
-
-                let Ok(bytes) = resp.bytes().await else {
-                    return acc;
-                };
-
-                let Ok(blob_ref) = agent.api.com.atproto.repo.upload_blob(bytes.to_vec()).await
-                else {
+                let Ok(image) = upload_blob_from_url(agent, &string).await else {
                     return acc;
                 };
 
@@ -175,7 +167,7 @@ where
                                 embed::images::ImageData {
                                     alt: Default::default(),
                                     aspect_ratio: None,
-                                    image: blob_ref.data.blob,
+                                    image,
                                 }
                                 .into(),
                             ],

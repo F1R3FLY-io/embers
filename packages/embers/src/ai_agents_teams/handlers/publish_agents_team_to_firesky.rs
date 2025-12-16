@@ -10,10 +10,12 @@ use atrium_api::types::{Collection, TryIntoUnknown};
 use atrium_xrpc_client::reqwest::ReqwestClient;
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use futures::FutureExt;
+use futures::future::OptionFuture;
 use serde::{Deserialize, Serialize};
 
 use crate::ai_agents_teams::blockchain;
-use crate::ai_agents_teams::common::serialize_encrypted;
+use crate::ai_agents_teams::common::{serialize_encrypted, upload_blob_from_url};
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
 use crate::ai_agents_teams::models::{
     EncryptedMsg,
@@ -81,7 +83,16 @@ impl AgentsTeamsService {
         let self_key = RecordKey::new("self".into()).unwrap();
         let agent_repo = AtIdentifier::Did(did);
 
-        if let Some(description) = agent_team.description {
+        if agent_team.description.is_some() || agent_team.logo.is_some() {
+            let avatar = OptionFuture::from(
+                agent_team
+                    .logo
+                    .as_ref()
+                    .map(|logo| upload_blob_from_url(&agent, logo).map(Result::ok)),
+            )
+            .await
+            .flatten();
+
             agent
                 .api
                 .com
@@ -92,10 +103,10 @@ impl AgentsTeamsService {
                         collection: Profile::nsid(),
                         record: KnownRecord::AppBskyActorProfile(Box::new(
                             profile::RecordData {
-                                avatar: None,
+                                avatar,
                                 banner: None,
                                 created_at: Some(Datetime::now()),
-                                description: Some(description),
+                                description: agent_team.description,
                                 display_name: None,
                                 joined_via_starter_pack: None,
                                 labels: None,
