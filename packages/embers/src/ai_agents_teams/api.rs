@@ -22,7 +22,16 @@ use crate::ai_agents_teams::api::dtos::{
     SaveAgentsTeamResp,
 };
 use crate::ai_agents_teams::handlers::AgentsTeamsService;
-use crate::common::api::dtos::{ApiTags, MaybeNotFound, SendResp, SignedContract, Stringified};
+use crate::ai_agents_teams::models;
+use crate::common::api::dtos::{
+    ApiTags,
+    MaybeNotFound,
+    PrepareResponse,
+    SendRequest,
+    SendResp,
+    SignedContract,
+    Stringified,
+};
 
 mod dtos;
 
@@ -73,21 +82,26 @@ impl AIAgentsTeams {
         &self,
         Json(body): Json<CreateAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<CreateAgentsTeamResp>> {
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<CreateAgentsTeamResp>>> {
         let contract = agents_teams
-            .prepare_create_agents_team_contract(body.into())
+            .prepare_create_agents_team_contract(body.clone().into())
             .await?;
-        Ok(Json(contract.into()))
+        Ok(Json(PrepareResponse::new(
+            &body,
+            contract.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/create/send", method = "post")]
     async fn create(
         &self,
-        Json(body): Json<SignedContract>,
+        SendRequest(body): SendRequest<SignedContract, CreateAgentsTeamReq, CreateAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
-            .deploy_signed_create_agents_team(body.into())
+            .deploy_signed_create_agents_team(body.request.into())
             .await?;
         Ok(Json(deploy_id.into()))
     }
@@ -97,21 +111,30 @@ impl AIAgentsTeams {
         &self,
         Json(body): Json<DeployAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<DeployAgentsTeamResp>> {
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<DeployAgentsTeamResp>>> {
         let contract = agents_teams
-            .prepare_deploy_agents_team_contract(body.into())
+            .prepare_deploy_agents_team_contract(body.clone().into())
             .await?;
-        Ok(Json(contract.into()))
+        Ok(Json(PrepareResponse::new(
+            &body,
+            contract.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/deploy/send", method = "post")]
     async fn deploy_agents_team(
         &self,
-        Json(body): Json<DeploySignedAgentsTeamtReq>,
+        SendRequest(body): SendRequest<
+            DeploySignedAgentsTeamtReq,
+            DeployAgentsTeamReq,
+            DeployAgentsTeamResp,
+        >,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
-            .deploy_signed_deploy_agents_team(body.into())
+            .deploy_signed_deploy_agents_team(body.request.into())
             .await?;
         Ok(Json(deploy_id.into()))
     }
@@ -121,21 +144,26 @@ impl AIAgentsTeams {
         &self,
         Json(body): Json<RunAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<RunAgentsTeamResp>> {
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<RunAgentsTeamResp>>> {
         let contract = agents_teams
-            .prepare_run_agents_team_contract(body.into())
+            .prepare_run_agents_team_contract(body.clone().into())
             .await?;
-        Ok(Json(contract.into()))
+        Ok(Json(PrepareResponse::new(
+            &body,
+            contract.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/run/send", method = "post")]
     async fn run_agents_team(
         &self,
-        Json(body): Json<SignedContract>,
+        SendRequest(body): SendRequest<SignedContract, RunAgentsTeamReq, RunAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<serde_json::Value>> {
         agents_teams
-            .deploy_signed_run_agents_team(body.into())
+            .deploy_signed_run_agents_team(body.request.into())
             .await
             .map(Json)
             .map_err(Into::into)
@@ -146,21 +174,34 @@ impl AIAgentsTeams {
         &self,
         Json(body): Json<RunAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<RunAgentsTeamResp>> {
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<RunAgentsTeamResp>>> {
         let contract = agents_teams
-            .prepare_run_agents_team_firesky_contract(body.into())
+            .prepare_run_agents_team_firesky_contract(body.clone().into())
             .await?;
-        Ok(Json(contract.into()))
+        Ok(Json(PrepareResponse::new(
+            &body,
+            contract.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/run-on-firesky/send", method = "post")]
     async fn run_agents_team_on_firesky(
         &self,
-        Json(body): Json<DeploySignedRunAgentsTeamFireskyReq>,
+        SendRequest(body): SendRequest<
+            DeploySignedRunAgentsTeamFireskyReq,
+            RunAgentsTeamReq,
+            RunAgentsTeamResp,
+        >,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
         agents_teams
-            .deploy_signed_run_agents_team_firesky(body.into())
+            .deploy_signed_run_agents_team_firesky(models::DeploySignedRunAgentsTeamFireskyReq {
+                contract: body.request.contract.into(),
+                agents_team: body.prepare_request.agents_team.into(),
+                reply_to: body.request.reply_to.map(Into::into),
+            })
             .await?;
         Ok(())
     }
@@ -171,22 +212,27 @@ impl AIAgentsTeams {
         Path(id): Path<String>,
         Json(body): Json<SaveAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<SaveAgentsTeamResp>> {
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<SaveAgentsTeamResp>>> {
         let contract = agents_teams
-            .prepare_save_agents_team_contract(id, body.into())
+            .prepare_save_agents_team_contract(id, body.clone().into())
             .await?;
-        Ok(Json(contract.into()))
+        Ok(Json(PrepareResponse::new(
+            &body,
+            contract.into(),
+            encoding_key,
+        )))
     }
 
     #[oai(path = "/:id/save/send", method = "post")]
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
-        Json(body): Json<SignedContract>,
+        SendRequest(body): SendRequest<SignedContract, SaveAgentsTeamReq, SaveAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
-            .deploy_signed_save_agents_team(body.into())
+            .deploy_signed_save_agents_team(body.request.into())
             .await?;
         Ok(Json(deploy_id.into()))
     }

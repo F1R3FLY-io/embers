@@ -15,7 +15,7 @@ from Crypto.Hash import keccak
 
 from tests.key import SECP256k1
 
-DEFAULT_TIMEOUT = 15
+DEFAULT_TIMEOUT = 30
 
 FIRECAP_ID = bytes([0, 0, 0])
 FIRECAP_VERSION = bytes([0])
@@ -96,23 +96,23 @@ class TestnetApi:
 
     def deploy(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
         prepare_request = {"test": test, "env": env}
-
         resp = self._client.post("/testnet/deploy/prepare", json=prepare_request)
         assert resp.status == 200
 
-        json = {
-            "prepare_request": prepare_request,
-            "prepare_response": resp.json["response"],
-            "request": {
-                "test": sing_contract(wallet, resp.json["response"]["test_contract"]),
-                "env": sing_contract(wallet, resp.json["response"]["env_contract"])
-                if resp.json["response"].get("env_contract") is not None
-                else None,
+        resp_next = self._client.post(
+            "/testnet/deploy/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": {
+                    "test": sing_contract(wallet, resp.json["response"]["test_contract"]),
+                    "env": sing_contract(wallet, resp.json["response"]["env_contract"])
+                    if resp.json["response"].get("env_contract") is not None
+                    else None,
+                },
+                "token": resp.json["token"],
             },
-            "token": resp.json["token"],
-        }
-
-        resp_next = self._client.post("/testnet/deploy/send", json=json)
+        )
         assert resp_next.status == 200
 
         return resp_next
@@ -355,13 +355,19 @@ class AiAgentsTeamsApi:
         logo: str | None = None,
         graph: str | None = None,
     ) -> UpdateResponce:
-        resp = self._client.post(
-            "/ai-agents-teams/create/prepare",
-            json={"name": name, "description": description, "shard": shard, "logo": logo, "graph": graph},
-        )
+        prepare_request = {"name": name, "description": description, "shard": shard, "logo": logo, "graph": graph}
+        resp = self._client.post("/ai-agents-teams/create/prepare", json=prepare_request)
         assert resp.status == 200
 
-        resp_next = self._client.post("/ai-agents-teams/create/send", json=sing_contract(wallet, resp.json["contract"]))
+        resp_next = self._client.post(
+            "/ai-agents-teams/create/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+        )
         assert resp_next.status == 200
 
         return UpdateResponce(
@@ -371,24 +377,29 @@ class AiAgentsTeamsApi:
         )
 
     def deploy(self, wallet: Wallet, agents_team: AgentsTeam, phlo_limit: int, deploy: dict) -> UpdateResponce:
-        resp = self._client.post(
-            "/ai-agents-teams/deploy/prepare",
-            json={
-                "type": "AgentsTeam",
-                "id": agents_team.id,
-                "version": agents_team.version,
-                "address": wallet.address,
-                "phlo_limit": phlo_limit,
-                "deploy": deploy,
-            },
-        )
+        prepare_request = {
+            "type": "AgentsTeam",
+            "id": agents_team.id,
+            "version": agents_team.version,
+            "address": wallet.address,
+            "phlo_limit": phlo_limit,
+            "deploy": deploy,
+        }
+        resp = self._client.post("/ai-agents-teams/deploy/prepare", json=prepare_request)
         assert resp.status == 200
 
         resp_next = self._client.post(
             "/ai-agents-teams/deploy/send",
             json={
-                "contract": sing_contract(wallet, resp.json["contract"]),
-                "system": sing_contract(wallet, resp.json["system"]) if resp.json.get("system") is not None else None,
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": {
+                    "contract": sing_contract(wallet, resp.json["response"]["contract"]),
+                    "system": sing_contract(wallet, resp.json["response"]["system"])
+                    if resp.json["response"].get("system") is not None
+                    else None,
+                },
+                "token": resp.json["token"],
             },
         )
         assert resp_next.status == 200
@@ -400,17 +411,22 @@ class AiAgentsTeamsApi:
         )
 
     def deploy_graph(self, wallet: Wallet, graph: str, phlo_limit: int, deploy: dict) -> UpdateResponce:
-        resp = self._client.post(
-            "/ai-agents-teams/deploy/prepare",
-            json={"type": "Graph", "graph": graph, "phlo_limit": phlo_limit, "deploy": deploy},
-        )
+        prepare_request = {"type": "Graph", "graph": graph, "phlo_limit": phlo_limit, "deploy": deploy}
+        resp = self._client.post("/ai-agents-teams/deploy/prepare", json=prepare_request)
         assert resp.status == 200
 
         resp_next = self._client.post(
             "/ai-agents-teams/deploy/send",
             json={
-                "contract": sing_contract(wallet, resp.json["contract"]),
-                "system": sing_contract(wallet, resp.json["system"]) if resp.json.get("system") is not None else None,
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": {
+                    "contract": sing_contract(wallet, resp.json["response"]["contract"]),
+                    "system": sing_contract(wallet, resp.json["response"]["system"])
+                    if resp.json["response"].get("system") is not None
+                    else None,
+                },
+                "token": resp.json["token"],
             },
         )
         assert resp_next.status == 200
@@ -422,13 +438,19 @@ class AiAgentsTeamsApi:
         )
 
     def run(self, wallet: Wallet, prompt: str, phlo_limit: int, agents_team: str) -> Responce:
-        resp = self._client.post(
-            "/ai-agents-teams/run/prepare",
-            json={"prompt": prompt, "phlo_limit": phlo_limit, "agents_team": agents_team},
-        )
+        prepare_request = {"prompt": prompt, "phlo_limit": phlo_limit, "agents_team": agents_team}
+        resp = self._client.post("/ai-agents-teams/run/prepare", json=prepare_request)
         assert resp.status == 200
 
-        resp_next = self._client.post("/ai-agents-teams/run/send", json=sing_contract(wallet, resp.json["contract"]))
+        resp_next = self._client.post(
+            "/ai-agents-teams/run/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+        )
         assert resp_next.status == 200
 
         return resp_next
@@ -443,15 +465,18 @@ class AiAgentsTeamsApi:
         logo: str | None = None,
         graph: str | None = None,
     ) -> UpdateResponce:
-        resp = self._client.post(
-            f"/ai-agents-teams/{agent_id}/save/prepare",
-            json={"name": name, "description": description, "shard": shard, "logo": logo, "graph": graph},
-        )
+        prepare_request = {"name": name, "description": description, "shard": shard, "logo": logo, "graph": graph}
+        resp = self._client.post(f"/ai-agents-teams/{agent_id}/save/prepare", json=prepare_request)
         assert resp.status == 200
 
         resp_next = self._client.post(
             f"/ai-agents-teams/{agent_id}/save/send",
-            json=sing_contract(wallet, resp.json["contract"]),
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
         )
         assert resp_next.status == 200
 
@@ -466,7 +491,7 @@ class AiAgentsTeamsApi:
         assert resp.status == 200
 
         resp_next = self._client.post(
-            f"/ai-agents-teams/{agent_id}/save/send",
+            f"/ai-agents-teams/{agent_id}/delete/send",
             json=sing_contract(wallet, resp.json["contract"]),
         )
         assert resp_next.status == 200

@@ -47,20 +47,6 @@ impl AgentsTeamsService {
         &self,
         request: DeploySignedRunAgentsTeamFireskyReq,
     ) -> anyhow::Result<()> {
-        let cred = self
-            .firesky_accounts
-            .get(&request.agents_team)
-            .ok_or_else(|| anyhow!("agents team is not connected to firesky"))?
-            .clone();
-
-        let resp = self.deploy_signed_run_agents_team(request.contract).await?;
-
-        let http_client = ReqwestClient::new(cred.pds_url);
-        let session = CredentialSession::new(http_client, MemorySessionStore::default());
-        let did = session.login(cred.email, cred.token).await?.data.did;
-
-        let agent = Agent::new(session);
-
         let reply = request
             .reply_to
             .map(|reply_to| {
@@ -92,6 +78,20 @@ impl AgentsTeamsService {
                 )
             })
             .transpose()?;
+
+        let cred = self
+            .firesky_accounts
+            .get(&request.agents_team)
+            .ok_or_else(|| anyhow!("agents team is not connected to firesky"))?
+            .clone();
+
+        let resp = self.deploy_signed_run_agents_team(request.contract).await?;
+
+        let http_client = ReqwestClient::new(cred.pds_url);
+        let session = CredentialSession::new(http_client, MemorySessionStore::default());
+        let did = session.login(cred.email, cred.token).await?.data.did;
+
+        let agent = Agent::new(session);
 
         agent
             .api

@@ -98,8 +98,8 @@ def agents_team(client: ApiClient, funded_wallet: Wallet, request: pytest.Fixtur
     ).wait_for_sync()
 
     return AgentsTeam(
-        id=resp.first.json["id"],
-        version=resp.first.json["version"],
+        id=resp.first.json["response"]["id"],
+        version=resp.first.json["response"]["version"],
         name="my_agents_team",
         graph="< foo > | 0 ",
     )

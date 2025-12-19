@@ -22,7 +22,7 @@ pub struct AgentsTeamHeader {
     pub logo: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Hash, Clone)]
 pub struct Graph(graphl_parser::ast::Graph);
 
 impl Graph {

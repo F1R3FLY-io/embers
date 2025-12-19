@@ -13,5 +13,5 @@ def test_create_agents_team(client: ApiClient, funded_wallet: Wallet):
         logo="http://nice-logo",
         graph="< foo > | 0 ",
     )
-    assert resp.first.json["id"]
-    assert resp.first.json["version"]
+    assert resp.first.json["response"]["id"]
+    assert resp.first.json["response"]["version"]

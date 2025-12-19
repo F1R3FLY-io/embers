@@ -1,3 +1,5 @@
+use std::sync::LazyLock;
+
 use atrium_api::agent::Agent;
 use atrium_api::agent::atp_agent::CredentialSession;
 use atrium_api::agent::atp_agent::store::MemorySessionStore;
@@ -26,6 +28,8 @@ use crate::ai_agents_teams::models::{
 use crate::common::prepare_for_signing;
 use crate::common::tracing::record_trace;
 
+static SELF_RKEY: LazyLock<RecordKey> = LazyLock::new(|| RecordKey::new("self".into()).unwrap());
+
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/save_firesky_token.rho")]
 struct SaveFireskyToken {
@@ -42,6 +46,8 @@ impl AgentsTeamsService {
         id: String,
         request: PublishAgentsTeamToFireskyReq,
     ) -> anyhow::Result<PublishAgentsTeamToFireskyResp> {
+        let handle = Handle::new(request.handle).map_err(|err| anyhow::anyhow!(err))?;
+
         let agent_team = self
             .get_agents_team(address, id, "latest".into())
             .await?
@@ -63,8 +69,8 @@ impl AgentsTeamsService {
                 server::create_account::InputData {
                     did: None,
                     email: request.email.clone().into(),
-                    handle: Handle::new(request.handle).map_err(|err| anyhow::anyhow!(err))?,
-                    invite_code: request.invite_code.unwrap_or_default().into(),
+                    handle,
+                    invite_code: request.invite_code,
                     password: request.password.clone().into(),
                     plc_op: None,
                     recovery_key: None,
@@ -80,7 +86,6 @@ impl AgentsTeamsService {
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
         session.login(&request.email, request.password).await?;
         let agent = Agent::new(session);
-        let self_key = RecordKey::new("self".into()).unwrap();
         let agent_repo = AtIdentifier::Did(did);
 
         if agent_team.description.is_some() || agent_team.logo.is_some() {
@@ -118,7 +123,7 @@ impl AgentsTeamsService {
                         ))
                         .try_into_unknown()?,
                         repo: agent_repo.clone(),
-                        rkey: self_key.clone(),
+                        rkey: SELF_RKEY.clone(),
                         swap_record: None,
                         swap_commit: None,
                         validate: None,
@@ -135,13 +140,13 @@ impl AgentsTeamsService {
             .repo
             .create_record(
                 repo::create_record::InputData {
-                    collection: BotConfig::nsid(),
-                    record: BotConfig {
+                    collection: AgentsTeamConfig::nsid(),
+                    record: AgentsTeamConfig {
                         uri: uri.clone().into(),
                     }
                     .try_into_unknown()?,
                     repo: agent_repo,
-                    rkey: Some(self_key),
+                    rkey: Some(SELF_RKEY.clone()),
                     swap_commit: None,
                     validate: None,
                 }
@@ -219,11 +224,11 @@ impl AgentsTeamsService {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct BotConfig {
+struct AgentsTeamConfig {
     uri: String,
 }
 
-impl Collection for BotConfig {
-    const NSID: &'static str = "com.f1r3sky.bot.config";
+impl Collection for AgentsTeamConfig {
+    const NSID: &'static str = "com.f1r3sky.agentsteam.config";
     type Record = Self;
 }

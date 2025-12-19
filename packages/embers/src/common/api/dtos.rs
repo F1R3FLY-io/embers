@@ -426,7 +426,7 @@ impl From<SignedContract> for firefly_client::models::SignedCode {
     }
 }
 
-#[derive(Debug, Clone, Object)]
+#[derive(Debug, Clone, Hash, Object)]
 pub struct RegistryDeploy {
     pub timestamp: Stringified<DateTime<Utc>>,
     pub version: Stringified<i64>,
