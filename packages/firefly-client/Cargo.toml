@@ -8,7 +8,7 @@ version = "0.1.0"
 
 [dependencies]
 anyhow                = { version = "1.0" }
-askama                = { version = "0.14" }
+askama                = { version = "0.15" }
 backon                = { version = "1.6" }
 base64                = { version = "0.22" }
 blake2                = { version = "0.10" }
