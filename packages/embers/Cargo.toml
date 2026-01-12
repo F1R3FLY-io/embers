@@ -31,7 +31,7 @@ jsonwebtoken       = { version = "10.2", features = ["rust_crypto"] }
 poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
 poem-openapi       = { version = "5.1", features = ["chrono", "swagger-ui", "websocket"] }
 prost              = { version = "0.14" }
-reqwest            = { version = "0.13", default-features = false, features = ["json"] }
+reqwest            = { version = "0.13", features = ["json"] }
 secp256k1          = { version = "0.31", features = ["hashes", "rand", "serde"] }
 serde              = { version = "1.0", features = ["derive"] }
 serde_json         = { version = "1.0" }
