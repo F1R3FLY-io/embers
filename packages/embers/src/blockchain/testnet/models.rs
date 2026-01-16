@@ -1,0 +1,20 @@
+use serde::Deserialize;
+use structural_convert::StructuralConvert;
+
+use crate::domain::testnet::models;
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::LogLevel))]
+#[serde(rename_all = "lowercase")]
+pub enum LogLevel {
+    Debug,
+    Info,
+    Error,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::Log))]
+pub struct Log {
+    pub level: LogLevel,
+    pub message: String,
+}

@@ -8,24 +8,22 @@ use secp256k1::rand;
 use secp256k1::rand::distr::{Alphanumeric, SampleString};
 use tokio::try_join;
 
-use crate::ai_agents::api::AIAgents;
-use crate::ai_agents::handlers::AgentsService;
-use crate::ai_agents_teams::api::AIAgentsTeams;
-use crate::ai_agents_teams::handlers::AgentsTeamsService;
-use crate::common::api::Service;
+use crate::api::ai_agents::AIAgents;
+use crate::api::ai_agents_teams::AIAgentsTeams;
+use crate::api::service::Service;
+use crate::api::testnet::Testnet;
+use crate::api::wallets::WalletsApi;
 use crate::configuration::collect_config;
-use crate::testnet::api::Testnet;
-use crate::testnet::handlers::TestnetService;
-use crate::wallets::api::WalletsApi;
-use crate::wallets::handlers::WalletsService;
+use crate::domain::ai_agents::AgentsService;
+use crate::domain::ai_agents_teams::AgentsTeamsService;
+use crate::domain::testnet::TestnetService;
+use crate::domain::wallets::WalletsService;
 
-mod ai_agents;
-mod ai_agents_teams;
-mod bootstrap;
+mod api;
+mod blockchain;
 mod common;
 mod configuration;
-mod testnet;
-mod wallets;
+mod domain;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {

@@ -1,16 +1,15 @@
-mod ai_agents;
-mod ai_agents_teams;
-mod common;
-mod testnet;
-mod wallets;
-
 use poem_openapi::OpenApiService;
 
-use crate::ai_agents::api::AIAgents;
-use crate::ai_agents_teams::api::AIAgentsTeams;
-use crate::common::api::Service;
-use crate::testnet::api::Testnet;
-use crate::wallets::api::WalletsApi;
+use crate::api::ai_agents::AIAgents;
+use crate::api::ai_agents_teams::AIAgentsTeams;
+use crate::api::service::Service;
+use crate::api::testnet::Testnet;
+use crate::api::wallets::WalletsApi;
+
+mod api;
+mod blockchain;
+mod common;
+mod domain;
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {

@@ -3,9 +3,7 @@ FROM --platform=$BUILDPLATFORM rust:1.92-slim-bookworm AS builder
 WORKDIR /app
 
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends pkg-config protobuf-compiler clang gcc-aarch64-linux-gnu libc6-dev-arm64-cross && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
+    apt-get install -y pkg-config protobuf-compiler clang gcc-aarch64-linux-gnu libc6-dev-arm64-cross && \
     rustup target add x86_64-unknown-linux-gnu && \
     rustup target add aarch64-unknown-linux-gnu
 
@@ -29,6 +27,9 @@ RUN \
     { echo "Error: Unsupported TARGETPLATFORM: ${TARGETPLATFORM}" >&2; exit 1; }
 
 FROM debian:bookworm-slim AS runtime
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

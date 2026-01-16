@@ -4,7 +4,6 @@ use prost::Message;
 
 use crate::common::models::{PositiveNonZero, PreparedContract};
 
-pub mod api;
 pub mod blockchain;
 pub mod models;
 pub mod tracing;

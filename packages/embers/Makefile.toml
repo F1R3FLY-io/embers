@@ -26,7 +26,3 @@ env.RUST_BACKTRACE                        = "full"
 [tasks.generate-schema]
 args    = ["run", "--bin", "generate_schema"]
 command = "cargo"
-
-[tasks.e2e-test]
-args    = ["run", "pytest"]
-command = "poetry"
