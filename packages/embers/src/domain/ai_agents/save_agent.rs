@@ -5,8 +5,7 @@ use uuid::Uuid;
 
 use crate::domain::ai_agents::AgentsService;
 use crate::domain::ai_agents::models::{SaveAgentReq, SaveAgentResp};
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
+use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents/save_agent.rho")]

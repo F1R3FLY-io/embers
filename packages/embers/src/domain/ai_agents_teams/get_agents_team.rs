@@ -2,9 +2,9 @@ use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
 use crate::blockchain::ai_agents_teams::models;
-use crate::common::tracing::record_trace;
 use crate::domain::ai_agents_teams::AgentsTeamsService;
 use crate::domain::ai_agents_teams::models::AgentsTeam;
+use crate::domain::common::record_trace;
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/get_agents_team.rho")]

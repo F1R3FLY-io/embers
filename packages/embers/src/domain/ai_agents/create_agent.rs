@@ -3,10 +3,9 @@ use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
 use uuid::Uuid;
 
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
 use crate::domain::ai_agents::AgentsService;
 use crate::domain::ai_agents::models::{CreateAgentReq, CreateAgentResp};
+use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents/create_agent.rho")]

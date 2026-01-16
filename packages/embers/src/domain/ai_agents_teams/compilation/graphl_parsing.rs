@@ -6,7 +6,7 @@ use derive_more::{AsRef, Display, From};
 use serde::Deserialize;
 
 use crate::domain::ai_agents_teams::models::Graph;
-use crate::common::tracing::record_trace;
+use crate::domain::common::record_trace;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, From, AsRef, Display)]
 pub struct Vertex<'a>(&'a str);

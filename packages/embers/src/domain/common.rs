@@ -2,9 +2,51 @@ use aes_gcm::aead::{Aead, AeadCore, KeyInit, Nonce, OsRng};
 use aes_gcm::{Aes256Gcm, Key};
 use atrium_api::agent::Agent;
 use atrium_api::types::BlobRef;
+use chrono::{DateTime, Utc};
+use firefly_client::helpers::ShortHex;
+use firefly_client::models::casper::DeployDataProto;
+use prost::Message;
+use secp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
 
 use crate::domain::ai_agents_teams::models::EncryptedMsg;
+
+macro_rules! record_trace {
+    ($($value:ident),+ $(,)?) => {
+        if ::tracing::enabled!(::tracing::Level::TRACE) {
+            let span = ::tracing::Span::current();
+            $(
+                span.record(stringify!($value), ::tracing::field::debug(&$value));
+            )+
+        }
+    };
+}
+
+pub(crate) use record_trace;
+
+#[bon::builder]
+pub fn prepare_for_signing(
+    code: String,
+    valid_after_block_number: u64,
+    phlo_limit: Option<PositiveNonZero<i64>>,
+    timestamp: Option<DateTime<Utc>>,
+) -> PreparedContract {
+    let timestamp = timestamp
+        .unwrap_or_else(chrono::Utc::now)
+        .timestamp_millis();
+    let contract = DeployDataProto {
+        term: code,
+        timestamp,
+        phlo_price: 1,
+        phlo_limit: phlo_limit.map_or(5_000_000, |v| v.0),
+        valid_after_block_number: valid_after_block_number as _,
+        shard_id: "root".into(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+
+    PreparedContract(contract)
+}
 
 pub fn serialize_encrypted<T>(val: T, key: &Key<Aes256Gcm>) -> anyhow::Result<EncryptedMsg>
 where
@@ -52,4 +94,43 @@ where
         .await?;
 
     Ok(blob_ref.data.blob)
+}
+
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PositiveNonZero<T>(pub T);
+
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum PositiveNonZeroParsingError {
+    #[error("value is zero")]
+    Zero,
+    #[error("value is negative")]
+    Negative,
+}
+
+impl TryFrom<i64> for PositiveNonZero<i64> {
+    type Error = PositiveNonZeroParsingError;
+
+    fn try_from(value: i64) -> Result<Self, Self::Error> {
+        if value == 0 {
+            return Err(Self::Error::Zero);
+        }
+
+        if value < 0 {
+            return Err(Self::Error::Negative);
+        }
+
+        Ok(Self(value))
+    }
+}
+
+#[derive(derive_more::Debug, Clone)]
+#[debug("{:?}", _0.short_hex(32))]
+pub struct PreparedContract(pub Vec<u8>);
+
+#[derive(Debug, Clone)]
+pub struct RegistryDeploy {
+    pub timestamp: DateTime<Utc>,
+    pub version: i64,
+    pub uri_pub_key: PublicKey,
+    pub signature: Vec<u8>,
 }

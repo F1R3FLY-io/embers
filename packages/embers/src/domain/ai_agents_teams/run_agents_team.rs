@@ -7,8 +7,7 @@ use futures::FutureExt;
 
 use crate::domain::ai_agents_teams::AgentsTeamsService;
 use crate::domain::ai_agents_teams::models::{RunAgentsTeamReq, RunAgentsTeamResp};
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
+use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/run_agents_team.rho")]

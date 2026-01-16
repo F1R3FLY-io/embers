@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use structural_convert::StructuralConvert;
 
-use crate::common::blockchain;
+use crate::blockchain::common::DateTime;
 use crate::domain::ai_agents::models;
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
@@ -15,8 +15,8 @@ pub struct Agents {
 pub struct AgentHeader {
     pub id: String,
     pub version: String,
-    pub created_at: blockchain::dtos::DateTime,
-    pub last_deploy: Option<blockchain::dtos::DateTime>,
+    pub created_at: DateTime,
+    pub last_deploy: Option<DateTime>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -28,8 +28,8 @@ pub struct AgentHeader {
 pub struct Agent {
     pub id: String,
     pub version: String,
-    pub created_at: blockchain::dtos::DateTime,
-    pub last_deploy: Option<blockchain::dtos::DateTime>,
+    pub created_at: DateTime,
+    pub last_deploy: Option<DateTime>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,

@@ -3,8 +3,6 @@ use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, Uri};
 use firefly_client::rendering::Render;
 
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
 use crate::domain::ai_agents_teams::AgentsTeamsService;
 use crate::domain::ai_agents_teams::compilation::{parse, render_agent_team};
 use crate::domain::ai_agents_teams::models::{
@@ -12,6 +10,7 @@ use crate::domain::ai_agents_teams::models::{
     DeployAgentsTeamResp,
     DeploySignedAgentsTeamtReq,
 };
+use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/record_deploy.rho")]

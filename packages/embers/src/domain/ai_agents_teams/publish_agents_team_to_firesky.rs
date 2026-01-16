@@ -17,8 +17,6 @@ use futures::future::OptionFuture;
 use serde::{Deserialize, Serialize};
 
 use crate::blockchain::ai_agents_teams::models;
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
 use crate::domain::ai_agents_teams::AgentsTeamsService;
 use crate::domain::ai_agents_teams::models::{
     EncryptedMsg,
@@ -26,7 +24,12 @@ use crate::domain::ai_agents_teams::models::{
     PublishAgentsTeamToFireskyReq,
     PublishAgentsTeamToFireskyResp,
 };
-use crate::domain::common::{serialize_encrypted, upload_blob_from_url};
+use crate::domain::common::{
+    prepare_for_signing,
+    record_trace,
+    serialize_encrypted,
+    upload_blob_from_url,
+};
 
 static SELF_RKEY: LazyLock<RecordKey> = LazyLock::new(|| RecordKey::new("self".into()).unwrap());
 

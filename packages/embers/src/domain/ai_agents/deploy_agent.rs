@@ -3,10 +3,9 @@ use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, Uri};
 use firefly_client::rendering::Render;
 
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
 use crate::domain::ai_agents::AgentsService;
 use crate::domain::ai_agents::models::{DeployAgentReq, DeployAgentResp, DeploySignedAgentReq};
+use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents/record_deploy.rho")]

@@ -2,8 +2,7 @@ use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
-use crate::common::prepare_for_signing;
-use crate::common::tracing::record_trace;
+use crate::domain::common::{prepare_for_signing, record_trace};
 use crate::domain::wallets::WalletsService;
 use crate::domain::wallets::models::{TransferReq, TransferResp};
 

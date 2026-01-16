@@ -24,10 +24,10 @@ use poem_openapi::{ApiExtractor, ApiResponse, NewType, Object, Tags};
 use secp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
 
-use crate::common::models;
 use crate::domain::ai_agents_teams::models::Graph;
+use crate::domain::common;
 
-impl<T> Type for models::PositiveNonZero<T>
+impl<T> Type for common::PositiveNonZero<T>
 where
     T: Format + Send + Sync,
     T::Alias: Type,
@@ -185,7 +185,7 @@ impl From<Stringified<Self>> for i64 {
     }
 }
 
-impl<T> Format for models::PositiveNonZero<T>
+impl<T> Format for common::PositiveNonZero<T>
 where
     T: Format,
 {
@@ -195,7 +195,7 @@ where
     }
 }
 
-impl ParseFromJSON for Stringified<models::PositiveNonZero<i64>> {
+impl ParseFromJSON for Stringified<common::PositiveNonZero<i64>> {
     fn parse_from_json(value: Option<serde_json::Value>) -> ParseResult<Self> {
         let value = String::parse_from_json(value).map_err(ParseError::propagate)?;
         let number = value.parse::<i64>().map_err(ParseError::custom)?;
@@ -203,13 +203,13 @@ impl ParseFromJSON for Stringified<models::PositiveNonZero<i64>> {
     }
 }
 
-impl ToJSON for Stringified<models::PositiveNonZero<i64>> {
+impl ToJSON for Stringified<common::PositiveNonZero<i64>> {
     fn to_json(&self) -> Option<serde_json::Value> {
         self.0.0.to_string().to_json()
     }
 }
 
-impl From<Stringified<Self>> for models::PositiveNonZero<i64> {
+impl From<Stringified<Self>> for common::PositiveNonZero<i64> {
     fn from(value: Stringified<Self>) -> Self {
         value.0
     }
@@ -398,8 +398,8 @@ where
 #[debug("{:?}", _0.0.short_hex(32))]
 pub struct PreparedContract(pub Base64<Vec<u8>>);
 
-impl From<models::PreparedContract> for PreparedContract {
-    fn from(value: models::PreparedContract) -> Self {
+impl From<common::PreparedContract> for PreparedContract {
+    fn from(value: common::PreparedContract) -> Self {
         Self(Base64(value.0))
     }
 }
@@ -434,7 +434,7 @@ pub struct RegistryDeploy {
     pub signature: Base64<Vec<u8>>,
 }
 
-impl From<RegistryDeploy> for models::RegistryDeploy {
+impl From<RegistryDeploy> for common::RegistryDeploy {
     fn from(value: RegistryDeploy) -> Self {
         Self {
             timestamp: value.timestamp.into(),

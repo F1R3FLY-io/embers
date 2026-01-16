@@ -8,7 +8,6 @@ use crate::api::wallets::WalletsApi;
 
 mod api;
 mod blockchain;
-mod common;
 mod domain;
 
 #[tokio::main]

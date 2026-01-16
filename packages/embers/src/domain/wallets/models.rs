@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, WalletAddress};
 
-use crate::common::models::{PositiveNonZero, PreparedContract};
+use crate::domain::common::{PositiveNonZero, PreparedContract};
 
 pub type Amount = PositiveNonZero<i64>;
 

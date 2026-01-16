@@ -2,14 +2,14 @@ use firefly_client::models::ParseWalletAddressError;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::common::blockchain;
-use crate::common::models::PositiveNonZeroParsingError;
+use crate::blockchain::common::DateTime;
+use crate::domain::common::PositiveNonZeroParsingError;
 use crate::domain::wallets::models::{Boost, Transfer};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct TransferRecord {
     pub id: String,
-    pub timestamp: blockchain::dtos::DateTime,
+    pub timestamp: DateTime,
     pub from: String,
     pub to: String,
     pub amount: i64,
@@ -19,7 +19,7 @@ pub struct TransferRecord {
 #[derive(Debug, Clone, Deserialize)]
 pub struct BoostRecord {
     pub id: String,
-    pub timestamp: blockchain::dtos::DateTime,
+    pub timestamp: DateTime,
     pub from: String,
     pub to: String,
     pub amount: i64,

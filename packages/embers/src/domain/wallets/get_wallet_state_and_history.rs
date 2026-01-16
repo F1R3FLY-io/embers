@@ -2,7 +2,7 @@ use firefly_client::models::{Either, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
 use crate::blockchain::wallets::models;
-use crate::common::tracing::record_trace;
+use crate::domain::common::record_trace;
 use crate::domain::wallets::WalletsService;
 use crate::domain::wallets::models::WalletStateAndHistory;
 

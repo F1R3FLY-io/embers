@@ -4,10 +4,9 @@ use derive_more::Display;
 use firefly_client::models::Uri;
 use firefly_client::rendering::{Inline, Render};
 
-use crate::common::models::RegistryDeploy;
-use crate::common::tracing::record_trace;
 use crate::domain::ai_agents_teams::compilation::graphl_parsing::Vertex;
 use crate::domain::ai_agents_teams::compilation::{Code, Node};
+use crate::domain::common::{RegistryDeploy, record_trace};
 
 #[derive(Debug, Clone, Display)]
 enum From<'a> {

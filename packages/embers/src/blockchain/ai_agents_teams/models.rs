@@ -2,8 +2,7 @@ use derive_more::Into;
 use serde::{Deserialize, Serialize, de};
 use structural_convert::StructuralConvert;
 
-use crate::common::blockchain;
-use crate::common::blockchain::dtos::Hex;
+use crate::blockchain::common::{DateTime, Hex, Uri};
 use crate::domain::ai_agents_teams::models;
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
@@ -17,8 +16,8 @@ pub struct AgentsTeams {
 pub struct AgentsTeamHeader {
     pub id: String,
     pub version: String,
-    pub created_at: blockchain::dtos::DateTime,
-    pub last_deploy: Option<blockchain::dtos::DateTime>,
+    pub created_at: DateTime,
+    pub last_deploy: Option<DateTime>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -45,9 +44,9 @@ impl<'de> Deserialize<'de> for Graph {
 pub struct AgentsTeam {
     pub id: String,
     pub version: String,
-    pub created_at: blockchain::dtos::DateTime,
-    pub last_deploy: Option<blockchain::dtos::DateTime>,
-    pub uri: Option<blockchain::dtos::Uri>,
+    pub created_at: DateTime,
+    pub last_deploy: Option<DateTime>,
+    pub uri: Option<Uri>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,

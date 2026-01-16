@@ -1,7 +1,7 @@
 use firefly_client::models::SignedCode;
 use secp256k1::SecretKey;
 
-use crate::common::models::PreparedContract;
+use crate::domain::common::PreparedContract;
 
 #[derive(Debug, Clone)]
 pub struct CreateTestwalletResp {

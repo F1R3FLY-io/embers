@@ -21,7 +21,6 @@ use crate::domain::wallets::WalletsService;
 
 mod api;
 mod blockchain;
-mod common;
 mod configuration;
 mod domain;
 

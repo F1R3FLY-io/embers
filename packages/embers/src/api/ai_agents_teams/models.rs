@@ -4,8 +4,8 @@ use poem_openapi::{Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::api::common::{PreparedContract, RegistryDeploy, SignedContract, Stringified};
-use crate::common::models::PositiveNonZero;
 use crate::domain::ai_agents_teams::models;
+use crate::domain::common::PositiveNonZero;
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::AgentsTeams))]

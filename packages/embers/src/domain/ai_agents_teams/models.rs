@@ -3,7 +3,7 @@ use std::convert::Infallible;
 use chrono::{DateTime, Utc};
 use firefly_client::models::{SignedCode, Uri, WalletAddress};
 
-use crate::common::models::{PositiveNonZero, PreparedContract, RegistryDeploy};
+use crate::domain::common::{PositiveNonZero, PreparedContract, RegistryDeploy};
 
 #[derive(Debug, Clone)]
 pub struct AgentsTeams {

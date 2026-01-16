@@ -4,7 +4,7 @@ use poem_openapi::{Enum, Object, Union};
 use structural_convert::StructuralConvert;
 
 use crate::api::common::{PreparedContract, Stringified};
-use crate::common::models::PositiveNonZero;
+use crate::domain::common::PositiveNonZero;
 use crate::domain::wallets::models;
 
 #[derive(Debug, Clone, Object, StructuralConvert)]
