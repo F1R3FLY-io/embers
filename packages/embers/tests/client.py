@@ -262,13 +262,19 @@ class AiAgentsApi:
         logo: str | None = None,
         code: str | None = None,
     ) -> UpdateResponce:
-        resp = self._client.post(
-            "/ai-agents/create/prepare",
-            json={"name": name, "description": description, "shard": shard, "logo": logo, "code": code},
-        )
+        prepare_request = {"name": name, "description": description, "shard": shard, "logo": logo, "code": code}
+        resp = self._client.post("/ai-agents/create/prepare", json=prepare_request)
         assert resp.status == 200
 
-        resp_next = self._client.post("/ai-agents/create/send", json=sing_contract(wallet, resp.json["contract"]))
+        resp_next = self._client.post(
+            "/ai-agents/create/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+        )
         assert resp_next.status == 200
 
         return UpdateResponce(
@@ -287,15 +293,18 @@ class AiAgentsApi:
         logo: str | None = None,
         code: str | None = None,
     ) -> UpdateResponce:
-        resp = self._client.post(
-            f"/ai-agents/{agent_id}/save/prepare",
-            json={"name": name, "description": description, "shard": shard, "logo": logo, "code": code},
-        )
+        prepare_request = {"name": name, "description": description, "shard": shard, "logo": logo, "code": code}
+        resp = self._client.post(f"/ai-agents/{agent_id}/save/prepare", json=prepare_request)
         assert resp.status == 200
 
         resp_next = self._client.post(
             f"/ai-agents/{agent_id}/save/send",
-            json=sing_contract(wallet, resp.json["contract"]),
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
         )
         assert resp_next.status == 200
 
@@ -310,7 +319,7 @@ class AiAgentsApi:
         assert resp.status == 200
 
         resp_next = self._client.post(
-            f"/ai-agents/{agent_id}/save/send",
+            f"/ai-agents/{agent_id}/delete/send",
             json=sing_contract(wallet, resp.json["contract"]),
         )
         assert resp_next.status == 200
@@ -503,20 +512,26 @@ class AiAgentsTeamsApi:
         )
 
     def publish_to_firesky(self, wallet: Wallet, agent_id: str) -> UpdateResponce:
+        prepare_request = {
+            "pds_url": "http://localhost:2583",
+            "email": "bar@bar.com",
+            "handle": "bar.test",
+            "password": "hunter22",
+        }
         resp = self._client.post(
             f"/ai-agents-teams/{wallet.address}/{agent_id}/publish-to-firesky/prepare",
-            json={
-                "pds_url": "http://localhost:2583",
-                "email": "bar@bar.com",
-                "handle": "bar.test",
-                "password": "hunter22",
-            },
+            json=prepare_request,
         )
         assert resp.status == 200
 
         resp_next = self._client.post(
             f"/ai-agents-teams/{wallet.address}/{agent_id}/publish-to-firesky/send",
-            json=sing_contract(wallet, resp.json["contract"]),
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
         )
         assert resp_next.status == 200
 
@@ -527,15 +542,18 @@ class AiAgentsTeamsApi:
         )
 
     def run_on_firesky(self, wallet: Wallet, prompt: str, uri: str) -> UpdateResponce:
-        resp = self._client.post(
-            "/ai-agents-teams/run-on-firesky/prepare",
-            json={"prompt": prompt, "phlo_limit": "50000000", "agents_team": uri},
-        )
+        prepare_request = {"prompt": prompt, "phlo_limit": "50000000", "agents_team": uri}
+        resp = self._client.post("/ai-agents-teams/run-on-firesky/prepare", json=prepare_request)
         assert resp.status == 200
 
         resp_next = self._client.post(
             "/ai-agents-teams/run-on-firesky/send",
-            json={"contract": sing_contract(wallet, resp.json["contract"]), "agents_team": uri},
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": {"contract": sing_contract(wallet, resp.json["response"]["contract"]), "agents_team": uri},
+                "token": resp.json["token"],
+            },
         )
         assert resp_next.status == 200
 

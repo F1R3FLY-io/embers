@@ -16,7 +16,15 @@ use crate::api::ai_agents::models::{
     SaveAgentReq,
     SaveAgentResp,
 };
-use crate::api::common::{ApiTags, MaybeNotFound, SendResp, SignedContract, Stringified};
+use crate::api::common::{
+    ApiTags,
+    MaybeNotFound,
+    PrepareResponse,
+    SendRequest,
+    SendResp,
+    SignedContract,
+    Stringified,
+};
 use crate::domain::ai_agents::AgentsService;
 
 #[derive(Debug, Clone)]
@@ -60,18 +68,27 @@ impl AIAgents {
         &self,
         Json(body): Json<CreateAgentReq>,
         Data(agents): Data<&AgentsService>,
-    ) -> poem::Result<Json<CreateAgentResp>> {
-        let contract = agents.prepare_create_agent_contract(body.into()).await?;
-        Ok(Json(contract.into()))
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<CreateAgentResp>>> {
+        PrepareResponse::from_call(
+            body,
+            |body| agents.prepare_create_agent_contract(body.into()),
+            encoding_key,
+        )
+        .await
+        .map(Json)
+        .map_err(Into::into)
     }
 
     #[oai(path = "/create/send", method = "post")]
     async fn create(
         &self,
-        Json(body): Json<SignedContract>,
+        SendRequest(body): SendRequest<SignedContract, CreateAgentReq, CreateAgentResp>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_create_agent(body.into()).await?;
+        let deploy_id = agents
+            .deploy_signed_create_agent(body.request.into())
+            .await?;
         Ok(Json(deploy_id.into()))
     }
 
@@ -80,18 +97,27 @@ impl AIAgents {
         &self,
         Json(body): Json<DeployAgentReq>,
         Data(agents): Data<&AgentsService>,
-    ) -> poem::Result<Json<DeployAgentResp>> {
-        let contract = agents.prepare_deploy_agent_contract(body.into()).await?;
-        Ok(Json(contract.into()))
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<DeployAgentResp>>> {
+        PrepareResponse::from_call(
+            body,
+            |body| agents.prepare_deploy_agent_contract(body.into()),
+            encoding_key,
+        )
+        .await
+        .map(Json)
+        .map_err(Into::into)
     }
 
     #[oai(path = "/deploy/send", method = "post")]
     async fn deploy_agent(
         &self,
-        Json(body): Json<DeploySignedAgentReq>,
+        SendRequest(body): SendRequest<DeploySignedAgentReq, DeployAgentReq, DeployAgentResp>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_deploy_agent(body.into()).await?;
+        let deploy_id = agents
+            .deploy_signed_deploy_agent(body.request.into())
+            .await?;
         Ok(Json(deploy_id.into()))
     }
 
@@ -101,19 +127,26 @@ impl AIAgents {
         Path(id): Path<String>,
         Json(body): Json<SaveAgentReq>,
         Data(agents): Data<&AgentsService>,
-    ) -> poem::Result<Json<SaveAgentResp>> {
-        let contract = agents.prepare_save_agent_contract(id, body.into()).await?;
-        Ok(Json(contract.into()))
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<SaveAgentResp>>> {
+        PrepareResponse::from_call(
+            body,
+            |body| agents.prepare_save_agent_contract(id, body.into()),
+            encoding_key,
+        )
+        .await
+        .map(Json)
+        .map_err(Into::into)
     }
 
     #[oai(path = "/:id/save/send", method = "post")]
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
-        Json(body): Json<SignedContract>,
+        SendRequest(body): SendRequest<SignedContract, SaveAgentReq, SaveAgentResp>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_save_agent(body.into()).await?;
+        let deploy_id = agents.deploy_signed_save_agent(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 

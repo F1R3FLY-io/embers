@@ -26,7 +26,7 @@ pub struct AgentHeader {
     pub logo: Option<String>,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(into(models::CreateAgentReq))]
 pub struct CreateAgentReq {
     pub name: String,
@@ -50,7 +50,7 @@ pub struct Agent {
     pub code: Option<String>,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::CreateAgentResp))]
 pub struct CreateAgentResp {
     pub id: String,
@@ -60,7 +60,7 @@ pub struct CreateAgentResp {
 
 pub type SaveAgentReq = CreateAgentReq;
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::SaveAgentResp))]
 pub struct SaveAgentResp {
     pub version: String,
@@ -73,7 +73,7 @@ pub struct DeleteAgentResp {
     pub contract: PreparedContract,
 }
 
-#[derive(Debug, Clone, Object)]
+#[derive(Debug, Clone, Hash, Object)]
 pub struct DeployAgent {
     id: String,
     version: String,
@@ -81,13 +81,13 @@ pub struct DeployAgent {
     phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 
-#[derive(Debug, Clone, Object)]
+#[derive(Debug, Clone, Hash, Object)]
 pub struct DeployCode {
     code: String,
     phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 
-#[derive(Debug, Clone, Union)]
+#[derive(Debug, Clone, Hash, Union)]
 #[oai(one_of = true, discriminator_name = "type")]
 pub enum DeployAgentReq {
     Agent(DeployAgent),
@@ -111,7 +111,7 @@ impl From<DeployAgentReq> for models::DeployAgentReq {
     }
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::DeployAgentResp))]
 pub struct DeployAgentResp {
     pub contract: PreparedContract,

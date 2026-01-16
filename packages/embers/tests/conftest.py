@@ -63,8 +63,8 @@ def agent(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureReque
     ).wait_for_sync()
 
     return Agent(
-        id=resp.first.json["id"],
-        version=resp.first.json["version"],
+        id=resp.first.json["response"]["id"],
+        version=resp.first.json["response"]["version"],
         name="my_agent",
         code='@Nil!("foo")',
     )

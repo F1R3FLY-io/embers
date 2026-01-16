@@ -1,5 +1,0 @@
-new ret in {
-    for(@result <- @{{ deploy_id }}) {
-        ret!(result)
-    }
-}

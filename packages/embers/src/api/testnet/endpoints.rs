@@ -33,12 +33,14 @@ impl Testnet {
         Data(testnet): Data<&TestnetService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<DeployTestResp>>> {
-        let contracts = testnet.prepare_test_contract(body.clone().into()).await?;
-        Ok(Json(PrepareResponse::new(
-            &body,
-            contracts.into(),
+        PrepareResponse::from_call(
+            body,
+            |body| testnet.prepare_test_contract(body.into()),
             encoding_key,
-        )))
+        )
+        .await
+        .map(Json)
+        .map_err(Into::into)
     }
 
     #[oai(path = "/deploy/send", method = "post")]

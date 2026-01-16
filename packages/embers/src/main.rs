@@ -10,6 +10,7 @@ use tokio::try_join;
 
 use crate::api::ai_agents::AIAgents;
 use crate::api::ai_agents_teams::AIAgentsTeams;
+use crate::api::oslf::OSLF;
 use crate::api::service::Service;
 use crate::api::testnet::Testnet;
 use crate::api::wallets::WalletsApi;
@@ -113,7 +114,7 @@ async fn main() -> anyhow::Result<()> {
     let secret = Alphanumeric.sample_string(&mut rand::rng(), 20);
 
     let api = OpenApiService::new(
-        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams),
+        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams, OSLF),
         "Embers API",
         "0.1.0",
     )

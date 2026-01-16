@@ -51,14 +51,14 @@ impl WalletsApi {
         Data(wallets): Data<&WalletsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<TransferResp>>> {
-        let result = wallets
-            .prepare_transfer_contract(body.clone().into())
-            .await?;
-        Ok(Json(PrepareResponse::new(
-            &body,
-            result.into(),
+        PrepareResponse::from_call(
+            body,
+            |body| wallets.prepare_transfer_contract(body.into()),
             encoding_key,
-        )))
+        )
+        .await
+        .map(Json)
+        .map_err(Into::into)
     }
 
     #[oai(path = "/transfer/send", method = "post")]
@@ -78,12 +78,14 @@ impl WalletsApi {
         Data(wallets): Data<&WalletsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<BoostResp>>> {
-        let result = wallets.prepare_boost_contract(body.clone().into()).await?;
-        Ok(Json(PrepareResponse::new(
-            &body,
-            result.into(),
+        PrepareResponse::from_call(
+            body,
+            |body| wallets.prepare_boost_contract(body.into()),
             encoding_key,
-        )))
+        )
+        .await
+        .map(Json)
+        .map_err(Into::into)
     }
 
     #[oai(path = "/boost/send", method = "post")]

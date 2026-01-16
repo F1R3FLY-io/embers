@@ -344,6 +344,7 @@ pub enum ApiTags {
     AIAgents,
     AIAgentsTeams,
     Service,
+    Oslf,
 }
 
 #[derive(Debug, Clone, Object)]
@@ -477,22 +478,31 @@ impl<T> PrepareResponse<T>
 where
     T: Type + ParseFromJSON + ToJSON,
 {
-    pub fn new<R>(request: &R, response: T, secret: &jsonwebtoken::EncodingKey) -> Self
+    pub async fn from_call<R, P, F, I, E>(
+        request: R,
+        closure: F,
+        secret: &jsonwebtoken::EncodingKey,
+    ) -> Result<Self, E>
     where
         R: Hash + 'static,
-        T: Hash + 'static,
+        T: Hash + 'static + From<P>,
+        F: FnOnce(R) -> I,
+        F::Output: Future<Output = Result<P, E>>,
     {
-        let exp = (Utc::now() + chrono::Days::new(1)).timestamp() as _;
-
         let mut h = DefaultHasher::new();
-        (request, TypeId::of::<R>(), &response, TypeId::of::<T>()).hash(&mut h);
+        (&request, TypeId::of::<R>()).hash(&mut h);
+
+        let response = closure(request).await?.into();
+        (&response, TypeId::of::<T>()).hash(&mut h);
         let hash = h.finish();
 
-        Self {
+        let exp = (Utc::now() + chrono::Days::new(1)).timestamp() as _;
+
+        Ok(Self {
             response,
             token: jsonwebtoken::encode(&Default::default(), &Claims { exp, hash }, secret)
                 .unwrap(),
-        }
+        })
     }
 }
 

@@ -68,7 +68,7 @@ pub struct SaveAgentsTeamResp {
     pub contract: PreparedContract,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::DeleteAgentsTeamResp))]
 pub struct DeleteAgentsTeamResp {
     pub contract: PreparedContract,
@@ -144,7 +144,7 @@ pub struct RunAgentsTeamResp {
     pub contract: PreparedContract,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(into(models::PublishAgentsTeamToFireskyReq))]
 pub struct PublishAgentsTeamToFireskyReq {
     pub pds_url: String,
@@ -154,7 +154,7 @@ pub struct PublishAgentsTeamToFireskyReq {
     pub invite_code: Option<String>,
 }
 
-#[derive(Debug, Clone, StructuralConvert, Object)]
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::PublishAgentsTeamToFireskyResp))]
 pub struct PublishAgentsTeamToFireskyResp {
     pub contract: PreparedContract,
