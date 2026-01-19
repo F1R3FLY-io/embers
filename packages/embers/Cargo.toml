@@ -25,7 +25,7 @@ derive_more        = { version = "2.1", features = ["full"] }
 figment            = { version = "0.10", features = ["env"] }
 firefly-client     = { path = "../firefly-client" }
 futures            = { version = "0.3" }
-graphl-parser      = { git = "https://github.com/F1R3FLY-io/graphl-parser", tag = "0.0.36" }
+graphl-parser      = { git = "https://github.com/F1R3FLY-io/graphl-parser", tag = "0.0.37" }
 hex                = { version = "0.4" }
 jsonwebtoken       = { version = "10.2", features = ["rust_crypto"] }
 poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
