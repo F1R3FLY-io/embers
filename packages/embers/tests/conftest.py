@@ -56,7 +56,7 @@ def assert_match_transfer(transfer: dict, match: dict):
 
 @pytest.fixture
 def agent(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureRequest) -> Agent:
-    resp = client.ai_agents.create(
+    resp = client.agents.create(
         funded_wallet,
         name="my_agent",
         code='@Nil!("foo")' if not hasattr(request, "param") else request.param,
@@ -91,7 +91,7 @@ def assert_match_agent(agent: dict, match: Agent):
 
 @pytest.fixture
 def agents_team(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureRequest) -> AgentsTeam:
-    resp = client.ai_agents_teams.create(
+    resp = client.agents_teams.create(
         funded_wallet,
         name="my_agents_team",
         graph="< foo > | 0 " if not hasattr(request, "param") else request.param,

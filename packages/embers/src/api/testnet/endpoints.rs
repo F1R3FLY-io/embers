@@ -13,10 +13,10 @@ use crate::api::testnet::models::{
 use crate::domain::testnet::TestnetService;
 
 #[derive(Debug, Clone)]
-pub struct Testnet;
+pub struct TestnetApi;
 
 #[OpenApi(prefix_path = "/testnet", tag = ApiTags::Testnet)]
-impl Testnet {
+impl TestnetApi {
     #[oai(path = "/wallet", method = "post")]
     async fn create_wallet(
         &self,

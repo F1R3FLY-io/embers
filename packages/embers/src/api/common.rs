@@ -24,7 +24,7 @@ use poem_openapi::{ApiExtractor, ApiResponse, NewType, Object, Tags};
 use secp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::ai_agents_teams::models::Graph;
+use crate::domain::agents_teams::models::Graph;
 use crate::domain::common;
 
 impl<T> Type for common::PositiveNonZero<T>

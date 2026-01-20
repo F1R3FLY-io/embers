@@ -9,7 +9,7 @@ use prost::Message;
 use secp256k1::PublicKey;
 use serde::{Deserialize, Serialize};
 
-use crate::domain::ai_agents_teams::models::EncryptedMsg;
+use crate::domain::agents_teams::models::EncryptedMsg;
 
 macro_rules! record_trace {
     ($($value:ident),+ $(,)?) => {

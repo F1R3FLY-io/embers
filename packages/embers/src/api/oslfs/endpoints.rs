@@ -24,12 +24,11 @@ use crate::api::oslfs::models::{
 };
 use crate::domain::oslfs::OslfsService;
 
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone)]
-pub struct OSLFS;
+pub struct OslfsApi;
 
 #[OpenApi(prefix_path = "/oslfs", tag = ApiTags::Oslfs)]
-impl OSLFS {
+impl OslfsApi {
     #[oai(path = "/:address", method = "get")]
     async fn list(
         &self,

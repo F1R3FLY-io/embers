@@ -2,7 +2,7 @@ from tests.client import ApiClient
 from tests.conftest import Wallet, assert_match_transfer
 
 
-def test_transfer(client: ApiClient, prepopulated_wallet: Wallet, wallet: Wallet):
+def test_boost(client: ApiClient, prepopulated_wallet: Wallet, wallet: Wallet):
     client.wallets.boost(
         from_wallet=prepopulated_wallet,
         to_wallet=wallet,

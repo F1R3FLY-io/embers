@@ -8,15 +8,15 @@ use secp256k1::rand;
 use secp256k1::rand::distr::{Alphanumeric, SampleString};
 use tokio::try_join;
 
-use crate::api::ai_agents::AIAgents;
-use crate::api::ai_agents_teams::AIAgentsTeams;
-use crate::api::oslfs::OSLFS;
-use crate::api::service::Service;
-use crate::api::testnet::Testnet;
+use crate::api::agents::AgentsApi;
+use crate::api::agents_teams::AgentsTeamsApi;
+use crate::api::oslfs::OslfsApi;
+use crate::api::service::ServiceApi;
+use crate::api::testnet::TestnetApi;
 use crate::api::wallets::WalletsApi;
 use crate::configuration::collect_config;
-use crate::domain::ai_agents::AgentsService;
-use crate::domain::ai_agents_teams::AgentsTeamsService;
+use crate::domain::agents::AgentsService;
+use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::oslfs::OslfsService;
 use crate::domain::testnet::TestnetService;
 use crate::domain::wallets::WalletsService;
@@ -129,7 +129,14 @@ async fn main() -> anyhow::Result<()> {
     let secret = Alphanumeric.sample_string(&mut rand::rng(), 20);
 
     let api = OpenApiService::new(
-        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams, OSLFS),
+        (
+            ServiceApi,
+            TestnetApi,
+            WalletsApi,
+            AgentsApi,
+            AgentsTeamsApi,
+            OslfsApi,
+        ),
         "Embers API",
         "0.1.0",
     )

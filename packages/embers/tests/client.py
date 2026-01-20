@@ -240,7 +240,7 @@ class Agent:
     code: str | None = None
 
 
-class AiAgentsApi:
+class AgentsApi:
     def __init__(self, client: HttpClient):
         self._client = client
 
@@ -342,7 +342,7 @@ class AgentsTeam:
     graph: str | None = None
 
 
-class AiAgentsTeamsApi:
+class AgentsTeamsApi:
     def __init__(self, client: HttpClient):
         self._client = client
 
@@ -668,8 +668,8 @@ class ApiClient:
         self._http_client = HttpClient(backend_url)
         self.testnet = TestnetApi(self._http_client)
         self.wallets = WalletsApi(self._http_client)
-        self.ai_agents = AiAgentsApi(self._http_client)
-        self.ai_agents_teams = AiAgentsTeamsApi(self._http_client)
+        self.agents = AgentsApi(self._http_client)
+        self.agents_teams = AgentsTeamsApi(self._http_client)
         self.oslfs = OslfsApi(self._http_client)
 
 

@@ -1,10 +1,10 @@
 use poem_openapi::OpenApiService;
 
-use crate::api::ai_agents::AIAgents;
-use crate::api::ai_agents_teams::AIAgentsTeams;
-use crate::api::oslfs::OSLFS;
-use crate::api::service::Service;
-use crate::api::testnet::Testnet;
+use crate::api::agents::AgentsApi;
+use crate::api::agents_teams::AgentsTeamsApi;
+use crate::api::oslfs::OslfsApi;
+use crate::api::service::ServiceApi;
+use crate::api::testnet::TestnetApi;
 use crate::api::wallets::WalletsApi;
 
 mod api;
@@ -14,7 +14,14 @@ mod domain;
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let api = OpenApiService::new(
-        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams, OSLFS),
+        (
+            ServiceApi,
+            TestnetApi,
+            WalletsApi,
+            AgentsApi,
+            AgentsTeamsApi,
+            OslfsApi,
+        ),
         "Embers API",
         "0.1.0",
     )
