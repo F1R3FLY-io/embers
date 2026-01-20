@@ -6,7 +6,7 @@ use firefly_client::rendering::Render;
 use futures::FutureExt;
 
 use crate::domain::agents_teams::AgentsTeamsService;
-use crate::domain::agents_teams::models::{RunAgentsTeamReq, RunAgentsTeamResp};
+use crate::domain::agents_teams::models::{RunReq, RunResp};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
@@ -32,8 +32,8 @@ impl AgentsTeamsService {
     )]
     pub async fn prepare_run_agents_team_contract(
         &self,
-        request: RunAgentsTeamReq,
-    ) -> anyhow::Result<RunAgentsTeamResp> {
+        request: RunReq,
+    ) -> anyhow::Result<RunResp> {
         record_trace!(request);
 
         let contract = RunAgentsTeam {
@@ -43,7 +43,7 @@ impl AgentsTeamsService {
         .render()?;
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
-        Ok(RunAgentsTeamResp {
+        Ok(RunResp {
             contract: prepare_for_signing()
                 .code(contract)
                 .phlo_limit(request.phlo_limit)

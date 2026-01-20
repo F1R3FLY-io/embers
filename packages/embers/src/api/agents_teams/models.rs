@@ -27,8 +27,8 @@ pub struct AgentsTeamHeader {
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(into(models::CreateAgentsTeamReq))]
-pub struct CreateAgentsTeamReq {
+#[convert(into(models::CreateReq))]
+pub struct CreateReq {
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -52,25 +52,25 @@ pub struct AgentsTeam {
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(from(models::CreateAgentsTeamResp))]
-pub struct CreateAgentsTeamResp {
+#[convert(from(models::CreateResp))]
+pub struct CreateResp {
     pub id: String,
     pub version: String,
     pub contract: PreparedContract,
 }
 
-pub type SaveAgentsTeamReq = CreateAgentsTeamReq;
+pub type SaveReq = CreateReq;
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(from(models::SaveAgentsTeamResp))]
-pub struct SaveAgentsTeamResp {
+#[convert(from(models::SaveResp))]
+pub struct SaveResp {
     pub version: String,
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(from(models::DeleteAgentsTeamResp))]
-pub struct DeleteAgentsTeamResp {
+#[convert(from(models::DeleteResp))]
+pub struct DeleteResp {
     pub contract: PreparedContract,
 }
 
@@ -92,22 +92,22 @@ pub struct DeployGraph {
 
 #[derive(Debug, Clone, Hash, Union)]
 #[oai(one_of = true, discriminator_name = "type")]
-pub enum DeployAgentsTeamReq {
+pub enum DeployReq {
     AgentsTeam(DeployAgentsTeam),
     Graph(DeployGraph),
 }
 
-impl From<DeployAgentsTeamReq> for models::DeployAgentsTeamReq {
-    fn from(value: DeployAgentsTeamReq) -> Self {
+impl From<DeployReq> for models::DeployReq {
+    fn from(value: DeployReq) -> Self {
         match value {
-            DeployAgentsTeamReq::AgentsTeam(deploy) => Self::AgentsTeam {
+            DeployReq::AgentsTeam(deploy) => Self::AgentsTeam {
                 id: deploy.id,
                 version: deploy.version,
                 address: deploy.address.0,
                 phlo_limit: deploy.phlo_limit.0,
                 deploy: deploy.deploy.into(),
             },
-            DeployAgentsTeamReq::Graph(deploy) => Self::Graph {
+            DeployReq::Graph(deploy) => Self::Graph {
                 graph: deploy.graph.0,
                 phlo_limit: deploy.phlo_limit.0,
                 deploy: deploy.deploy.into(),
@@ -117,36 +117,36 @@ impl From<DeployAgentsTeamReq> for models::DeployAgentsTeamReq {
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(from(models::DeployAgentsTeamResp))]
-pub struct DeployAgentsTeamResp {
+#[convert(from(models::DeployResp))]
+pub struct DeployResp {
     pub contract: PreparedContract,
     pub system: Option<PreparedContract>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
-#[convert(into(models::DeploySignedAgentsTeamtReq))]
-pub struct DeploySignedAgentsTeamtReq {
+#[convert(into(models::DeploySignedReq))]
+pub struct DeploySignedReq {
     pub contract: SignedContract,
     pub system: Option<SignedContract>,
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(into(models::RunAgentsTeamReq))]
-pub struct RunAgentsTeamReq {
+#[convert(into(models::RunReq))]
+pub struct RunReq {
     pub prompt: String,
     pub phlo_limit: Stringified<PositiveNonZero<i64>>,
     pub agents_team: Stringified<Uri>,
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(from(models::RunAgentsTeamResp))]
-pub struct RunAgentsTeamResp {
+#[convert(from(models::RunResp))]
+pub struct RunResp {
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(into(models::PublishAgentsTeamToFireskyReq))]
-pub struct PublishAgentsTeamToFireskyReq {
+#[convert(into(models::PublishToFireskyReq))]
+pub struct PublishToFireskyReq {
     pub pds_url: String,
     pub email: String,
     pub handle: String,
@@ -155,13 +155,13 @@ pub struct PublishAgentsTeamToFireskyReq {
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
-#[convert(from(models::PublishAgentsTeamToFireskyResp))]
-pub struct PublishAgentsTeamToFireskyResp {
+#[convert(from(models::PublishToFireskyResp))]
+pub struct PublishToFireskyResp {
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, Object)]
-pub struct DeploySignedRunAgentsTeamFireskyReq {
+pub struct DeploySignedRunOnFireskyReq {
     pub contract: SignedContract,
     pub reply_to: Option<FireskyReply>,
 }

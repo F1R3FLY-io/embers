@@ -7,14 +7,14 @@ use poem_openapi::payload::Json;
 use crate::api::agents::models::{
     Agent,
     Agents,
-    CreateAgentReq,
-    CreateAgentResp,
-    DeleteAgentResp,
-    DeployAgentReq,
-    DeployAgentResp,
-    DeploySignedAgentReq,
-    SaveAgentReq,
-    SaveAgentResp,
+    CreateReq,
+    CreateResp,
+    DeleteResp,
+    DeployReq,
+    DeployResp,
+    DeploySignedReq,
+    SaveReq,
+    SaveResp,
 };
 use crate::api::common::{
     ApiTags,
@@ -38,7 +38,7 @@ impl AgentsApi {
         Path(address): Path<Stringified<WalletAddress>>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<Agents>> {
-        let agents = agents.list_agents(address.0).await?;
+        let agents = agents.list(address.0).await?;
         Ok(Json(agents.into()))
     }
 
@@ -49,7 +49,7 @@ impl AgentsApi {
         Path(id): Path<String>,
         Data(agents): Data<&AgentsService>,
     ) -> MaybeNotFound<Agents> {
-        agents.list_agent_versions(address.0, id).await.into()
+        agents.list_versions(address.0, id).await.into()
     }
 
     #[oai(path = "/:address/:id/versions/:version", method = "get")]
@@ -60,19 +60,19 @@ impl AgentsApi {
         Path(version): Path<String>,
         Data(agents): Data<&AgentsService>,
     ) -> MaybeNotFound<Agent> {
-        agents.get_agent(address.0, id, version).await.into()
+        agents.get(address.0, id, version).await.into()
     }
 
     #[oai(path = "/create/prepare", method = "post")]
     async fn prepare_create(
         &self,
-        Json(body): Json<CreateAgentReq>,
+        Json(body): Json<CreateReq>,
         Data(agents): Data<&AgentsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<CreateAgentResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<CreateResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents.prepare_create_agent_contract(body.into()),
+            |body| agents.prepare_create_contract(body.into()),
             encoding_key,
         )
         .await
@@ -83,25 +83,23 @@ impl AgentsApi {
     #[oai(path = "/create/send", method = "post")]
     async fn create(
         &self,
-        SendRequest(body): SendRequest<SignedContract, CreateAgentReq, CreateAgentResp>,
+        SendRequest(body): SendRequest<SignedContract, CreateReq, CreateResp>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents
-            .deploy_signed_create_agent(body.request.into())
-            .await?;
+        let deploy_id = agents.deploy_signed_create(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 
     #[oai(path = "/deploy/prepare", method = "post")]
-    async fn prepare_deploy_agent(
+    async fn prepare_deploy(
         &self,
-        Json(body): Json<DeployAgentReq>,
+        Json(body): Json<DeployReq>,
         Data(agents): Data<&AgentsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<DeployAgentResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<DeployResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents.prepare_deploy_agent_contract(body.into()),
+            |body| agents.prepare_deploy_contract(body.into()),
             encoding_key,
         )
         .await
@@ -110,14 +108,12 @@ impl AgentsApi {
     }
 
     #[oai(path = "/deploy/send", method = "post")]
-    async fn deploy_agent(
+    async fn deploy(
         &self,
-        SendRequest(body): SendRequest<DeploySignedAgentReq, DeployAgentReq, DeployAgentResp>,
+        SendRequest(body): SendRequest<DeploySignedReq, DeployReq, DeployResp>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents
-            .deploy_signed_deploy_agent(body.request.into())
-            .await?;
+        let deploy_id = agents.deploy_signed_deploy(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 
@@ -125,13 +121,13 @@ impl AgentsApi {
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
-        Json(body): Json<SaveAgentReq>,
+        Json(body): Json<SaveReq>,
         Data(agents): Data<&AgentsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<SaveAgentResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<SaveResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents.prepare_save_agent_contract(id, body.into()),
+            |body| agents.prepare_save_contract(id, body.into()),
             encoding_key,
         )
         .await
@@ -143,10 +139,10 @@ impl AgentsApi {
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
-        SendRequest(body): SendRequest<SignedContract, SaveAgentReq, SaveAgentResp>,
+        SendRequest(body): SendRequest<SignedContract, SaveReq, SaveResp>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_save_agent(body.request.into()).await?;
+        let deploy_id = agents.deploy_signed_save(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 
@@ -155,8 +151,8 @@ impl AgentsApi {
         &self,
         Path(id): Path<String>,
         Data(agents): Data<&AgentsService>,
-    ) -> poem::Result<Json<DeleteAgentResp>> {
-        let contract = agents.prepare_delete_agent_contract(id).await?;
+    ) -> poem::Result<Json<DeleteResp>> {
+        let contract = agents.prepare_delete_contract(id).await?;
         Ok(Json(contract.into()))
     }
 
@@ -167,7 +163,7 @@ impl AgentsApi {
         Json(body): Json<SignedContract>,
         Data(agents): Data<&AgentsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_delete_agent(body.into()).await?;
+        let deploy_id = agents.deploy_signed_delete(body.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 }

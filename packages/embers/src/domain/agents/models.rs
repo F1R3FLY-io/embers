@@ -21,7 +21,7 @@ pub struct AgentHeader {
 }
 
 #[derive(Debug, Clone)]
-pub struct CreateAgentReq {
+pub struct CreateReq {
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -43,27 +43,27 @@ pub struct Agent {
 }
 
 #[derive(Debug, Clone)]
-pub struct CreateAgentResp {
+pub struct CreateResp {
     pub id: String,
     pub version: String,
     pub contract: PreparedContract,
 }
 
-pub type SaveAgentReq = CreateAgentReq;
+pub type SaveReq = CreateReq;
 
 #[derive(Debug, Clone)]
-pub struct SaveAgentResp {
+pub struct SaveResp {
     pub version: String,
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone)]
-pub struct DeleteAgentResp {
+pub struct DeleteResp {
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone)]
-pub enum DeployAgentReq {
+pub enum DeployReq {
     Agent {
         id: String,
         version: String,
@@ -77,13 +77,13 @@ pub enum DeployAgentReq {
 }
 
 #[derive(Debug, Clone)]
-pub struct DeployAgentResp {
+pub struct DeployResp {
     pub contract: PreparedContract,
     pub system: Option<PreparedContract>,
 }
 
 #[derive(Debug, Clone)]
-pub struct DeploySignedAgentReq {
+pub struct DeploySignedReq {
     pub contract: SignedCode,
     pub system: Option<SignedCode>,
 }

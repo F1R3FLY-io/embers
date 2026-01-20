@@ -3,42 +3,42 @@ use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
 use uuid::Uuid;
 
-use crate::domain::agents::AgentsService;
-use crate::domain::agents::models::{CreateAgentReq, CreateAgentResp};
+use crate::domain::agents_teams::AgentsTeamsService;
+use crate::domain::agents_teams::models::{Graph, SaveReq, SaveResp};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents/create_agent.rho")]
-struct CreateAgent {
+#[template(path = "ai_agents_teams/save_agents_team.rho")]
+struct Save {
     env_uri: Uri,
-    id: Uuid,
+    id: String,
     version: Uuid,
     created_at: DateTime<Utc>,
     name: String,
     description: Option<String>,
     shard: Option<String>,
     logo: Option<String>,
-    code: Option<String>,
+    graph: Option<String>,
 }
 
-impl AgentsService {
+impl AgentsTeamsService {
     #[tracing::instrument(
         level = "info",
         skip_all,
-        fields(request),
+        fields(id, request),
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn prepare_create_agent_contract(
+    pub async fn prepare_save_contract(
         &self,
-        request: CreateAgentReq,
-    ) -> anyhow::Result<CreateAgentResp> {
-        record_trace!(request);
+        id: String,
+        request: SaveReq,
+    ) -> anyhow::Result<SaveResp> {
+        record_trace!(id, request);
 
-        let id = Uuid::new_v4();
         let version = Uuid::now_v7();
 
-        let contract = CreateAgent {
+        let contract = Save {
             env_uri: self.uri.clone(),
             id,
             version,
@@ -47,13 +47,12 @@ impl AgentsService {
             description: request.description,
             shard: request.shard,
             logo: request.logo,
-            code: request.code,
+            graph: request.graph.map(Graph::graphl),
         }
         .render()?;
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
-        Ok(CreateAgentResp {
-            id: id.into(),
+        Ok(SaveResp {
             version: version.into(),
             contract: prepare_for_signing()
                 .code(contract)
@@ -69,17 +68,13 @@ impl AgentsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn deploy_signed_create_agent(
-        &self,
-        contract: SignedCode,
-    ) -> anyhow::Result<DeployId> {
+    pub async fn deploy_signed_save(&self, contract: SignedCode) -> anyhow::Result<DeployId> {
         record_trace!(contract);
 
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
         write_client.propose().await?;
-
         Ok(deploy_id)
     }
 }

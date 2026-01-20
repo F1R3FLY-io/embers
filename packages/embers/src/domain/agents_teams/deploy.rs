@@ -4,12 +4,8 @@ use firefly_client::models::{DeployId, Uri};
 use firefly_client::rendering::Render;
 
 use crate::domain::agents_teams::AgentsTeamsService;
-use crate::domain::agents_teams::compilation::{parse, render_agent_team};
-use crate::domain::agents_teams::models::{
-    DeployAgentsTeamReq,
-    DeployAgentsTeamResp,
-    DeploySignedAgentsTeamtReq,
-};
+use crate::domain::agents_teams::compilation::{parse, render};
+use crate::domain::agents_teams::models::{DeployReq, DeployResp, DeploySignedReq};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
@@ -29,15 +25,12 @@ impl AgentsTeamsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn prepare_deploy_agents_team_contract(
-        &self,
-        request: DeployAgentsTeamReq,
-    ) -> anyhow::Result<DeployAgentsTeamResp> {
+    pub async fn prepare_deploy_contract(&self, request: DeployReq) -> anyhow::Result<DeployResp> {
         record_trace!(request);
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
         let (graph, phlo_limit, deploy, system) = match request {
-            DeployAgentsTeamReq::AgentsTeam {
+            DeployReq::AgentsTeam {
                 id,
                 version,
                 address,
@@ -45,7 +38,7 @@ impl AgentsTeamsService {
                 deploy,
             } => {
                 let graph = self
-                    .get_agents_team(address, id.clone(), version.clone())
+                    .get(address, id.clone(), version.clone())
                     .await?
                     .context("agents team not found")?
                     .graph
@@ -71,7 +64,7 @@ impl AgentsTeamsService {
                     ),
                 )
             }
-            DeployAgentsTeamReq::Graph {
+            DeployReq::Graph {
                 graph,
                 phlo_limit,
                 deploy,
@@ -81,9 +74,9 @@ impl AgentsTeamsService {
         let timestamp = deploy.timestamp;
 
         let code = parse(&graph)?;
-        let code = render_agent_team(code, deploy)?;
+        let code = render(code, deploy)?;
 
-        Ok(DeployAgentsTeamResp {
+        Ok(DeployResp {
             contract: prepare_for_signing()
                 .code(code)
                 .valid_after_block_number(valid_after)
@@ -101,10 +94,7 @@ impl AgentsTeamsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn deploy_signed_deploy_agents_team(
-        &self,
-        request: DeploySignedAgentsTeamtReq,
-    ) -> anyhow::Result<DeployId> {
+    pub async fn deploy_signed_deploy(&self, request: DeploySignedReq) -> anyhow::Result<DeployId> {
         record_trace!(request);
 
         let mut write_client = self.write_client.clone();

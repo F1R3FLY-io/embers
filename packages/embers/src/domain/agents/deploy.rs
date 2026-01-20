@@ -4,7 +4,7 @@ use firefly_client::models::{DeployId, Uri};
 use firefly_client::rendering::Render;
 
 use crate::domain::agents::AgentsService;
-use crate::domain::agents::models::{DeployAgentReq, DeployAgentResp, DeploySignedAgentReq};
+use crate::domain::agents::models::{DeployReq, DeployResp, DeploySignedReq};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
@@ -24,22 +24,19 @@ impl AgentsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn prepare_deploy_agent_contract(
-        &self,
-        request: DeployAgentReq,
-    ) -> anyhow::Result<DeployAgentResp> {
+    pub async fn prepare_deploy_contract(&self, request: DeployReq) -> anyhow::Result<DeployResp> {
         record_trace!(request);
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
         let (code, phlo_limit, system) = match request {
-            DeployAgentReq::Agent {
+            DeployReq::Agent {
                 id,
                 version,
                 address,
                 phlo_limit,
             } => {
                 let code = self
-                    .get_agent(address, id.clone(), version.clone())
+                    .get(address, id.clone(), version.clone())
                     .await?
                     .context("agent not found")?
                     .code
@@ -64,10 +61,10 @@ impl AgentsService {
                     ),
                 )
             }
-            DeployAgentReq::Code { code, phlo_limit } => (code, phlo_limit, None),
+            DeployReq::Code { code, phlo_limit } => (code, phlo_limit, None),
         };
 
-        Ok(DeployAgentResp {
+        Ok(DeployResp {
             contract: prepare_for_signing()
                 .code(code)
                 .valid_after_block_number(valid_after)
@@ -84,10 +81,7 @@ impl AgentsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn deploy_signed_deploy_agent(
-        &self,
-        request: DeploySignedAgentReq,
-    ) -> anyhow::Result<DeployId> {
+    pub async fn deploy_signed_deploy(&self, request: DeploySignedReq) -> anyhow::Result<DeployId> {
         record_trace!(request);
 
         let mut write_client = self.write_client.clone();

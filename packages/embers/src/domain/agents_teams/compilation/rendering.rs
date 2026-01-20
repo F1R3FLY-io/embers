@@ -148,7 +148,7 @@ fn get_output_for_vertex<'a, 'b>(
     err(Debug),
     ret(Display, level = "trace")
 )]
-pub fn render_agent_team(code: Code<'_>, deploy: RegistryDeploy) -> anyhow::Result<String> {
+pub fn render(code: Code<'_>, deploy: RegistryDeploy) -> anyhow::Result<String> {
     record_trace!(code);
 
     let vertex_outputs: BTreeMap<_, _> = code

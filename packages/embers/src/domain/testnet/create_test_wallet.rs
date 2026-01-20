@@ -17,7 +17,7 @@ struct FundTestWallet {
 
 impl TestnetService {
     #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
-    pub async fn create_test_wallet(&self) -> anyhow::Result<CreateTestwalletResp> {
+    pub async fn create_wallet(&self) -> anyhow::Result<CreateTestwalletResp> {
         let sk = Secp256k1::new();
         let (test_account_secret_key, test_account_public_key) =
             sk.generate_keypair(&mut rand::rng());

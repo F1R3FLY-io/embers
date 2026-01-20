@@ -8,7 +8,7 @@ use crate::domain::common::record_trace;
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "ai_agents_teams/list_agents_team_versions.rho")]
-struct ListAgentsTeamVersions {
+struct ListVersions {
     env_uri: Uri,
     address: WalletAddress,
     id: String,
@@ -22,14 +22,14 @@ impl AgentsTeamsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn list_agents_team_versions(
+    pub async fn list_versions(
         &self,
         address: WalletAddress,
         id: String,
     ) -> anyhow::Result<Option<AgentsTeams>> {
         record_trace!(address, id);
 
-        let code = ListAgentsTeamVersions {
+        let code = ListVersions {
             env_uri: self.uri.clone(),
             address,
             id,

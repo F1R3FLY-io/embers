@@ -22,7 +22,7 @@ impl TestnetApi {
         &self,
         Data(testnet): Data<&TestnetService>,
     ) -> poem::Result<Json<CreateTestwalletResp>> {
-        let wallet = testnet.create_test_wallet().await?;
+        let wallet = testnet.create_wallet().await?;
         Ok(Json(wallet.into()))
     }
 

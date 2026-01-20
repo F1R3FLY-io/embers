@@ -7,19 +7,19 @@ use poem_openapi::payload::Json;
 use crate::api::agents_teams::models::{
     AgentsTeam,
     AgentsTeams,
-    CreateAgentsTeamReq,
-    CreateAgentsTeamResp,
-    DeleteAgentsTeamResp,
-    DeployAgentsTeamReq,
-    DeployAgentsTeamResp,
-    DeploySignedAgentsTeamtReq,
-    DeploySignedRunAgentsTeamFireskyReq,
-    PublishAgentsTeamToFireskyReq,
-    PublishAgentsTeamToFireskyResp,
-    RunAgentsTeamReq,
-    RunAgentsTeamResp,
-    SaveAgentsTeamReq,
-    SaveAgentsTeamResp,
+    CreateReq,
+    CreateResp,
+    DeleteResp,
+    DeployReq,
+    DeployResp,
+    DeploySignedReq,
+    DeploySignedRunOnFireskyReq,
+    PublishToFireskyReq,
+    PublishToFireskyResp,
+    RunReq,
+    RunResp,
+    SaveReq,
+    SaveResp,
 };
 use crate::api::common::{
     ApiTags,
@@ -43,7 +43,7 @@ impl AgentsTeamsApi {
         Path(address): Path<Stringified<WalletAddress>>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<AgentsTeams>> {
-        let agents_teams = agents_teams.list_agents_teams(address.0).await?;
+        let agents_teams = agents_teams.list(address.0).await?;
         Ok(Json(agents_teams.into()))
     }
 
@@ -54,10 +54,7 @@ impl AgentsTeamsApi {
         Path(id): Path<String>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> MaybeNotFound<AgentsTeams> {
-        agents_teams
-            .list_agents_team_versions(address.0, id)
-            .await
-            .into()
+        agents_teams.list_versions(address.0, id).await.into()
     }
 
     #[oai(path = "/:address/:id/versions/:version", method = "get")]
@@ -68,22 +65,19 @@ impl AgentsTeamsApi {
         Path(version): Path<String>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> MaybeNotFound<AgentsTeam> {
-        agents_teams
-            .get_agents_team(address.0, id, version)
-            .await
-            .into()
+        agents_teams.get(address.0, id, version).await.into()
     }
 
     #[oai(path = "/create/prepare", method = "post")]
     async fn prepare_create(
         &self,
-        Json(body): Json<CreateAgentsTeamReq>,
+        Json(body): Json<CreateReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<CreateAgentsTeamResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<CreateResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_create_agents_team_contract(body.into()),
+            |body| agents_teams.prepare_create_contract(body.into()),
             encoding_key,
         )
         .await
@@ -94,25 +88,25 @@ impl AgentsTeamsApi {
     #[oai(path = "/create/send", method = "post")]
     async fn create(
         &self,
-        SendRequest(body): SendRequest<SignedContract, CreateAgentsTeamReq, CreateAgentsTeamResp>,
+        SendRequest(body): SendRequest<SignedContract, CreateReq, CreateResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
-            .deploy_signed_create_agents_team(body.request.into())
+            .deploy_signed_create(body.request.into())
             .await?;
         Ok(Json(deploy_id.into()))
     }
 
     #[oai(path = "/deploy/prepare", method = "post")]
-    async fn prepare_deploy_agents_team(
+    async fn prepare_deploy(
         &self,
-        Json(body): Json<DeployAgentsTeamReq>,
+        Json(body): Json<DeployReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<DeployAgentsTeamResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<DeployResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_deploy_agents_team_contract(body.into()),
+            |body| agents_teams.prepare_deploy_contract(body.into()),
             encoding_key,
         )
         .await
@@ -121,28 +115,24 @@ impl AgentsTeamsApi {
     }
 
     #[oai(path = "/deploy/send", method = "post")]
-    async fn deploy_agents_team(
+    async fn deploy(
         &self,
-        SendRequest(body): SendRequest<
-            DeploySignedAgentsTeamtReq,
-            DeployAgentsTeamReq,
-            DeployAgentsTeamResp,
-        >,
+        SendRequest(body): SendRequest<DeploySignedReq, DeployReq, DeployResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
-            .deploy_signed_deploy_agents_team(body.request.into())
+            .deploy_signed_deploy(body.request.into())
             .await?;
         Ok(Json(deploy_id.into()))
     }
 
     #[oai(path = "/run/prepare", method = "post")]
-    async fn prepare_run_agents_team(
+    async fn prepare_run(
         &self,
-        Json(body): Json<RunAgentsTeamReq>,
+        Json(body): Json<RunReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<RunAgentsTeamResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<RunResp>>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_run_agents_team_contract(body.into()),
@@ -154,9 +144,9 @@ impl AgentsTeamsApi {
     }
 
     #[oai(path = "/run/send", method = "post")]
-    async fn run_agents_team(
+    async fn run(
         &self,
-        SendRequest(body): SendRequest<SignedContract, RunAgentsTeamReq, RunAgentsTeamResp>,
+        SendRequest(body): SendRequest<SignedContract, RunReq, RunResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<serde_json::Value>> {
         agents_teams
@@ -167,15 +157,15 @@ impl AgentsTeamsApi {
     }
 
     #[oai(path = "/run-on-firesky/prepare", method = "post")]
-    async fn prepare_run_agents_team_on_firesky(
+    async fn prepare_run_on_firesky(
         &self,
-        Json(body): Json<RunAgentsTeamReq>,
+        Json(body): Json<RunReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<RunAgentsTeamResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<RunResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_run_agents_team_firesky_contract(body.into()),
+            |body| agents_teams.prepare_run_om_firesky_contract(body.into()),
             encoding_key,
         )
         .await
@@ -184,17 +174,13 @@ impl AgentsTeamsApi {
     }
 
     #[oai(path = "/run-on-firesky/send", method = "post")]
-    async fn run_agents_team_on_firesky(
+    async fn run_on_firesky(
         &self,
-        SendRequest(body): SendRequest<
-            DeploySignedRunAgentsTeamFireskyReq,
-            RunAgentsTeamReq,
-            RunAgentsTeamResp,
-        >,
+        SendRequest(body): SendRequest<DeploySignedRunOnFireskyReq, RunReq, RunResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
         agents_teams
-            .deploy_signed_run_agents_team_firesky(models::DeploySignedRunAgentsTeamFireskyReq {
+            .deploy_signed_run_on_firesky(models::DeploySignedRunOnFireskyReq {
                 contract: body.request.contract.into(),
                 agents_team: body.prepare_request.agents_team.into(),
                 reply_to: body.request.reply_to.map(Into::into),
@@ -207,13 +193,13 @@ impl AgentsTeamsApi {
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
-        Json(body): Json<SaveAgentsTeamReq>,
+        Json(body): Json<SaveReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<SaveAgentsTeamResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<SaveResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_save_agents_team_contract(id, body.into()),
+            |body| agents_teams.prepare_save_contract(id, body.into()),
             encoding_key,
         )
         .await
@@ -225,12 +211,10 @@ impl AgentsTeamsApi {
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
-        SendRequest(body): SendRequest<SignedContract, SaveAgentsTeamReq, SaveAgentsTeamResp>,
+        SendRequest(body): SendRequest<SignedContract, SaveReq, SaveResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents_teams
-            .deploy_signed_save_agents_team(body.request.into())
-            .await?;
+        let deploy_id = agents_teams.deploy_signed_save(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 
@@ -239,8 +223,8 @@ impl AgentsTeamsApi {
         &self,
         Path(id): Path<String>,
         Data(agents): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<DeleteAgentsTeamResp>> {
-        let contract = agents.prepare_delete_agents_team_contract(id).await?;
+    ) -> poem::Result<Json<DeleteResp>> {
+        let contract = agents.prepare_delete_contract(id).await?;
         Ok(Json(contract.into()))
     }
 
@@ -251,27 +235,23 @@ impl AgentsTeamsApi {
         Json(body): Json<SignedContract>,
         Data(agents): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_delete_agents_team(body.into()).await?;
+        let deploy_id = agents.deploy_signed_delete(body.into()).await?;
         Ok(Json(deploy_id.into()))
     }
 
     #[oai(path = "/:address/:id/publish-to-firesky/prepare", method = "post")]
-    async fn prepare_publish_agents_team_to_firesky(
+    async fn prepare_publish_to_firesky(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
-        Json(body): Json<PublishAgentsTeamToFireskyReq>,
+        Json(body): Json<PublishToFireskyReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<PublishAgentsTeamToFireskyResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<PublishToFireskyResp>>> {
         PrepareResponse::from_call(
             body,
             |body| {
-                agents_teams.prepare_publish_agents_team_to_firesky_contract(
-                    address.into(),
-                    id,
-                    body.into(),
-                )
+                agents_teams.prepare_publish_to_firesky_contract(address.into(), id, body.into())
             },
             encoding_key,
         )
@@ -281,19 +261,15 @@ impl AgentsTeamsApi {
     }
 
     #[oai(path = "/:address/:id/publish-to-firesky/send", method = "post")]
-    async fn publish_agents_team_to_firesky(
+    async fn publish_to_firesky(
         &self,
         #[allow(unused_variables)] Path(address): Path<Stringified<WalletAddress>>,
         #[allow(unused_variables)] Path(id): Path<String>,
-        SendRequest(body): SendRequest<
-            SignedContract,
-            PublishAgentsTeamToFireskyReq,
-            PublishAgentsTeamToFireskyResp,
-        >,
+        SendRequest(body): SendRequest<SignedContract, PublishToFireskyReq, PublishToFireskyResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
-            .deploy_signed_publish_agents_team_to_firesky(body.request.into())
+            .deploy_signed_publish_to_firesky(body.request.into())
             .await?;
         Ok(Json(deploy_id.into()))
     }

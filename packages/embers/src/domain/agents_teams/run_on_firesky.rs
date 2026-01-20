@@ -11,11 +11,7 @@ use atrium_xrpc_client::reqwest::ReqwestClient;
 use futures::{StreamExt, stream};
 
 use crate::domain::agents_teams::AgentsTeamsService;
-use crate::domain::agents_teams::models::{
-    DeploySignedRunAgentsTeamFireskyReq,
-    RunAgentsTeamReq,
-    RunAgentsTeamResp,
-};
+use crate::domain::agents_teams::models::{DeploySignedRunOnFireskyReq, RunReq, RunResp};
 use crate::domain::common::upload_blob_from_url;
 
 impl AgentsTeamsService {
@@ -26,10 +22,10 @@ impl AgentsTeamsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn prepare_run_agents_team_firesky_contract(
+    pub async fn prepare_run_om_firesky_contract(
         &self,
-        request: RunAgentsTeamReq,
-    ) -> anyhow::Result<RunAgentsTeamResp> {
+        request: RunReq,
+    ) -> anyhow::Result<RunResp> {
         if !self.firesky_accounts.contains_key(&request.agents_team) {
             return Err(anyhow!("agents team is not connected to firesky"));
         }
@@ -43,9 +39,9 @@ impl AgentsTeamsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn deploy_signed_run_agents_team_firesky(
+    pub async fn deploy_signed_run_on_firesky(
         &self,
-        request: DeploySignedRunAgentsTeamFireskyReq,
+        request: DeploySignedRunOnFireskyReq,
     ) -> anyhow::Result<()> {
         let reply = request
             .reply_to

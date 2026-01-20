@@ -15,17 +15,17 @@ use crate::domain::agents_teams::models::FireskyCredentials;
 use crate::domain::common::deserialize_decrypted;
 
 mod compilation;
-mod create_agents_team;
-mod delete_agents_team;
-mod deploy_agents_team;
-mod get_agents_team;
-mod list_agents_team_versions;
-mod list_agents_teams;
+mod create;
+mod delete;
+mod deploy;
+mod get;
+mod list;
+mod list_versions;
 pub mod models;
-mod publish_agents_team_to_firesky;
+mod publish_to_firesky;
 mod run_agents_team;
-mod run_agents_team_firesky;
-mod save_agents_team;
+mod run_on_firesky;
+mod save;
 
 #[derive(Clone)]
 pub struct AgentsTeamsService {

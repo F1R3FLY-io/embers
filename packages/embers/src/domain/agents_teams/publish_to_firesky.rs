@@ -21,8 +21,8 @@ use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::models::{
     EncryptedMsg,
     FireskyCredentials,
-    PublishAgentsTeamToFireskyReq,
-    PublishAgentsTeamToFireskyResp,
+    PublishToFireskyReq,
+    PublishToFireskyResp,
 };
 use crate::domain::common::{
     prepare_for_signing,
@@ -43,16 +43,16 @@ struct SaveFireskyToken {
 
 impl AgentsTeamsService {
     #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
-    pub async fn prepare_publish_agents_team_to_firesky_contract(
+    pub async fn prepare_publish_to_firesky_contract(
         &self,
         address: WalletAddress,
         id: String,
-        request: PublishAgentsTeamToFireskyReq,
-    ) -> anyhow::Result<PublishAgentsTeamToFireskyResp> {
+        request: PublishToFireskyReq,
+    ) -> anyhow::Result<PublishToFireskyResp> {
         let handle = Handle::new(request.handle).map_err(|err| anyhow::anyhow!(err))?;
 
         let agent_team = self
-            .get_agents_team(address, id, "latest".into())
+            .get(address, id, "latest".into())
             .await?
             .ok_or_else(|| anyhow::anyhow!("agents team not found"))?;
 
@@ -197,7 +197,7 @@ impl AgentsTeamsService {
         .render()?;
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
-        Ok(PublishAgentsTeamToFireskyResp {
+        Ok(PublishToFireskyResp {
             contract: prepare_for_signing()
                 .code(contract)
                 .valid_after_block_number(valid_after)
@@ -212,7 +212,7 @@ impl AgentsTeamsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn deploy_signed_publish_agents_team_to_firesky(
+    pub async fn deploy_signed_publish_to_firesky(
         &self,
         contract: SignedCode,
     ) -> anyhow::Result<DeployId> {

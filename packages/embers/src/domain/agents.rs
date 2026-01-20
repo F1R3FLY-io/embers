@@ -5,14 +5,14 @@ use firefly_client::rendering::Render;
 use firefly_client::{ReadNodeClient, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
-mod create_agent;
-mod delete_agent;
-mod deploy_agent;
-mod get_agent;
-mod list_agent_versions;
-mod list_agents;
+mod create;
+mod delete;
+mod deploy;
+mod get;
+mod list;
+mod list_versions;
 pub mod models;
-mod save_agent;
+mod save;
 
 #[derive(Clone)]
 pub struct AgentsService {

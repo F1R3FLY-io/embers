@@ -50,7 +50,7 @@ impl Graph {
 }
 
 #[derive(Debug, Clone)]
-pub struct CreateAgentsTeamReq {
+pub struct CreateReq {
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -73,27 +73,27 @@ pub struct AgentsTeam {
 }
 
 #[derive(Debug, Clone)]
-pub struct CreateAgentsTeamResp {
+pub struct CreateResp {
     pub id: String,
     pub version: String,
     pub contract: PreparedContract,
 }
 
-pub type SaveAgentsTeamReq = CreateAgentsTeamReq;
+pub type SaveReq = CreateReq;
 
 #[derive(Debug, Clone)]
-pub struct SaveAgentsTeamResp {
+pub struct SaveResp {
     pub version: String,
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone)]
-pub struct DeleteAgentsTeamResp {
+pub struct DeleteResp {
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone)]
-pub enum DeployAgentsTeamReq {
+pub enum DeployReq {
     AgentsTeam {
         id: String,
         version: String,
@@ -109,31 +109,31 @@ pub enum DeployAgentsTeamReq {
 }
 
 #[derive(Debug, Clone)]
-pub struct DeployAgentsTeamResp {
+pub struct DeployResp {
     pub contract: PreparedContract,
     pub system: Option<PreparedContract>,
 }
 
 #[derive(Debug, Clone)]
-pub struct DeploySignedAgentsTeamtReq {
+pub struct DeploySignedReq {
     pub contract: SignedCode,
     pub system: Option<SignedCode>,
 }
 
 #[derive(Debug, Clone)]
-pub struct RunAgentsTeamReq {
+pub struct RunReq {
     pub prompt: String,
     pub phlo_limit: PositiveNonZero<i64>,
     pub agents_team: Uri,
 }
 
 #[derive(Debug, Clone)]
-pub struct RunAgentsTeamResp {
+pub struct RunResp {
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone)]
-pub struct PublishAgentsTeamToFireskyReq {
+pub struct PublishToFireskyReq {
     pub pds_url: String,
     pub email: String,
     pub handle: String,
@@ -142,7 +142,7 @@ pub struct PublishAgentsTeamToFireskyReq {
 }
 
 #[derive(Debug, Clone)]
-pub struct PublishAgentsTeamToFireskyResp {
+pub struct PublishToFireskyResp {
     pub contract: PreparedContract,
 }
 
@@ -154,7 +154,7 @@ pub struct FireskyCredentials {
 }
 
 #[derive(Debug, Clone)]
-pub struct DeploySignedRunAgentsTeamFireskyReq {
+pub struct DeploySignedRunOnFireskyReq {
     pub contract: SignedCode,
     pub agents_team: Uri,
     pub reply_to: Option<FireskyReply>,

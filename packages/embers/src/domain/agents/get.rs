@@ -3,45 +3,43 @@ use firefly_client::rendering::Render;
 
 use crate::blockchain::agents::models;
 use crate::domain::agents::AgentsService;
-use crate::domain::agents::models::Agents;
+use crate::domain::agents::models::Agent;
 use crate::domain::common::record_trace;
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents/list_agent_versions.rho")]
-struct ListAgentVersions {
+#[template(path = "ai_agents/get_agent.rho")]
+struct Get {
     env_uri: Uri,
     address: WalletAddress,
     id: String,
+    version: String,
 }
 
 impl AgentsService {
     #[tracing::instrument(
         level = "info",
         skip_all,
-        fields(address, id),
+        fields(address, id, version),
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn list_agent_versions(
+    pub async fn get(
         &self,
         address: WalletAddress,
         id: String,
-    ) -> anyhow::Result<Option<Agents>> {
-        record_trace!(address, id);
+        version: String,
+    ) -> anyhow::Result<Option<Agent>> {
+        record_trace!(address, id, version);
 
-        let code = ListAgentVersions {
+        let code = Get {
             env_uri: self.uri.clone(),
             address,
             id,
+            version,
         }
         .render()?;
 
-        let agents: Option<Vec<models::AgentHeader>> = self.read_client.get_data(code).await?;
-        Ok(agents.map(|mut agents| {
-            agents.sort_by(|l, r| l.version.cmp(&r.version));
-            Agents {
-                agents: agents.into_iter().map(Into::into).collect(),
-            }
-        }))
+        let agent: Option<models::Agent> = self.read_client.get_data(code).await?;
+        Ok(agent.map(Into::into))
     }
 }
