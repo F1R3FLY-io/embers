@@ -567,6 +567,102 @@ class AiAgentsTeamsApi:
         )
 
 
+@dataclass
+class Oslf:
+    id: str
+    version: str
+    name: str
+    description: str | None = None
+    query: str | None = None
+
+
+class OslfsApi:
+    def __init__(self, client: HttpClient):
+        self._client = client
+
+    def list(self, address: str) -> Responce:
+        return self._client.get(f"/oslfs/{address}")
+
+    def list_versions(self, address: str, oslf_id: str) -> Responce:
+        return self._client.get(f"/oslfs/{address}/{oslf_id}/versions")
+
+    def get(self, address: str, oslf_id: str, oslf_version: str) -> Responce:
+        return self._client.get(f"/oslfs/{address}/{oslf_id}/versions/{oslf_version}")
+
+    def create(
+        self,
+        wallet: Wallet,
+        name: str,
+        description: str | None = None,
+        query: str | None = None,
+    ) -> UpdateResponce:
+        prepare_request = {"name": name, "description": description, "query": query}
+        resp = self._client.post("/oslfs/create/prepare", json=prepare_request)
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            "/oslfs/create/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+        )
+        assert resp_next.status == 200
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
+        )
+
+    def save(
+        self,
+        wallet: Wallet,
+        oslf_id: str,
+        name: str,
+        description: str | None = None,
+        query: str | None = None,
+    ) -> UpdateResponce:
+        prepare_request = {"name": name, "description": description, "query": query}
+        resp = self._client.post(f"/oslfs/{oslf_id}/save/prepare", json=prepare_request)
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/oslfs/{oslf_id}/save/send",
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+        )
+        assert resp_next.status == 200
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
+        )
+
+    def delete(self, wallet: Wallet, oslf_id: str) -> UpdateResponce:
+        resp = self._client.post(f"/oslfs/{oslf_id}/delete/prepare")
+        assert resp.status == 200
+
+        resp_next = self._client.post(
+            f"/oslfs/{oslf_id}/delete/send",
+            json=sing_contract(wallet, resp.json["contract"]),
+        )
+        assert resp_next.status == 200
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
+        )
+
+
 class ApiClient:
     def __init__(self, backend_url: str):
         self._http_client = HttpClient(backend_url)
@@ -574,6 +670,7 @@ class ApiClient:
         self.wallets = WalletsApi(self._http_client)
         self.ai_agents = AiAgentsApi(self._http_client)
         self.ai_agents_teams = AiAgentsTeamsApi(self._http_client)
+        self.oslfs = OslfsApi(self._http_client)
 
 
 def sing_contract(wallet: Wallet, contract: Any) -> dict:

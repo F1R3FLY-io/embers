@@ -1,0 +1,6 @@
+new rl(`rho:registry:lookup`), oslfsCh in {
+    rl!({{ env_uri }}, *oslfsCh) |
+    for(@(_, oslfs) <- oslfsCh) {
+        @oslfs!("delete", {{ id }})
+    }
+}

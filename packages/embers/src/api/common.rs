@@ -344,7 +344,7 @@ pub enum ApiTags {
     AIAgents,
     AIAgentsTeams,
     Service,
-    Oslf,
+    Oslfs,
 }
 
 #[derive(Debug, Clone, Object)]

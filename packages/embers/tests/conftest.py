@@ -7,7 +7,7 @@ import zbase32
 from crc import Calculator, Configuration
 from ecdsa import VerifyingKey
 
-from tests.client import Agent, AgentsTeam, ApiClient, Wallet
+from tests.client import Agent, AgentsTeam, ApiClient, Oslf, Wallet
 from tests.key import SECP256k1
 from tests.protobuf.rhoapi import ETuple, Expr, Par
 
@@ -122,6 +122,26 @@ def assert_match_agents_team(team: dict, match: AgentsTeam):
     assert team.get("shard") == match.shard
     assert team.get("logo") == match.logo
     assert team.get("graph") == match.graph
+
+
+@pytest.fixture
+def oslf(client: ApiClient, funded_wallet: Wallet) -> Oslf:
+    resp = client.oslfs.create(funded_wallet, name="my_oslf", query="foo-bar").wait_for_sync()
+
+    return Oslf(
+        id=resp.first.json["response"]["id"],
+        version=resp.first.json["response"]["version"],
+        name="my_oslf",
+        query="foo-bar",
+    )
+
+
+def assert_match_oslf(oslf: dict, match: Oslf):
+    assert oslf["id"] == match.id
+    assert oslf["version"] == match.version
+    assert oslf.get("created_at")
+    assert oslf["name"] == match.name
+    assert oslf.get("query") == match.query
 
 
 def insert_signed_signature(key: SECP256k1, timestamp: int, wallet: Wallet, version: int) -> bytes:

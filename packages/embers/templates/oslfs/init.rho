@@ -1,0 +1,314 @@
+{% extends "common/insert_signed.rho" %}
+
+{%- block name -%} oslfs {%- endblock -%}
+
+{%- block initialization -%}
+{%- filter indent(8) -%}
+
+new rl(`rho:registry:lookup`),
+    revAddress(`rho:rev:address`),
+    devNull(`rho:io:devNull`),
+    abort(`rho:execution:abort`),
+    deployData(`rho:deploy:data`),
+    treeHashMapCh,
+    listOpsCh,
+    stackCh,
+    visit,
+    notNil
+in {
+    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
+    for(treeHashMap <- treeHashMapCh) {
+        treeHashMap!("init", 3, *treeHashMapCh) |
+
+        for(@map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map)
+        }
+    } |
+
+    rl!(`rho:lang:listOps`, *listOpsCh) |
+    for(@(_, listOps) <- listOpsCh) {
+        listOpsCh!(listOps)
+    } |
+
+    rl!(`rho:lang:stack`, *stackCh) |
+    for(@(_, stack) <- stackCh) {
+        stackCh!(stack)
+    } |
+
+    contract visit(@"oslfs", @address, f, notFound) = {
+        for(treeHashMap, @map <<- treeHashMapCh) {
+            treeHashMap!("getOrElse", map, address, *f, *notFound)
+        }
+    } |
+
+    contract visit(@"oslfVersions", @address, @id, f, notFound) = {
+        new foundCh in {
+            visit!("oslfs", address, *foundCh, *notFound) |
+
+            for(@(oslfs, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", oslfs, id, *f, *notFound)
+            }
+        }
+    } |
+
+    contract visit(@"oslfVersion", @address, @id, @version, f, notFound) = {
+        new foundCh in {
+            visit!("oslfVersions", address, id, *foundCh, *notFound) |
+
+            for(@(oslfVersions, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", oslfVersions, version, *f, *notFound)
+            }
+        }
+    } |
+
+    contract notNil(@v, ret) = {
+        ret!(v != Nil)
+    } |
+
+    contract oslfs(@"create", @id, @version, @created_at, @name, @description, @query) = {
+        new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
+            deployData!(*deployDataCh) |
+
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+
+            for(@address <- deployerAddressCh) {
+                visit!("oslfs", address, *valueCh, *nilCh) |
+
+                for(@(oslfs, oslfsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
+                    new insertOslfCh, oslfVersionsCh, oslfVersionsIndexCh in {
+                        for(<- insertOslfCh) {
+                            stack!("push", oslfsIndex, id, *devNull) |
+
+                            treeHashMap!("init", 3, *oslfVersionsCh) |
+                            stack!("init", *oslfVersionsIndexCh) |
+
+                            for(
+                                @oslfVersions <- oslfVersionsCh &
+                                @oslfVersionsIndex <- oslfVersionsIndexCh
+                            ) {
+                                treeHashMap!("set", oslfs, id, (oslfVersions, oslfVersionsIndex), *devNull) |
+
+                                treeHashMap!("set", oslfVersions, version,
+                                    {
+                                        "created_at": created_at,
+                                        "name": name,
+                                        "description": description,
+                                        "query": query,
+                                    }, *devNull) |
+
+                                treeHashMap!("set", oslfVersions, "latest",
+                                    {
+                                        "version": version,
+                                        "created_at": created_at,
+                                        "name": name,
+                                        "description": description,
+                                        "query": query,
+                                    }, *devNull) |
+
+                                stack!("push", oslfVersionsIndex, version, *devNull)
+                            }
+                        } |
+
+                        treeHashMap!("getOrElse", oslfs, id, *errCh, *insertOslfCh)
+                    }
+                } |
+
+                for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
+                    new oslfsCh, oslfsIndexCh, oslfVersionsCh, oslfVersionsIndexCh in {
+                        treeHashMap!("init", 3, *oslfsCh) |
+                        stack!("init", *oslfsIndexCh) |
+
+                        treeHashMap!("init", 3, *oslfVersionsCh) |
+                        stack!("init", *oslfVersionsIndexCh) |
+
+                        for(
+                            @oslfs <- oslfsCh &
+                            @oslfsIndex <- oslfsIndexCh &
+                            @oslfVersions <- oslfVersionsCh &
+                            @oslfVersionsIndex <- oslfVersionsIndexCh
+                        ) {
+                            treeHashMap!("set", map, address, (oslfs, oslfsIndex), *devNull) |
+
+                            treeHashMap!("set", oslfs, id, (oslfVersions, oslfVersionsIndex), *devNull) |
+                            stack!("push", oslfsIndex, id, *devNull) |
+
+                            treeHashMap!("set", oslfVersions, version,
+                                {
+                                    "created_at": created_at,
+                                    "name": name,
+                                    "description": description,
+                                    "query": query,
+                                }, *devNull) |
+
+                            treeHashMap!("set", oslfVersions, "latest",
+                                {
+                                    "version": version,
+                                    "created_at": created_at,
+                                    "name": name,
+                                    "description": description,
+                                    "query": query,
+                                }, *devNull) |
+
+                            stack!("push", oslfVersionsIndex, version, *devNull)
+                        }
+                    }
+                }
+            } |
+
+            for(<- errCh) {
+                abort!("in createOslf")
+            }
+        }
+    } |
+
+    contract oslfs(@"list", @address, ret) = {
+        new valueCh, nilCh in {
+            for(@(oslfs, oslfsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
+                new toOslfHeader, oslfsListCh in {
+                    contract toOslfHeader(@id, ret) = {
+                        new oslfContextCh, oslfLastVersionCh in {
+                            treeHashMap!("get", oslfs, id, *oslfContextCh) |
+
+                            for(@(oslfVersions, _) <- oslfContextCh) {
+                                treeHashMap!("get", oslfVersions, "latest", *oslfLastVersionCh) |
+
+                                for(@oslfLastVersion <- oslfLastVersionCh) {
+                                    ret!(oslfLastVersion.set("id", id))
+                                }
+                            } |
+
+                            for(@Nil <- oslfContextCh) {
+                                ret!(Nil)
+                            }
+                        }
+                    } |
+
+                    stack!("toList", oslfsIndex, *oslfsListCh) |
+
+                    for(@oslfsList <- oslfsListCh) {
+                        new aggregateCh in {
+                            listOps!("unorderedParMap", oslfsList, *toOslfHeader, *aggregateCh) |
+                            for(@aggregate <- aggregateCh) {
+                                listOps!("filter", aggregate, *notNil, *ret)
+                            }
+                        }
+                    }
+                }
+            } |
+
+            for(<- nilCh) {
+                ret!([])
+            } |
+
+            visit!("oslfs", address, *valueCh, *nilCh)
+        }
+    } |
+
+    contract oslfs(@"listVersions", @address, @id, ret) = {
+        new valueCh, nilCh, oslfVersionsListCh, toOslfHeader in {
+            for(@(oslfVersions, oslfVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
+                contract toOslfHeader(@version, ret) = {
+                    new versionCh in {
+                        treeHashMap!("get", oslfVersions, version, *versionCh) |
+
+                        for(@oslfVersion <- versionCh) {
+                            ret!(oslfVersion.union({"id": id, "version": version}))
+                        }
+                    }
+                } |
+
+                stack!("toList", oslfVersionsIndex, *oslfVersionsListCh) |
+
+                for(@oslfVersionsList <- oslfVersionsListCh) {
+                    listOps!("parMap", oslfVersionsList, *toOslfHeader, *ret)
+                }
+            } |
+
+            for(<- nilCh) {
+                ret!(Nil)
+            } |
+
+            visit!("oslfVersions", address, id, *valueCh, *nilCh)
+        }
+    } |
+
+    contract oslfs(@"get", @address, @id, @version, ret) = {
+        new valueCh, nilCh in {
+            for(@oslfVersion <- valueCh) {
+                ret!(oslfVersion.union({"id": id, "version": version}))
+            } |
+
+            for(<- nilCh) {
+                ret!(Nil)
+            } |
+
+            visit!("oslfVersion", address, id, version, *valueCh, *nilCh)
+        }
+    } |
+
+    contract oslfs(@"save", @id, @version, @created_at, @name, @description, @query) = {
+        new deployDataCh, deployerAddressCh, valueCh, errCh, insertOslfVersionCh in {
+            deployData!(*deployDataCh) |
+
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+
+            for(@address <- deployerAddressCh) {
+                visit!("oslfVersions", address, id, *valueCh, *errCh)
+            } |
+
+            for(@(oslfVersions, oslfVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
+                for(<- insertOslfVersionCh) {
+                    stack!("push", oslfVersionsIndex, version, *devNull) |
+
+                    treeHashMap!("set", oslfVersions, version,
+                        {
+                            "created_at": created_at,
+                            "name": name,
+                            "description": description,
+                            "query": query,
+                        }, *devNull) |
+
+                    treeHashMap!("set", oslfVersions, "latest",
+                        {
+                            "version": version,
+                            "created_at": created_at,
+                            "name": name,
+                            "description": description,
+                            "query": query,
+                        }, *devNull)
+                } |
+
+                treeHashMap!("getOrElse", oslfVersions, version, *errCh, *insertOslfVersionCh)
+            } |
+
+            for(<- errCh) {
+                abort!("in saveOslf")
+            }
+        }
+    } |
+
+    contract oslfs(@"delete", @id) = {
+        new deployDataCh, deployerAddressCh, valueCh in {
+            deployData!(*deployDataCh) |
+
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+
+            for(@address <- deployerAddressCh) {
+                visit!("oslfs", address, *valueCh, *devNull)
+            } |
+
+            for(@(oslfs, _) <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("delete", oslfs, id, *devNull)
+            }
+        }
+    }
+}
+
+{%- endfilter -%}
+{%- endblock -%}

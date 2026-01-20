@@ -10,13 +10,14 @@ use tokio::try_join;
 
 use crate::api::ai_agents::AIAgents;
 use crate::api::ai_agents_teams::AIAgentsTeams;
-use crate::api::oslf::OSLF;
+use crate::api::oslfs::OSLFS;
 use crate::api::service::Service;
 use crate::api::testnet::Testnet;
 use crate::api::wallets::WalletsApi;
 use crate::configuration::collect_config;
 use crate::domain::ai_agents::AgentsService;
 use crate::domain::ai_agents_teams::AgentsTeamsService;
+use crate::domain::oslfs::OslfsService;
 use crate::domain::testnet::TestnetService;
 use crate::domain::wallets::WalletsService;
 
@@ -49,72 +50,86 @@ async fn main() -> anyhow::Result<()> {
     let _testnet_validator_node_events = NodeEvents::new(&config.testnet.validator_ws_api_url);
     let testnet_observer_node_events = NodeEvents::new(&config.testnet.observer_ws_api_url);
 
-    let ((agents_service, agents_teams_service, wallets_service), testnet_service) = try_join!(
-        async {
-            let mut write_client = WriteNodeClient::new(
-                config.mainnet.deploy_service_url,
-                config.mainnet.propose_service_url,
-            )
-            .await?;
+    let ((agents_service, agents_teams_service, oslfs_service, wallets_service), testnet_service) =
+        try_join!(
+            async {
+                let mut write_client = WriteNodeClient::new(
+                    config.mainnet.deploy_service_url,
+                    config.mainnet.propose_service_url,
+                )
+                .await?;
 
-            let agents_service = AgentsService::bootstrap(
-                write_client.clone(),
-                read_client.clone(),
-                &config.mainnet.service_key,
-                &config.mainnet.agents_env_key,
-            )
-            .await?;
+                let agents_service = AgentsService::bootstrap(
+                    write_client.clone(),
+                    read_client.clone(),
+                    &config.mainnet.service_key,
+                    &config.mainnet.agents_env_key,
+                )
+                .await?;
 
-            let agents_teams_service = AgentsTeamsService::bootstrap(
-                write_client.clone(),
-                read_client.clone(),
-                observer_node_events.clone(),
-                &config.mainnet.service_key,
-                &config.mainnet.agents_teams_env_key,
-                config.aes_encryption_key.into(),
-            )
-            .await?;
+                let agents_teams_service = AgentsTeamsService::bootstrap(
+                    write_client.clone(),
+                    read_client.clone(),
+                    observer_node_events.clone(),
+                    &config.mainnet.service_key,
+                    &config.mainnet.agents_teams_env_key,
+                    config.aes_encryption_key.into(),
+                )
+                .await?;
 
-            let wallets_service = WalletsService::bootstrap(
-                write_client.clone(),
-                read_client,
-                validator_node_events,
-                observer_node_events,
-                &config.mainnet.service_key,
-                &config.mainnet.wallets_env_key,
-            )
-            .await?;
+                let oslfs_service = OslfsService::bootstrap(
+                    write_client.clone(),
+                    read_client.clone(),
+                    &config.mainnet.service_key,
+                    &config.mainnet.oslfs_env_key,
+                )
+                .await?;
 
-            write_client.propose().await?;
+                let wallets_service = WalletsService::bootstrap(
+                    write_client.clone(),
+                    read_client,
+                    validator_node_events,
+                    observer_node_events,
+                    &config.mainnet.service_key,
+                    &config.mainnet.wallets_env_key,
+                )
+                .await?;
 
-            anyhow::Ok((agents_service, agents_teams_service, wallets_service))
-        },
-        async {
-            let mut testnet_write_client = WriteNodeClient::new(
-                config.testnet.deploy_service_url,
-                config.testnet.propose_service_url,
-            )
-            .await?;
+                write_client.propose().await?;
 
-            let testnet_service = TestnetService::bootstrap(
-                testnet_write_client.clone(),
-                testnet_read_client,
-                testnet_observer_node_events,
-                config.testnet.service_key,
-                &config.testnet.env_key,
-            )
-            .await?;
+                anyhow::Ok((
+                    agents_service,
+                    agents_teams_service,
+                    oslfs_service,
+                    wallets_service,
+                ))
+            },
+            async {
+                let mut testnet_write_client = WriteNodeClient::new(
+                    config.testnet.deploy_service_url,
+                    config.testnet.propose_service_url,
+                )
+                .await?;
 
-            testnet_write_client.propose().await?;
+                let testnet_service = TestnetService::bootstrap(
+                    testnet_write_client.clone(),
+                    testnet_read_client,
+                    testnet_observer_node_events,
+                    config.testnet.service_key,
+                    &config.testnet.env_key,
+                )
+                .await?;
 
-            anyhow::Ok(testnet_service)
-        },
-    )?;
+                testnet_write_client.propose().await?;
+
+                anyhow::Ok(testnet_service)
+            },
+        )?;
 
     let secret = Alphanumeric.sample_string(&mut rand::rng(), 20);
 
     let api = OpenApiService::new(
-        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams, OSLF),
+        (Service, Testnet, WalletsApi, AIAgents, AIAgentsTeams, OSLFS),
         "Embers API",
         "0.1.0",
     )
@@ -133,6 +148,7 @@ async fn main() -> anyhow::Result<()> {
         .data(jsonwebtoken::DecodingKey::from_secret(secret.as_ref()))
         .data(agents_service)
         .data(agents_teams_service)
+        .data(oslfs_service)
         .data(wallets_service)
         .data(testnet_service)
         .with(Cors::new().allow_origin_regex("*"))

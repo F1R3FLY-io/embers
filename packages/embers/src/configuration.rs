@@ -15,6 +15,7 @@ pub struct MainNet {
     pub wallets_env_key: SecretKey,
     pub agents_env_key: SecretKey,
     pub agents_teams_env_key: SecretKey,
+    pub oslfs_env_key: SecretKey,
 }
 
 #[derive(Debug, Clone, Deserialize)]
