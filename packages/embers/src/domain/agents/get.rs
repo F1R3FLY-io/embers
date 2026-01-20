@@ -7,7 +7,7 @@ use crate::domain::agents::models::Agent;
 use crate::domain::common::record_trace;
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents/get_agent.rho")]
+#[template(path = "agents/get.rho")]
 struct Get {
     env_uri: Uri,
     address: WalletAddress,

@@ -34,7 +34,7 @@ use crate::domain::common::{
 static SELF_RKEY: LazyLock<RecordKey> = LazyLock::new(|| RecordKey::new("self".into()).unwrap());
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/save_firesky_token.rho")]
+#[template(path = "agents_teams/save_firesky_token.rho")]
 struct SaveFireskyToken {
     env_uri: Uri,
     nonce: Vec<u8>,

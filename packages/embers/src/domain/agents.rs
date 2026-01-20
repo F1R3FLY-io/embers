@@ -23,7 +23,7 @@ pub struct AgentsService {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents/init.rho")]
+#[template(path = "agents/init.rho")]
 struct InitAgentsEnv {
     env_uri: Uri,
     version: i64,

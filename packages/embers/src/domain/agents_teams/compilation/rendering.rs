@@ -22,7 +22,7 @@ enum Output<'a> {
 
 #[derive(Debug, Clone, Render)]
 enum NodesTemplate<'a> {
-    #[template(path = "ai_agents_teams/nodes/compress.rho")]
+    #[template(path = "agents_teams/nodes/compress.rho")]
     Compress {
         #[template(direct)]
         from: Vec<From<'a>>,
@@ -33,7 +33,7 @@ enum NodesTemplate<'a> {
         body: BTreeMap<String, Inline>,
     },
 
-    #[template(path = "ai_agents_teams/nodes/text_model.rho")]
+    #[template(path = "agents_teams/nodes/text_model.rho")]
     TextModel {
         #[template(direct)]
         from: From<'a>,
@@ -42,7 +42,7 @@ enum NodesTemplate<'a> {
         output: Output<'a>,
     },
 
-    #[template(path = "ai_agents_teams/nodes/tti_model.rho")]
+    #[template(path = "agents_teams/nodes/tti_model.rho")]
     TTIModel {
         #[template(direct)]
         from: From<'a>,
@@ -51,7 +51,7 @@ enum NodesTemplate<'a> {
         output: Output<'a>,
     },
 
-    #[template(path = "ai_agents_teams/nodes/tts_model.rho")]
+    #[template(path = "agents_teams/nodes/tts_model.rho")]
     TTSModel {
         #[template(direct)]
         from: From<'a>,
@@ -60,7 +60,7 @@ enum NodesTemplate<'a> {
         output: Output<'a>,
     },
 
-    #[template(path = "ai_agents_teams/nodes/output.rho")]
+    #[template(path = "agents_teams/nodes/output.rho")]
     Output {
         #[template(direct)]
         from: From<'a>,
@@ -68,7 +68,7 @@ enum NodesTemplate<'a> {
 }
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/deploy_agents_team.rho")]
+#[template(path = "agents_teams/deploy.rho")]
 struct DeployAgentTeamTemplate<'a> {
     env_uri: Uri,
     version: i64,

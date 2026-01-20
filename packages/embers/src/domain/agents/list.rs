@@ -7,7 +7,7 @@ use crate::domain::agents::models::Agents;
 use crate::domain::common::record_trace;
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents/list_agents.rho")]
+#[template(path = "agents/list.rho")]
 struct List {
     env_uri: Uri,
     address: WalletAddress,

@@ -8,7 +8,7 @@ use crate::domain::agents_teams::models::{Graph, SaveReq, SaveResp};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/save_agents_team.rho")]
+#[template(path = "agents_teams/save.rho")]
 struct Save {
     env_uri: Uri,
     id: String,

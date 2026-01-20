@@ -28,7 +28,7 @@ pub struct AgentsTeamHeader {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(into(models::CreateReq))]
-pub struct CreateReq {
+pub struct CreateAgentsTeamReq {
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -53,24 +53,24 @@ pub struct AgentsTeam {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::CreateResp))]
-pub struct CreateResp {
+pub struct CreateAgentsTeamResp {
     pub id: String,
     pub version: String,
     pub contract: PreparedContract,
 }
 
-pub type SaveReq = CreateReq;
+pub type SaveAgentsTeamReq = CreateAgentsTeamReq;
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::SaveResp))]
-pub struct SaveResp {
+pub struct SaveAgentsTeamResp {
     pub version: String,
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::DeleteResp))]
-pub struct DeleteResp {
+pub struct DeleteAgentsTeamResp {
     pub contract: PreparedContract,
 }
 
@@ -92,22 +92,22 @@ pub struct DeployGraph {
 
 #[derive(Debug, Clone, Hash, Union)]
 #[oai(one_of = true, discriminator_name = "type")]
-pub enum DeployReq {
+pub enum DeployAgentsTeamReq {
     AgentsTeam(DeployAgentsTeam),
     Graph(DeployGraph),
 }
 
-impl From<DeployReq> for models::DeployReq {
-    fn from(value: DeployReq) -> Self {
+impl From<DeployAgentsTeamReq> for models::DeployReq {
+    fn from(value: DeployAgentsTeamReq) -> Self {
         match value {
-            DeployReq::AgentsTeam(deploy) => Self::AgentsTeam {
+            DeployAgentsTeamReq::AgentsTeam(deploy) => Self::AgentsTeam {
                 id: deploy.id,
                 version: deploy.version,
                 address: deploy.address.0,
                 phlo_limit: deploy.phlo_limit.0,
                 deploy: deploy.deploy.into(),
             },
-            DeployReq::Graph(deploy) => Self::Graph {
+            DeployAgentsTeamReq::Graph(deploy) => Self::Graph {
                 graph: deploy.graph.0,
                 phlo_limit: deploy.phlo_limit.0,
                 deploy: deploy.deploy.into(),
@@ -118,14 +118,14 @@ impl From<DeployReq> for models::DeployReq {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::DeployResp))]
-pub struct DeployResp {
+pub struct DeployAgentsTeamResp {
     pub contract: PreparedContract,
     pub system: Option<PreparedContract>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(into(models::DeploySignedReq))]
-pub struct DeploySignedReq {
+pub struct DeploySignedAgentsTeamReq {
     pub contract: SignedContract,
     pub system: Option<SignedContract>,
 }

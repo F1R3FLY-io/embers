@@ -39,7 +39,7 @@ pub struct AgentsTeamsService {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/init.rho")]
+#[template(path = "agents_teams/init.rho")]
 struct InitAgentsTeamsEnv {
     env_uri: Uri,
     version: i64,
@@ -49,7 +49,7 @@ struct InitAgentsTeamsEnv {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/get_firesky_tokens.rho")]
+#[template(path = "agents_teams/get_firesky_tokens.rho")]
 struct GetFireskyTokens {
     env_uri: Uri,
 }

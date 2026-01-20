@@ -24,7 +24,7 @@ pub struct Oslf {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(into(models::CreateReq))]
-pub struct CreateReq {
+pub struct CreateOslfReq {
     pub name: String,
     pub description: Option<String>,
     pub query: Option<String>,
@@ -32,23 +32,23 @@ pub struct CreateReq {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::CreateResp))]
-pub struct CreateResp {
+pub struct CreateOslfResp {
     pub id: String,
     pub version: String,
     pub contract: PreparedContract,
 }
 
-pub type SaveReq = CreateReq;
+pub type SaveOslfReq = CreateOslfReq;
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::SaveResp))]
-pub struct SaveResp {
+pub struct SaveOslfResp {
     pub version: String,
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::DeleteResp))]
-pub struct DeleteResp {
+pub struct DeleteOslfResp {
     pub contract: PreparedContract,
 }

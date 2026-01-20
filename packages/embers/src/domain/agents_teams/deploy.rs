@@ -9,7 +9,7 @@ use crate::domain::agents_teams::models::{DeployReq, DeployResp, DeploySignedReq
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/record_deploy.rho")]
+#[template(path = "agents_teams/record_deploy.rho")]
 struct RecordDeploy {
     env_uri: Uri,
     id: String,

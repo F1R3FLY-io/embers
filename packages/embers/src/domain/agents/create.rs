@@ -8,7 +8,7 @@ use crate::domain::agents::models::{CreateReq, CreateResp};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents/create_agent.rho")]
+#[template(path = "agents/create.rho")]
 struct Create {
     env_uri: Uri,
     id: Uuid,

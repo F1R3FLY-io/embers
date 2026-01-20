@@ -14,13 +14,13 @@ use crate::api::common::{
     Stringified,
 };
 use crate::api::oslfs::models::{
-    CreateReq,
-    CreateResp,
-    DeleteResp,
+    CreateOslfReq,
+    CreateOslfResp,
+    DeleteOslfResp,
     Oslf,
     Oslfs,
-    SaveReq,
-    SaveResp,
+    SaveOslfReq,
+    SaveOslfResp,
 };
 use crate::domain::oslfs::OslfsService;
 
@@ -63,10 +63,10 @@ impl OslfsApi {
     #[oai(path = "/create/prepare", method = "post")]
     async fn prepare_create(
         &self,
-        Json(body): Json<CreateReq>,
+        Json(body): Json<CreateOslfReq>,
         Data(oslfs): Data<&OslfsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<CreateResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<CreateOslfResp>>> {
         PrepareResponse::from_call(
             body,
             |body| oslfs.prepare_create_contract(body.into()),
@@ -80,7 +80,7 @@ impl OslfsApi {
     #[oai(path = "/create/send", method = "post")]
     async fn create(
         &self,
-        SendRequest(body): SendRequest<SignedContract, CreateReq, CreateResp>,
+        SendRequest(body): SendRequest<SignedContract, CreateOslfReq, CreateOslfResp>,
         Data(oslfs): Data<&OslfsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = oslfs.deploy_signed_create(body.request.into()).await?;
@@ -91,10 +91,10 @@ impl OslfsApi {
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
-        Json(body): Json<SaveReq>,
+        Json(body): Json<SaveOslfReq>,
         Data(oslfs): Data<&OslfsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<SaveResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<SaveOslfResp>>> {
         PrepareResponse::from_call(
             body,
             |body| oslfs.prepare_save_contract(id, body.into()),
@@ -109,7 +109,7 @@ impl OslfsApi {
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
-        SendRequest(body): SendRequest<SignedContract, SaveReq, SaveResp>,
+        SendRequest(body): SendRequest<SignedContract, SaveOslfReq, SaveOslfResp>,
         Data(oslfs): Data<&OslfsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = oslfs.deploy_signed_save(body.request.into()).await?;
@@ -121,7 +121,7 @@ impl OslfsApi {
         &self,
         Path(id): Path<String>,
         Data(oslfs): Data<&OslfsService>,
-    ) -> poem::Result<Json<DeleteResp>> {
+    ) -> poem::Result<Json<DeleteOslfResp>> {
         let contract = oslfs.prepare_delete_contract(id).await?;
         Ok(Json(contract.into()))
     }

@@ -7,19 +7,19 @@ use poem_openapi::payload::Json;
 use crate::api::agents_teams::models::{
     AgentsTeam,
     AgentsTeams,
-    CreateReq,
-    CreateResp,
-    DeleteResp,
-    DeployReq,
-    DeployResp,
-    DeploySignedReq,
+    CreateAgentsTeamReq,
+    CreateAgentsTeamResp,
+    DeleteAgentsTeamResp,
+    DeployAgentsTeamReq,
+    DeployAgentsTeamResp,
+    DeploySignedAgentsTeamReq,
     DeploySignedRunOnFireskyReq,
     PublishToFireskyReq,
     PublishToFireskyResp,
     RunReq,
     RunResp,
-    SaveReq,
-    SaveResp,
+    SaveAgentsTeamReq,
+    SaveAgentsTeamResp,
 };
 use crate::api::common::{
     ApiTags,
@@ -71,10 +71,10 @@ impl AgentsTeamsApi {
     #[oai(path = "/create/prepare", method = "post")]
     async fn prepare_create(
         &self,
-        Json(body): Json<CreateReq>,
+        Json(body): Json<CreateAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<CreateResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<CreateAgentsTeamResp>>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_create_contract(body.into()),
@@ -88,7 +88,7 @@ impl AgentsTeamsApi {
     #[oai(path = "/create/send", method = "post")]
     async fn create(
         &self,
-        SendRequest(body): SendRequest<SignedContract, CreateReq, CreateResp>,
+        SendRequest(body): SendRequest<SignedContract, CreateAgentsTeamReq, CreateAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
@@ -100,10 +100,10 @@ impl AgentsTeamsApi {
     #[oai(path = "/deploy/prepare", method = "post")]
     async fn prepare_deploy(
         &self,
-        Json(body): Json<DeployReq>,
+        Json(body): Json<DeployAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<DeployResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<DeployAgentsTeamResp>>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_deploy_contract(body.into()),
@@ -117,7 +117,11 @@ impl AgentsTeamsApi {
     #[oai(path = "/deploy/send", method = "post")]
     async fn deploy(
         &self,
-        SendRequest(body): SendRequest<DeploySignedReq, DeployReq, DeployResp>,
+        SendRequest(body): SendRequest<
+            DeploySignedAgentsTeamReq,
+            DeployAgentsTeamReq,
+            DeployAgentsTeamResp,
+        >,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
@@ -193,10 +197,10 @@ impl AgentsTeamsApi {
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
-        Json(body): Json<SaveReq>,
+        Json(body): Json<SaveAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<SaveResp>>> {
+    ) -> poem::Result<Json<PrepareResponse<SaveAgentsTeamResp>>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_save_contract(id, body.into()),
@@ -211,7 +215,7 @@ impl AgentsTeamsApi {
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
-        SendRequest(body): SendRequest<SignedContract, SaveReq, SaveResp>,
+        SendRequest(body): SendRequest<SignedContract, SaveAgentsTeamReq, SaveAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams.deploy_signed_save(body.request.into()).await?;
@@ -223,7 +227,7 @@ impl AgentsTeamsApi {
         &self,
         Path(id): Path<String>,
         Data(agents): Data<&AgentsTeamsService>,
-    ) -> poem::Result<Json<DeleteResp>> {
+    ) -> poem::Result<Json<DeleteAgentsTeamResp>> {
         let contract = agents.prepare_delete_contract(id).await?;
         Ok(Json(contract.into()))
     }

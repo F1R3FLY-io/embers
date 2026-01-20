@@ -10,14 +10,14 @@ use crate::domain::agents_teams::models::{RunReq, RunResp};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/run_agents_team.rho")]
+#[template(path = "agents_teams/run.rho")]
 struct RunAgentsTeam {
     agents_team: Uri,
     prompt: String,
 }
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/get_run_agents_team_result.rho")]
+#[template(path = "agents_teams/get_run_result.rho")]
 struct GetAgentsTeamResult {
     deploy_id: DeployId,
 }

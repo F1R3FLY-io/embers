@@ -28,7 +28,7 @@ pub struct AgentHeader {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(into(models::CreateReq))]
-pub struct CreateReq {
+pub struct CreateAgentReq {
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
@@ -52,24 +52,24 @@ pub struct Agent {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::CreateResp))]
-pub struct CreateResp {
+pub struct CreateAgentResp {
     pub id: String,
     pub version: String,
     pub contract: PreparedContract,
 }
 
-pub type SaveReq = CreateReq;
+pub type SaveAgentReq = CreateAgentReq;
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::SaveResp))]
-pub struct SaveResp {
+pub struct SaveAgentResp {
     pub version: String,
     pub contract: PreparedContract,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::DeleteResp))]
-pub struct DeleteResp {
+pub struct DeleteAgentResp {
     pub contract: PreparedContract,
 }
 
@@ -89,21 +89,21 @@ pub struct DeployCode {
 
 #[derive(Debug, Clone, Hash, Union)]
 #[oai(one_of = true, discriminator_name = "type")]
-pub enum DeployReq {
+pub enum DeployAgentReq {
     Agent(DeployAgent),
     Code(DeployCode),
 }
 
-impl From<DeployReq> for models::DeployReq {
-    fn from(value: DeployReq) -> Self {
+impl From<DeployAgentReq> for models::DeployReq {
+    fn from(value: DeployAgentReq) -> Self {
         match value {
-            DeployReq::Agent(deploy) => Self::Agent {
+            DeployAgentReq::Agent(deploy) => Self::Agent {
                 id: deploy.id,
                 version: deploy.version,
                 address: deploy.address.0,
                 phlo_limit: deploy.phlo_limit.0,
             },
-            DeployReq::Code(deploy) => Self::Code {
+            DeployAgentReq::Code(deploy) => Self::Code {
                 code: deploy.code,
                 phlo_limit: deploy.phlo_limit.0,
             },
@@ -113,14 +113,14 @@ impl From<DeployReq> for models::DeployReq {
 
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::DeployResp))]
-pub struct DeployResp {
+pub struct DeployAgentResp {
     pub contract: PreparedContract,
     pub system: Option<PreparedContract>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(into(models::DeploySignedReq))]
-pub struct DeploySignedReq {
+pub struct DeploySignedAgentReq {
     pub contract: SignedContract,
     pub system: Option<SignedContract>,
 }

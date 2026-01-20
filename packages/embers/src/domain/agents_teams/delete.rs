@@ -6,7 +6,7 @@ use crate::domain::agents_teams::models::DeleteResp;
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "ai_agents_teams/delete_agents_team.rho")]
+#[template(path = "agents_teams/delete.rho")]
 struct Delete {
     env_uri: Uri,
     id: String,
