@@ -1,7 +1,7 @@
 import pytest
 
 from tests.client import ApiClient, Oslf
-from tests.conftest import Wallet, assert_match_oslf
+from tests.conftest import Wallet, assert_match_oslf_header
 
 
 def test_list_empty(client: ApiClient, wallet: Wallet):
@@ -17,4 +17,4 @@ def test_list(client: ApiClient, funded_wallet: Wallet, oslf: Oslf):
 
     assert resp.status == 200
     assert len(resp.json["oslfs"]) == 1
-    assert_match_oslf(resp.json["oslfs"][0], oslf)
+    assert_match_oslf_header(resp.json["oslfs"][0], oslf)

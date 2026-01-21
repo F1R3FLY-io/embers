@@ -13,6 +13,7 @@ use crate::domain::common::{prepare_for_signing, record_trace};
 struct RecordDeploy {
     env_uri: Uri,
     id: String,
+    version: String,
     last_deploy: DateTime<Utc>,
     uri: Uri,
 }
@@ -37,16 +38,16 @@ impl AgentsTeamsService {
                 phlo_limit,
                 deploy,
             } => {
-                let graph = self
+                let agents_team = self
                     .get(address, id.clone(), version.clone())
                     .await?
-                    .context("agents team not found")?
-                    .graph
-                    .context("agents team has no graph")?;
+                    .context("agents team not found")?;
+                let graph = agents_team.graph.context("agents team has no graph")?;
 
                 let system_code = RecordDeploy {
                     env_uri: self.uri.clone(),
                     id,
+                    version: agents_team.version,
                     last_deploy: Utc::now(),
                     uri: deploy.uri_pub_key.into(),
                 }

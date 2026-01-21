@@ -70,13 +70,13 @@ def agent(client: ApiClient, funded_wallet: Wallet, request: pytest.FixtureReque
     )
 
 
-def assert_match_agent_header(header: dict, match: Agent):
-    assert header["id"] == match.id
-    assert header["version"] == match.version
-    assert header.get("created_at")
-    assert header["name"] == match.name
-    assert header.get("shard") == match.shard
-    assert header.get("logo") == match.logo
+def assert_match_agent_header(agent: dict, match: Agent):
+    assert agent["id"] == match.id
+    assert agent["version"] == match.version
+    assert agent.get("created_at")
+    assert agent["name"] == match.name
+    assert agent.get("shard") == match.shard
+    assert agent.get("logo") == match.logo
 
 
 def assert_match_agent(agent: dict, match: Agent):
@@ -105,13 +105,13 @@ def agents_team(client: ApiClient, funded_wallet: Wallet, request: pytest.Fixtur
     )
 
 
-def assert_match_agents_team_header(header: dict, match: AgentsTeam):
-    assert header["id"] == match.id
-    assert header["version"] == match.version
-    assert header.get("created_at")
-    assert header["name"] == match.name
-    assert header.get("shard") == match.shard
-    assert header.get("logo") == match.logo
+def assert_match_agents_team_header(team: dict, match: AgentsTeam):
+    assert team["id"] == match.id
+    assert team["version"] == match.version
+    assert team.get("created_at")
+    assert team["name"] == match.name
+    assert team.get("shard") == match.shard
+    assert team.get("logo") == match.logo
 
 
 def assert_match_agents_team(team: dict, match: AgentsTeam):
@@ -134,6 +134,13 @@ def oslf(client: ApiClient, funded_wallet: Wallet) -> Oslf:
         name="my_oslf",
         query="foo-bar",
     )
+
+
+def assert_match_oslf_header(oslf: dict, match: Oslf):
+    assert oslf["id"] == match.id
+    assert oslf["version"] == match.version
+    assert oslf.get("created_at")
+    assert oslf["name"] == match.name
 
 
 def assert_match_oslf(oslf: dict, match: Oslf):

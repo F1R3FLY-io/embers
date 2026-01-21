@@ -12,9 +12,7 @@ new rl(`rho:registry:lookup`),
     deployData(`rho:deploy:data`),
     treeHashMapCh,
     listOpsCh,
-    stackCh,
-    visit,
-    notNil
+    visit
 in {
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
     for(treeHashMap <- treeHashMapCh) {
@@ -30,11 +28,6 @@ in {
         listOpsCh!(listOps)
     } |
 
-    rl!(`rho:lang:stack`, *stackCh) |
-    for(@(_, stack) <- stackCh) {
-        stackCh!(stack)
-    } |
-
     contract visit(@"agents", @address, f, notFound) = {
         for(treeHashMap, @map <<- treeHashMapCh) {
             treeHashMap!("getOrElse", map, address, *f, *notFound)
@@ -45,7 +38,7 @@ in {
         new foundCh in {
             visit!("agents", address, *foundCh, *notFound) |
 
-            for(@(agents, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agents <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("getOrElse", agents, id, *f, *notFound)
             }
         }
@@ -55,14 +48,10 @@ in {
         new foundCh in {
             visit!("agentVersions", address, id, *foundCh, *notFound) |
 
-            for(@(agentVersions, _) <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentVersions <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("getOrElse", agentVersions, version, *f, *notFound)
             }
         }
-    } |
-
-    contract notNil(@v, ret) = {
-        ret!(v != Nil)
     } |
 
     contract agents(@"create", @id, @version, @created_at, @name, @description, @shard, @logo, @code) = {
@@ -76,20 +65,15 @@ in {
             for(@address <- deployerAddressCh) {
                 visit!("agents", address, *valueCh, *nilCh) |
 
-                for(@(agents, agentsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
-                    new insertAgentCh, agentVersionsCh, agentVersionsIndexCh in {
+                for(@agents <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+                    new insertAgentCh, agentVersionsCh in {
+                        treeHashMap!("getOrElse", agents, id, *errCh, *insertAgentCh) |
+
                         for(<- insertAgentCh) {
-                            stack!("push", agentsIndex, id, *devNull) |
-
                             treeHashMap!("init", 3, *agentVersionsCh) |
-                            stack!("init", *agentVersionsIndexCh) |
 
-                            for(
-                                @agentVersions <- agentVersionsCh &
-                                @agentVersionsIndex <- agentVersionsIndexCh
-                            ) {
-                                treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *devNull) |
-
+                            for(@agentVersions <- agentVersionsCh ) {
+                                treeHashMap!("set", agents, id, agentVersions, *devNull) |
                                 treeHashMap!("set", agentVersions, version,
                                     {
                                         "created_at": created_at,
@@ -100,7 +84,6 @@ in {
                                         "logo": logo,
                                         "code": code,
                                     }, *devNull) |
-
                                 treeHashMap!("set", agentVersions, "latest",
                                     {
                                         "version": version,
@@ -111,35 +94,20 @@ in {
                                         "shard": shard,
                                         "logo": logo,
                                         "code": code,
-                                    }, *devNull) |
-
-                                stack!("push", agentVersionsIndex, version, *devNull)
+                                    }, *devNull)
                             }
-                        } |
-
-                        treeHashMap!("getOrElse", agents, id, *errCh, *insertAgentCh)
+                        }
                     }
                 } |
 
-                for(<- nilCh; treeHashMap, @map <<- treeHashMapCh; stack <<- stackCh) {
-                    new agentsCh, agentsIndexCh, agentVersionsCh, agentVersionsIndexCh in {
+                for(<- nilCh; treeHashMap, @map <<- treeHashMapCh) {
+                    new agentsCh, agentVersionsCh in {
                         treeHashMap!("init", 3, *agentsCh) |
-                        stack!("init", *agentsIndexCh) |
-
                         treeHashMap!("init", 3, *agentVersionsCh) |
-                        stack!("init", *agentVersionsIndexCh) |
 
-                        for(
-                            @agents <- agentsCh &
-                            @agentsIndex <- agentsIndexCh &
-                            @agentVersions <- agentVersionsCh &
-                            @agentVersionsIndex <- agentVersionsIndexCh
-                        ) {
-                            treeHashMap!("set", map, address, (agents, agentsIndex), *devNull) |
-
-                            treeHashMap!("set", agents, id, (agentVersions, agentVersionsIndex), *devNull) |
-                            stack!("push", agentsIndex, id, *devNull) |
-
+                        for(@agents <- agentsCh & @agentVersions <- agentVersionsCh) {
+                            treeHashMap!("set", map, address, agents, *devNull) |
+                            treeHashMap!("set", agents, id, agentVersions, *devNull) |
                             treeHashMap!("set", agentVersions, version,
                                 {
                                     "created_at": created_at,
@@ -150,7 +118,6 @@ in {
                                     "logo": logo,
                                     "code": code,
                                 }, *devNull) |
-
                             treeHashMap!("set", agentVersions, "latest",
                                 {
                                     "version": version,
@@ -161,9 +128,7 @@ in {
                                     "shard": shard,
                                     "logo": logo,
                                     "code": code,
-                                }, *devNull) |
-
-                            stack!("push", agentVersionsIndex, version, *devNull)
+                                }, *devNull)
                         }
                     }
                 }
@@ -177,86 +142,64 @@ in {
 
     contract agents(@"list", @address, ret) = {
         new valueCh, nilCh in {
-            for(@(agents, agentsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
-                new toAgentHeader, agentsListCh in {
-                    contract toAgentHeader(@id, ret) = {
-                        new agentContextCh, agentLastVersionCh in {
-                            treeHashMap!("get", agents, id, *agentContextCh) |
+            visit!("agents", address, *valueCh, *nilCh) |
 
-                            for(@(agentVersions, _) <- agentContextCh) {
-                                treeHashMap!("get", agentVersions, "latest", *agentLastVersionCh) |
-
-                                for(@agentLastVersion <- agentLastVersionCh) {
-                                    ret!(agentLastVersion.delete("code").set("id", id))
-                                }
-                            } |
-
-                            for(@Nil <- agentContextCh) {
-                                ret!(Nil)
+            for(@agents <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh) {
+                new toAgentHeader, agentsMapsCh in {
+                    contract toAgentHeader(@(id, agentVersions), ret) = {
+                        new agentLastVersionCh in {
+                            treeHashMap!("get", agentVersions, "latest", *agentLastVersionCh) |
+                            for(@agentLastVersion <- agentLastVersionCh) {
+                                ret!(agentLastVersion.delete("code").set("id", id))
                             }
                         }
                     } |
 
-                    stack!("toList", agentsIndex, *agentsListCh) |
-
-                    for(@agentsList <- agentsListCh) {
-                        new aggregateCh in {
-                            listOps!("unorderedParMap", agentsList, *toAgentHeader, *aggregateCh) |
-                            for(@aggregate <- aggregateCh) {
-                                listOps!("filter", aggregate, *notNil, *ret)
-                            }
-                        }
+                    treeHashMap!("toMap", agents, *agentsMapsCh) |
+                    for(@agentsMaps <- agentsMapsCh) {
+                        listOps!("unorderedParMap", agentsMaps.toList(), *toAgentHeader, *ret)
                     }
                 }
             } |
 
             for(<- nilCh) {
                 ret!([])
-            } |
-
-            visit!("agents", address, *valueCh, *nilCh)
+            }
         }
     } |
 
     contract agents(@"listVersions", @address, @id, ret) = {
-        new valueCh, nilCh, agentVersionsListCh, toAgentHeader in {
-            for(@(agentVersions, agentVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh; stack <<- stackCh) {
-                contract toAgentHeader(@version, ret) = {
-                    new versionCh in {
-                        treeHashMap!("get", agentVersions, version, *versionCh) |
+        new valueCh, nilCh, agentVersionsMapCh, toAgentHeader in {
+            visit!("agentVersions", address, id, *valueCh, *nilCh) |
 
-                        for(@agentVersion <- versionCh) {
-                            ret!(agentVersion.delete("code").union({"id": id, "version": version}))
-                        }
-                    }
+            for(@agentVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh) {
+                contract toAgentHeader(@(version, agent), ret) = {
+                    ret!(agent.delete("code").union({"id": id, "version": version}))
                 } |
 
-                stack!("toList", agentVersionsIndex, *agentVersionsListCh) |
-
-                for(@agentVersionsList <- agentVersionsListCh) {
-                    listOps!("parMap", agentVersionsList, *toAgentHeader, *ret)
+                treeHashMap!("toMap", agentVersions, *agentVersionsMapCh) |
+                for(@agentVersionsMap <- agentVersionsMapCh) {
+                    listOps!("parMap", agentVersionsMap.delete("latest").toList(), *toAgentHeader, *ret)
                 }
             } |
 
             for(<- nilCh) {
                 ret!(Nil)
-            } |
-
-            visit!("agentVersions", address, id, *valueCh, *nilCh)
+            }
         }
     } |
 
     contract agents(@"get", @address, @id, @version, ret) = {
         new valueCh, nilCh in {
+            visit!("agentVersion", address, id, version, *valueCh, *nilCh) |
+
             for(@agentVersion <- valueCh) {
                 ret!(agentVersion.union({"id": id, "version": version}))
             } |
 
             for(<- nilCh) {
                 ret!(Nil)
-            } |
-
-            visit!("agentVersion", address, id, version, *valueCh, *nilCh)
+            }
         }
     } |
 
@@ -272,10 +215,10 @@ in {
                 visit!("agentVersions", address, id, *valueCh, *errCh)
             } |
 
-            for(@(agentVersions, agentVersionsIndex) <- valueCh; treeHashMap, _ <<- treeHashMapCh; stack <<- stackCh) {
-                for(<- insertAgentVersionCh) {
-                    stack!("push", agentVersionsIndex, version, *devNull) |
+            for(@agentVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", agentVersions, version, *errCh, *insertAgentVersionCh) |
 
+                for(<- insertAgentVersionCh) {
                     treeHashMap!("set", agentVersions, version,
                         {
                             "created_at": created_at,
@@ -298,9 +241,7 @@ in {
                             "logo": logo,
                             "code": code,
                         }, *devNull)
-                } |
-
-                treeHashMap!("getOrElse", agentVersions, version, *errCh, *insertAgentVersionCh)
+                }
             } |
 
             for(<- errCh) {
@@ -321,7 +262,7 @@ in {
                 visit!("agents", address, *valueCh, *devNull)
             } |
 
-            for(@(agents, _) <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agents <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("delete", agents, id, *devNull)
             }
         }
@@ -339,15 +280,13 @@ in {
                 visit!("agentVersions", address, id, *valueCh, *errCh)
             } |
 
-            for(@(agentVersions, _) <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("getOrElse", agentVersions, version, *valueCh, *errCh) |
-
                 for(@agent <- valueCh) {
                     treeHashMap!("set", agentVersions, version, agent.union({"last_deploy": last_deploy}), *devNull)
                 } |
 
                 treeHashMap!("getOrElse", agentVersions, "latest", *latestCh, *errCh) |
-
                 for(@agent <- latestCh) {
                     if(agent.get("version") == version) {
                         treeHashMap!("set", agentVersions, "latest", agent.union({"last_deploy": last_deploy}), *devNull)

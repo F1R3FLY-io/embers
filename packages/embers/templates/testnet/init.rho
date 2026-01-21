@@ -62,16 +62,16 @@ in {
 
     contract log(@"get", @deployId, ret) = {
         new valueCh, nilCh in {
+            for(treeHashMap, @map <<- treeHashMapCh) {
+                treeHashMap!("getOrElse", map, deployId, *valueCh, *nilCh)
+            } |
+
             for(@logs <- valueCh; stack <<- stackCh) {
                 stack!("toList", logs, *ret)
             } |
 
             for(<- nilCh) {
                 ret!(Nil)
-            } |
-
-            for(treeHashMap, @map <<- treeHashMapCh) {
-                treeHashMap!("getOrElse", map, deployId, *valueCh, *nilCh)
             }
         }
     }

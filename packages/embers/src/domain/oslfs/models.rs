@@ -4,7 +4,16 @@ use crate::domain::common::PreparedContract;
 
 #[derive(Debug, Clone)]
 pub struct Oslfs {
-    pub oslfs: Vec<Oslf>,
+    pub oslfs: Vec<OslfHeader>,
+}
+
+#[derive(Debug, Clone)]
+pub struct OslfHeader {
+    pub id: String,
+    pub version: String,
+    pub created_at: DateTime<Utc>,
+    pub name: String,
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone)]

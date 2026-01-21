@@ -18,6 +18,7 @@ pub struct AgentsTeamHeader {
     pub version: String,
     pub created_at: DateTime,
     pub last_deploy: Option<DateTime>,
+    pub uri: Option<Uri>,
     pub name: String,
     pub description: Option<String>,
     pub shard: Option<String>,
