@@ -71,7 +71,7 @@ impl AgentsTeamsService {
 
         let deploy_waiter = self
             .observer_node_events
-            .wait_for_deploy(&deploy_id, Duration::from_secs(60));
+            .wait_for_deploy(&deploy_id, Duration::from_mins(1));
         let (_, finalized) = tokio::try_join!(write_client.propose(), deploy_waiter.map(Ok))?;
 
         if !finalized {

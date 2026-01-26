@@ -193,8 +193,7 @@ impl Stream for WalletSubscription {
     ) -> std::task::Poll<Option<Self::Item>> {
         ready!(self.rx.poll_next_unpin(cx))
             .transpose()
-            .map(std::task::Poll::Ready)
-            .unwrap_or(std::task::Poll::Pending)
+            .map_or(std::task::Poll::Pending, std::task::Poll::Ready)
     }
 }
 
