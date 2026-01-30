@@ -22,7 +22,7 @@ pub struct OslfsService {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Render)]
-#[template(path = "oslfs/init.rho")]
+#[template(path = "oslfs/init.rho", blocks = ["name"])]
 struct InitEnv {
     env_uri: Uri,
     version: i64,

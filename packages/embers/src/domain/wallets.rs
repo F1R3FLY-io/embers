@@ -22,7 +22,7 @@ pub struct WalletsService {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Render)]
-#[template(path = "wallets/init.rho")]
+#[template(path = "wallets/init.rho", blocks = ["name"])]
 struct InitWalletsEnv {
     env_uri: Uri,
     version: i64,

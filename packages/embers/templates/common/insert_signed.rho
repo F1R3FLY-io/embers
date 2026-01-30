@@ -24,7 +24,7 @@ in {
 
         rs!(
             {{ public_key }},
-            ({{ version }}, bundle+{*{% block name %}{% endblock %}}),
+            ({{ version }}, bundle+{*{{ as_name() }}}),
             {{ sig }},
             *uriCh
         ) |

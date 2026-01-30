@@ -1,7 +1,7 @@
 use darling::{FromDeriveInput, FromField, FromVariant, ast};
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{DeriveInput, parse_macro_input};
+use syn::{DeriveInput, LitStr, parse_macro_input};
 
 #[derive(Debug, Clone, FromDeriveInput)]
 #[darling(
@@ -12,6 +12,7 @@ struct Args {
     ident: syn::Ident,
     generics: syn::Generics,
     path: Option<String>,
+    blocks: Option<Vec<LitStr>>,
     data: ast::Data<EnumFieldArgs, StructFieldArgs>,
 }
 
@@ -46,6 +47,7 @@ pub fn render_derive(input: TokenStream) -> TokenStream {
             &args.ident,
             &args.generics,
             &args.path.unwrap(),
+            args.blocks.unwrap_or_default(),
             fields,
         )),
         ast::Data::Enum(items) => {
@@ -58,6 +60,7 @@ fn impl_for_struct(
     ident: &syn::Ident,
     generics: &syn::Generics,
     path: &str,
+    blocks: Vec<LitStr>,
     fields: ast::Fields<StructFieldArgs>,
 ) -> proc_macro2::TokenStream {
     let fields = fields.fields;
@@ -105,7 +108,7 @@ fn impl_for_struct(
         {
             fn render(self) -> ::std::result::Result<::std::string::String, ::firefly_client::rendering::_dependencies::askama::Error> {
                 #[derive(::firefly_client::rendering::_dependencies::askama::Template)]
-                #[template(path = #path, escape = "none")]
+                #[template(path = #path, blocks = [#(#blocks),*], escape = "none")]
                 struct Template #ty_generics {
                     #(#template_struct_fields),*
                 }

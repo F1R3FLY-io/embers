@@ -39,7 +39,7 @@ pub struct AgentsTeamsService {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Render)]
-#[template(path = "agents_teams/init.rho")]
+#[template(path = "agents_teams/init.rho", blocks = ["name"])]
 struct InitAgentsTeamsEnv {
     env_uri: Uri,
     version: i64,

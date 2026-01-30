@@ -20,7 +20,7 @@ pub struct TestnetService {
 
 #[allow(unused)]
 #[derive(Debug, Clone, Render)]
-#[template(path = "testnet/init.rho")]
+#[template(path = "testnet/init.rho", blocks = ["name"])]
 struct InitTestnetEnv {
     env_uri: Uri,
     version: i64,

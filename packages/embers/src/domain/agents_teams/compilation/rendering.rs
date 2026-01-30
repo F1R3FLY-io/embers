@@ -68,7 +68,7 @@ enum NodesTemplate<'a> {
 }
 
 #[derive(Debug, Clone, Render)]
-#[template(path = "agents_teams/deploy.rho")]
+#[template(path = "agents_teams/deploy.rho", blocks = ["name"])]
 struct DeployAgentTeamTemplate<'a> {
     env_uri: Uri,
     version: i64,
