@@ -47,7 +47,7 @@ pub fn render_derive(input: TokenStream) -> TokenStream {
             &args.ident,
             &args.generics,
             &args.path.unwrap(),
-            args.blocks.unwrap_or_default(),
+            &args.blocks.unwrap_or_default(),
             fields,
         )),
         ast::Data::Enum(items) => {
@@ -60,7 +60,7 @@ fn impl_for_struct(
     ident: &syn::Ident,
     generics: &syn::Generics,
     path: &str,
-    blocks: Vec<LitStr>,
+    blocks: &[LitStr],
     fields: ast::Fields<StructFieldArgs>,
 ) -> proc_macro2::TokenStream {
     let fields = fields.fields;

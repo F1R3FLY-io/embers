@@ -27,7 +27,7 @@ firefly-client     = { path = "../firefly-client" }
 futures            = { version = "0.3" }
 graphl-parser      = { git = "https://github.com/F1R3FLY-io/graphl-parser", tag = "0.0.38" }
 hex                = { version = "0.4" }
-jsonwebtoken       = { version = "10.2", features = ["rust_crypto"] }
+jsonwebtoken       = { version = "10.3", features = ["rust_crypto"] }
 poem               = { version = "3.1", features = ["anyhow", "compression", "requestid"] }
 poem-openapi       = { version = "5.1", features = ["chrono", "swagger-ui", "websocket"] }
 prost              = { version = "0.14" }
@@ -40,7 +40,7 @@ thiserror          = { version = "2.0" }
 tokio              = { version = "1.49", features = ["macros", "rt-multi-thread", "signal"] }
 tracing            = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid               = { version = "1.19", features = ["serde", "v7"] }
+uuid               = { version = "1.20", features = ["serde", "v7"] }
 
 [lints.clippy]
 cast_possible_wrap    = "allow"
