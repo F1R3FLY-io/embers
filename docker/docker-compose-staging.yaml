@@ -1,6 +1,6 @@
 services:
   firefly:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyio/f1r3fly-scala-node:latest
     pull_policy: always
     user: root
     env_file:
@@ -25,7 +25,7 @@ services:
       - mainnet
 
   firefly-read:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyio/f1r3fly-scala-node:latest
     pull_policy: always
     user: root
     command:
@@ -38,7 +38,7 @@ services:
       - mainnet
 
   firefly-testnet:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyio/f1r3fly-scala-node:latest
     pull_policy: always
     user: root
     volumes:
@@ -61,7 +61,7 @@ services:
       - testnet
 
   firefly-read-testnet:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyio/f1r3fly-scala-node:latest
     pull_policy: always
     user: root
     command:
@@ -74,7 +74,7 @@ services:
       - testnet
 
   embers:
-    image: f1r3flyindustries/embers:0.0.2
+    image: f1r3flyio/embers:0.0.2
     pull_policy: always
     environment:
       EMBERS__AES_ENCRYPTION_KEY: 48E37E0E448C482ADEAE83CD15FE91AA4E2459ED67D707BB40EF17BB18E60EE4
@@ -109,7 +109,7 @@ services:
         condition: service_healthy
 
   embers-frontend:
-    image: f1r3flyindustries/embers-frontend:0.0.2
+    image: f1r3flyio/embers-frontend:0.0.2
     pull_policy: always
     environment:
       API_URL: https://localhost
