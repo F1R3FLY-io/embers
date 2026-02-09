@@ -21,8 +21,8 @@ requires      = ["poetry-core>=2.0.0,<3.0.0"]
 package-mode = false
 
 [tool.poetry.group.dev.dependencies]
-grpcio-tools = "^1.76"
-ruff         = "^0.14"
+grpcio-tools = "^1.78"
+ruff         = "^0.15"
 
 [tool.ruff]
 exclude        = ["tests/protobuf"]
