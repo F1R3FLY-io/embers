@@ -9,7 +9,7 @@ We recommend using Docker to run each component of the application. All required
 Before running the backend or frontend, you need to have two separate `f1r3fly` clusters up and running: one for `mainnet` and one for `testnet`.
 
 - **Cluster Composition**: Each cluster must have a minimum of one validator node and one observer node.
-- **Setup using Docker**: You can run each f1r3fly node using the [**official Docker image**](https://hub.docker.com/r/f1r3flyio/f1r3fly-scala-node).
+- **Setup using Docker**: You can run each f1r3fly node using the [**official Docker image**](https://hub.docker.com/r/f1r3flyindustries/f1r3fly-scala-node).
 
 ## 2. Running the Backend (Embers)
 
