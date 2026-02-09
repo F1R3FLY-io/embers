@@ -1115,7 +1115,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ab67060fc6b8ef687992d439ca0fa36e7ed17e9a0b16b25b601e8757df720de"
 dependencies = [
  "data-encoding",
- "syn 2.0.114",
+ "syn 1.0.109",
 ]
 
 [[package]]
@@ -1668,7 +1668,7 @@ dependencies = [
 [[package]]
 name = "graphl-parser"
 version = "0.0.1"
-source = "git+https://github.com/F1R3FLY-io/graphl-parser?tag=0.0.39#363f2c5bebb11d6678decdd856c4dbe7c3c21022"
+source = "git+https://github.com/F1R3FLY-io/graphl-parser?tag=0.0.40#8e04eb1a5da32f6ea3988d7b9fd0c885e1bf350d"
 dependencies = [
  "bindgen",
  "cc",
