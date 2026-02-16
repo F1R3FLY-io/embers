@@ -12,13 +12,13 @@ askama                = { version = "0.15" }
 backon                = { version = "1.6" }
 base64                = { version = "0.22" }
 blake2                = { version = "0.10" }
-bon                   = { version = "3.8" }
+bon                   = { version = "3.9" }
 bs58                  = { version = "0.5" }
 chrono                = { version = "0.4" }
 crc                   = { version = "3.4" }
 dashmap               = { version = "6.1" }
 derive_more           = { version = "2.1", features = ["full"] }
-digest                = { version = "0.10" }
+digest                = { version = "0.11" }
 firefly-client-macros = { path = "../firefly-client-macros" }
 futures               = { version = "0.3" }
 hex                   = { version = "0.4" }
@@ -36,7 +36,7 @@ tokio-tungstenite     = { version = "0.28" }
 tonic                 = { version = "0.14" }
 tonic-prost           = { version = "0.14" }
 tracing               = { version = "0.1" }
-uuid                  = { version = "1.20", features = ["v7"] }
+uuid                  = { version = "1.21", features = ["v7"] }
 zbase32               = { version = "0.1" }
 
 [build-dependencies]

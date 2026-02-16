@@ -18,7 +18,7 @@ anyhow             = { version = "1.0", features = ["std"] }
 askama             = { version = "0.15" }
 atrium-api         = { version = "0.25" }
 atrium-xrpc-client = { version = "0.5", default-features = false, features = ["reqwest"] }
-bon                = { version = "3.8" }
+bon                = { version = "3.9" }
 chrono             = { version = "0.4", features = ["serde"] }
 dashmap            = { version = "6.1" }
 derive_more        = { version = "2.1", features = ["full"] }
@@ -40,7 +40,7 @@ thiserror          = { version = "2.0" }
 tokio              = { version = "1.49", features = ["macros", "rt-multi-thread", "signal"] }
 tracing            = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid               = { version = "1.20", features = ["serde", "v7"] }
+uuid               = { version = "1.21", features = ["serde", "v7"] }
 
 [lints.clippy]
 cast_possible_wrap    = "allow"
