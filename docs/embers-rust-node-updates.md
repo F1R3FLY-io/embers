@@ -230,7 +230,7 @@ These packages used `full_deploy()` which returned `BlockId` from propose. Chang
 
 ---
 
-## Active Investigation: Tuplespace Reads Fail After Agent Team Save
+## 9. Peek Workaround — Tuplespace Reads Fail After Agent Team Save
 
 **Symptom:** After saving an agent team (create deploy succeeds, finalization confirmed), all `get`, `list`, and `list_versions` endpoints for agents_teams return 500 with `contract did not return any value`. Agents and OSLFs work fine.
 
@@ -295,3 +295,32 @@ Evidence:
 
 **Files:**
 - `src/blockchain/agents_teams/models.rs` — Graph deserializer unescape
+
+---
+
+## 12. find_deploy for Deploy ID Resolution
+
+**Problem:** After removing `propose()` (update #6), events-sync and state-sync had stubbed `get_channel_value` calls because they no longer had a `BlockId` from propose. They need to resolve `DeployId` → `BlockId` to look up channel data.
+
+**Fix:** Added `WriteNodeClient::find_deploy()` method that calls the gRPC `findDeploy` endpoint to resolve a deploy signature to its containing block's `LightBlockInfo`. Fixed events-sync and state-sync to use `find_deploy` before `get_channel_value`.
+
+**Status:** Fixed. All three workspace crates compile cleanly.
+
+**Files:**
+- `packages/firefly-client/src/write_node_client.rs` — added `find_deploy()` method
+- `packages/events-sync/src/main.rs` — use find_deploy in subscribe_to_firefly
+- `packages/state-sync/src/main.rs` — use find_deploy in download command
+
+---
+
+## 13. Image Compression for F1R3Sky Blob Uploads
+
+**Problem:** When posting agent team results to F1R3Sky (`run-on-firesky`), the DALL-E 3 image (1024x1024 PNG, ~2MB) exceeds the PDS blob upload limit of 976KB: `BlobTooLarge: This file is too large. It is 1.95MB but the maximum size is 976.56KB.`
+
+**Fix:** Added image compression in `upload_blob_from_url()`. When an image exceeds 950KB, it's decoded and re-encoded as JPEG with progressive quality reduction (starting at 85, stepping down by 10 until under limit or quality reaches 20). Added `image` crate dependency with `png` + `jpeg` features.
+
+**Status:** Fixed. Agent replies to F1R3Sky posts now include compressed images.
+
+**Files:**
+- `packages/embers/Cargo.toml` — added `image` dependency
+- `packages/embers/src/domain/common.rs` — `compress_image()` function, updated `upload_blob_from_url()`
