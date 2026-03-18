@@ -53,9 +53,8 @@ async fn main() -> anyhow::Result<()> {
     let ((agents_service, agents_teams_service, oslfs_service, wallets_service), testnet_service) =
         try_join!(
             async {
-                let mut write_client = WriteNodeClient::new(
+                let write_client = WriteNodeClient::new(
                     config.mainnet.deploy_service_url,
-                    config.mainnet.propose_service_url,
                 )
                 .await?;
 
@@ -95,8 +94,6 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await?;
 
-                write_client.propose().await?;
-
                 anyhow::Ok((
                     agents_service,
                     agents_teams_service,
@@ -105,9 +102,8 @@ async fn main() -> anyhow::Result<()> {
                 ))
             },
             async {
-                let mut testnet_write_client = WriteNodeClient::new(
+                let testnet_write_client = WriteNodeClient::new(
                     config.testnet.deploy_service_url,
-                    config.testnet.propose_service_url,
                 )
                 .await?;
 
@@ -119,8 +115,6 @@ async fn main() -> anyhow::Result<()> {
                     &config.testnet.env_key,
                 )
                 .await?;
-
-                testnet_write_client.propose().await?;
 
                 anyhow::Ok(testnet_service)
             },

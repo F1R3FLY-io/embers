@@ -30,7 +30,7 @@ in {
         }
     } |
 
-    rl!(`rho:rchain:revVault`, *revVaultCh) |
+    rl!(`rho:vault:system`, *revVaultCh) |
     for(@(_, revVault) <- revVaultCh) {
         revVaultCh!(revVault)
     } |

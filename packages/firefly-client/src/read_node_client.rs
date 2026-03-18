@@ -24,6 +24,15 @@ impl ReadNodeClient {
     {
         let mut response_json = self.explore_deploy(rholang_code).await?;
 
+        tracing::debug!(
+            "explore-deploy response keys: {:?}",
+            response_json.as_object().map(|o| o.keys().collect::<Vec<_>>())
+        );
+        tracing::debug!(
+            "explore-deploy expr: {}",
+            serde_json::to_string(&response_json.get("expr")).unwrap_or_default()
+        );
+
         let data_value = response_json
             .pointer_mut("/expr/0")
             .map(Value::take)
@@ -42,8 +51,7 @@ impl ReadNodeClient {
         let request = self
             .client
             .post(format!("{}/api/explore-deploy", self.url))
-            .body(rholang_code)
-            .header("Content-Type", "text/plain")
+            .json(&serde_json::json!({ "term": rholang_code }))
             .send()
             .await?;
 

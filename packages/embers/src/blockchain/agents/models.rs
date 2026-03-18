@@ -16,10 +16,14 @@ pub struct AgentHeader {
     pub id: String,
     pub version: String,
     pub created_at: DateTime,
+    #[serde(default)]
     pub last_deploy: Option<DateTime>,
     pub name: String,
+    #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
     pub shard: Option<String>,
+    #[serde(default)]
     pub logo: Option<String>,
 }
 
@@ -29,10 +33,15 @@ pub struct Agent {
     pub id: String,
     pub version: String,
     pub created_at: DateTime,
+    #[serde(default)]
     pub last_deploy: Option<DateTime>,
     pub name: String,
+    #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
     pub shard: Option<String>,
+    #[serde(default)]
     pub logo: Option<String>,
+    #[serde(default)]
     pub code: Option<String>,
 }

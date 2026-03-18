@@ -94,7 +94,6 @@ impl AgentsService {
             write_client.deploy_signed_contract(system).await?;
         }
 
-        write_client.propose().await?;
         Ok(deploy_id)
     }
 }

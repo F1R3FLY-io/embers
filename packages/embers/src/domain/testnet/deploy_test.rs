@@ -73,7 +73,6 @@ impl TestnetService {
                 });
             }
 
-            write_client.propose().await?;
         }
 
         let result = write_client.deploy_signed_contract(request.test).await;
@@ -89,8 +88,7 @@ impl TestnetService {
         let deploy_waiter = self
             .observer_node_events
             .wait_for_deploy(&deploy_id, Duration::from_mins(1));
-        let (_, finalized) =
-            tokio::try_join!(write_client.propose(), async { Ok(deploy_waiter.await) })?;
+        let finalized = deploy_waiter.await;
 
         if !finalized {
             return Err(anyhow!("block is not finalized"));

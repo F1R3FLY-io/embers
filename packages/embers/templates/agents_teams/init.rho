@@ -6,7 +6,7 @@
 {%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
-    revAddress(`rho:rev:address`),
+    vaultAddress(`rho:vault:address`),
     devNull(`rho:io:devNull`),
     abort(`rho:execution:abort`),
     deployData(`rho:deploy:data`),
@@ -38,7 +38,8 @@ in {
     } |
 
     contract visit(@"agentsTeams", @address, f, notFound) = {
-        for(treeHashMap, @map <<- treeHashMapCh) {
+        for(treeHashMap, @map <- treeHashMapCh) {
+            treeHashMapCh!(*treeHashMap, map) |
             treeHashMap!("getOrElse", map, address, *f, *notFound)
         }
     } |
@@ -47,7 +48,8 @@ in {
         new foundCh in {
             visit!("agentsTeams", address, *foundCh, *notFound) |
 
-            for(@agentsTeams <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentsTeams <- foundCh; treeHashMap, @map <- treeHashMapCh) {
+                treeHashMapCh!(*treeHashMap, map) |
                 treeHashMap!("getOrElse", agentsTeams, id, *f, *notFound)
             }
         }
@@ -57,7 +59,8 @@ in {
         new foundCh in {
             visit!("agentsTeamVersions", address, id, *foundCh, *notFound) |
 
-            for(@agentsTeamVersions <- foundCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentsTeamVersions <- foundCh; treeHashMap, @map <- treeHashMapCh) {
+                treeHashMapCh!(*treeHashMap, map) |
                 treeHashMap!("getOrElse", agentsTeamVersions, version, *f, *notFound)
             }
         }
@@ -68,13 +71,14 @@ in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
-                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+                vaultAddress!("fromDeployerId", deployerId, *deployerAddressCh)
             } |
 
             for(@address <- deployerAddressCh) {
                 visit!("agentsTeams", address, *valueCh, *nilCh) |
 
-                for(<- nilCh; treeHashMap, @map <<- treeHashMapCh) {
+                for(<- nilCh; treeHashMap, @map <- treeHashMapCh) {
+                    treeHashMapCh!(*treeHashMap, map) |
                     new agentsTeamsCh in {
                         treeHashMap!("init", 3, *agentsTeamsCh) |
 
@@ -86,7 +90,8 @@ in {
                 }
             } |
 
-            for(@agentsTeams <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentsTeams <- valueCh; treeHashMap, @map <- treeHashMapCh) {
+                treeHashMapCh!(*treeHashMap, map) |
                 new insertAgentsTeamCh, agentsTeamVersionsCh in {
                     treeHashMap!("getOrElse", agentsTeams, id, *errCh, *insertAgentsTeamCh) |
 
@@ -133,7 +138,8 @@ in {
         new valueCh, nilCh in {
             visit!("agentsTeams", address, *valueCh, *nilCh) |
 
-            for(@agentsTeams <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh) {
+            for(@agentsTeams <- valueCh; treeHashMap, @map <- treeHashMapCh; @listOps <- listOpsCh) {
+                treeHashMapCh!(*treeHashMap, map) | listOpsCh!(listOps) |
                 new toAgentsTeamHeader, agentsTeamsMapCh in {
                     contract toAgentsTeamHeader(@(id, agentsTeamVersions), ret) = {
                         new agentsTeamLastVersionCh in {
@@ -146,7 +152,7 @@ in {
 
                     treeHashMap!("toMap", agentsTeams, *agentsTeamsMapCh) |
                     for(@agentsTeamsMap <- agentsTeamsMapCh) {
-                        listOps!("unorderedParMap", agentsTeamsMap.toList(), *toAgentsTeamHeader, *ret)
+                        @listOps!("unorderedParMap", agentsTeamsMap.toList(), *toAgentsTeamHeader, *ret)
                     }
                 }
             } |
@@ -161,14 +167,15 @@ in {
         new valueCh, nilCh, agentsTeamVersionsMapCh, toAgentsTeamHeader in {
             visit!("agentsTeamVersions", address, id, *valueCh, *nilCh) |
 
-            for(@agentsTeamVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh) {
+            for(@agentsTeamVersions <- valueCh; treeHashMap, @map <- treeHashMapCh; @listOps <- listOpsCh) {
+                treeHashMapCh!(*treeHashMap, map) | listOpsCh!(listOps) |
                 contract toAgentsTeamHeader(@(version, agentsTeam), ret) = {
                     ret!(agentsTeam.delete("graph").union({"id": id, "version": version}))
                 } |
 
                 treeHashMap!("toMap", agentsTeamVersions, *agentsTeamVersionsMapCh) |
                 for(@agentsTeamVersionsMap <- agentsTeamVersionsMapCh) {
-                    listOps!("parMap", agentsTeamVersionsMap.delete("latest").toList(), *toAgentsTeamHeader, *ret)
+                    @listOps!("parMap", agentsTeamVersionsMap.delete("latest").toList(), *toAgentsTeamHeader, *ret)
                 }
             } |
 
@@ -197,14 +204,15 @@ in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
-                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+                vaultAddress!("fromDeployerId", deployerId, *deployerAddressCh)
             } |
 
             for(@address <- deployerAddressCh) {
                 visit!("agentsTeamVersions", address, id, *valueCh, *errCh)
             } |
 
-            for(@agentsTeamVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentsTeamVersions <- valueCh; treeHashMap, @map <- treeHashMapCh) {
+                treeHashMapCh!(*treeHashMap, map) |
                 treeHashMap!("getOrElse", agentsTeamVersions, version, *errCh, *insertAgentsTeamVersionCh) |
 
                 for(<- insertAgentsTeamVersionCh) {
@@ -245,14 +253,15 @@ in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
-                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+                vaultAddress!("fromDeployerId", deployerId, *deployerAddressCh)
             } |
 
             for(@address <- deployerAddressCh) {
                 visit!("agentsTeams", address, *valueCh, *devNull)
             } |
 
-            for(@agentsTeams <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentsTeams <- valueCh; treeHashMap, @map <- treeHashMapCh) {
+                treeHashMapCh!(*treeHashMap, map) |
                 treeHashMap!("delete", agentsTeams, id, *devNull)
             }
         }
@@ -263,14 +272,15 @@ in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
-                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+                vaultAddress!("fromDeployerId", deployerId, *deployerAddressCh)
             } |
 
             for(@address <- deployerAddressCh) {
                 visit!("agentsTeamVersions", address, id, *valueCh, *errCh)
             } |
 
-            for(@agentsTeamVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
+            for(@agentsTeamVersions <- valueCh; treeHashMap, @map <- treeHashMapCh) {
+                treeHashMapCh!(*treeHashMap, map) |
                 treeHashMap!("getOrElse", agentsTeamVersions, version, *valueCh, *errCh) |
                 for(@agentsTeam <- valueCh) {
                     treeHashMap!("set", agentsTeamVersions, version, agentsTeam.union({"last_deploy": last_deploy, "uri": uri}), *devNull)
@@ -291,14 +301,16 @@ in {
     } |
 
     contract agentsTeams(@"saveFireskyToken", @nonce, @ciphertext) = {
-        for(@tokens <<- tokensCh; stack <<- stackCh) {
-            stack!("push", tokens, {"nonce": nonce, "ciphertext": ciphertext}, *devNull)
+        for(@tokens <- tokensCh; @stack <- stackCh) {
+            tokensCh!(tokens) | stackCh!(stack) |
+            @stack!("push", tokens, {"nonce": nonce, "ciphertext": ciphertext}, *devNull)
         }
     } |
 
     contract agentsTeams(@"getFireskyTokens", ret) = {
-        for(@tokens <<- tokensCh; stack <<- stackCh) {
-            stack!("toList", tokens, *ret)
+        for(@tokens <- tokensCh; @stack <- stackCh) {
+            tokensCh!(tokens) | stackCh!(stack) |
+            @stack!("toList", tokens, *ret)
         }
     }
 }

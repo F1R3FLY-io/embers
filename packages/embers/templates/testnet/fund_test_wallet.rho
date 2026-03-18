@@ -1,5 +1,5 @@
 new rl(`rho:registry:lookup`),
-    deployerId(`rho:rchain:deployerId`),
+    deployerId(`rho:system:deployerId`),
     revVaultCh,
     eitherCh,
     abort(`rho:execution:abort`),
@@ -10,7 +10,7 @@ new rl(`rho:registry:lookup`),
     transferOp,
     transferResultCh
 in {
-    rl!(`rho:rchain:revVault`, *revVaultCh) |
+    rl!(`rho:vault:system`, *revVaultCh) |
     rl!(`rho:lang:either`, *eitherCh) |
 
     contract okOrAbort(eitherCh, @log) = {

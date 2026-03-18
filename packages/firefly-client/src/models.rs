@@ -15,33 +15,9 @@ use thiserror::Error;
 use crate::helpers::ShortHex;
 use crate::rendering::{IntoValue, Value};
 
-pub mod servicemodelapi {
-    #![allow(warnings)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
-    #![allow(clippy::nursery)]
-    tonic::include_proto!("servicemodelapi");
-}
-
-pub mod rhoapi {
-    #![allow(warnings)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
-    #![allow(clippy::nursery)]
-    tonic::include_proto!("rhoapi");
-}
-
-pub mod casper {
-    #![allow(warnings)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
-    #![allow(clippy::nursery)]
-    tonic::include_proto!("casper");
-
-    pub mod v1 {
-        tonic::include_proto!("casper.v1");
-    }
-}
+pub use f1r3fly_models::casper;
+pub use f1r3fly_models::rhoapi;
+pub use f1r3fly_models::servicemodelapi;
 
 #[derive(
     Debug,
@@ -250,28 +226,27 @@ pub struct DeployData {
     pub valid_after_block_number: ValidAfter,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "event", rename_all = "kebab-case")]
-pub enum NodeEvent {
-    Started,
-    BlockAdded { payload: BlockEventPayload },
-    BlockCreated { payload: BlockEventPayload },
-    BlockFinalised { payload: BlockEventPayload },
+pub use f1r3fly_shared::rust::shared::f1r3fly_event::{
+    BlockAdded, BlockCreated, BlockFinalised, DeployEvent as NodeDeployEvent, F1r3flyEvent,
+};
+
+pub fn event_deploys(event: F1r3flyEvent) -> Option<Vec<NodeDeployEvent>> {
+    match event {
+        F1r3flyEvent::BlockFinalised(b) => Some(b.deploys),
+        F1r3flyEvent::BlockAdded(b) => Some(b.deploys),
+        F1r3flyEvent::BlockCreated(b) => Some(b.deploys),
+        _ => None,
+    }
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub struct BlockEventPayload {
-    pub block_hash: BlockId,
-    pub deploys: Vec<BlockEventDeploy>,
+pub fn deploy_event_id(deploy: &NodeDeployEvent) -> DeployId {
+    DeployId::from(deploy.id.clone())
 }
 
-#[derive(Debug, Clone, Deserialize)]
-pub struct BlockEventDeploy {
-    pub id: DeployId,
-    pub cost: u64,
-    pub deployer: PublicKey,
-    pub errored: bool,
+pub fn deploy_event_wallet_address(deploy: &NodeDeployEvent) -> Option<WalletAddress> {
+    let bytes = hex::decode(&deploy.deployer).ok()?;
+    let pk = PublicKey::from_slice(&bytes).ok()?;
+    Some(pk.into())
 }
 
 pub const FIRECAP_ID: [u8; 3] = [0, 0, 0];

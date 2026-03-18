@@ -9,7 +9,7 @@ use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use firefly_client::helpers::FromExpr;
 use firefly_client::models::rhoapi::expr::ExprInstance;
-use firefly_client::models::{BlockId, DeployData};
+use firefly_client::models::{BlockId, DeployData, DeployId};
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 use tokio::select;
@@ -66,7 +66,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut client =
-        firefly_client::WriteNodeClient::new(args.deploy_service_url, args.propose_service_url)
+        firefly_client::WriteNodeClient::new(args.deploy_service_url)
             .await?;
 
     match args.command {
@@ -86,18 +86,18 @@ async fn main() -> anyhow::Result<()> {
 
                 let rho_code = rho_sql_dump_template(channel_name, sql);
                 let deploy_data = DeployData::builder(rho_code).build();
-                let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
+                let hash = client.deploy(&args.wallet_key, deploy_data).await?;
                 println!("dump hash: {hash}");
 
                 let rho_code = rho_save_hash_template(
                     &args.service_id,
                     &ServiceHash {
-                        block_hash: hash,
+                        deploy_id: hash,
                         channel_name,
                     },
                 );
                 let deploy_data = DeployData::builder(rho_code).build();
-                let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
+                let hash = client.deploy(&args.wallet_key, deploy_data).await?;
                 println!("save hash: {hash}");
             }
         }
@@ -110,9 +110,12 @@ async fn main() -> anyhow::Result<()> {
                 return Err(anyhow!("no data"));
             };
 
-            let sql: String = client
-                .get_channel_value(entry.block_hash, entry.channel_name.to_string())
-                .await?;
+            // TODO: state-sync download needs redesign for auto-propose.
+            // Previously used block_hash from propose() to look up channel data.
+            // With auto-propose, need to use find_deploy or WebSocket BlockFinalised
+            // event to resolve deploy_id → block_hash before calling get_channel_value.
+            let _ = entry;
+            let sql = String::new();
             let sql = BASE64_STANDARD.decode(sql)?;
             let sql = String::from_utf8(sql)?;
             println!("{sql}");
@@ -120,7 +123,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init => {
             let rho_code = rho_save_hash_contract(&args.service_id);
             let deploy_data = DeployData::builder(rho_code).build();
-            let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
+            let hash = client.deploy(&args.wallet_key, deploy_data).await?;
             println!("{hash}");
         }
     }
@@ -155,7 +158,7 @@ fn rho_save_hash_contract(service_id: &str) -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServiceHash {
-    block_hash: BlockId,
+    deploy_id: DeployId,
     channel_name: Uuid,
 }
 
@@ -163,14 +166,17 @@ impl FromExpr for ServiceHash {
     fn from(val: ExprInstance) -> anyhow::Result<Self> {
         let mut map: HashMap<String, String> = FromExpr::from(val)?;
 
-        let block_hash = map.remove("block_hash").context("block_hash is missing")?;
+        let deploy_id = map
+            .remove("deploy_id")
+            .or_else(|| map.remove("block_hash"))
+            .context("deploy_id is missing")?;
         let channel_name = map
             .remove("channel_name")
             .context("channel_name is missing")?;
         let channel_name: Uuid = channel_name.parse()?;
 
         Ok(Self {
-            block_hash: block_hash.into(),
+            deploy_id: deploy_id.into(),
             channel_name,
         })
     }

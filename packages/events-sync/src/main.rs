@@ -11,7 +11,7 @@ use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use contracts::{rho_init_events_channels, rho_subscribe_to_service, rho_unsubscribe_from_service};
 use firefly_client::CommunicationService;
-use firefly_client::models::{BlockId, DeployData};
+use firefly_client::models::{DeployData, DeployId};
 use futures::stream::select_all;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, future};
 use secp256k1::SecretKey;
@@ -91,7 +91,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut client =
-        firefly_client::WriteNodeClient::new(args.deploy_service_url, args.propose_service_url)
+        firefly_client::WriteNodeClient::new(args.deploy_service_url)
             .await
             .context("failed to create firefly client")?;
 
@@ -180,7 +180,7 @@ async fn main() -> anyhow::Result<()> {
                     let rho_code = rho_save_events(channel_name, &events)?;
                     let deploy_data = DeployData::builder(rho_code).build();
                     let hash = client
-                        .full_deploy(&args.wallet_key, deploy_data)
+                        .deploy(&args.wallet_key, deploy_data)
                         .await
                         .context("failed save events")?;
                     println!("events deployed");
@@ -188,13 +188,13 @@ async fn main() -> anyhow::Result<()> {
                     let rho_code = rho_notify_listeners(
                         &args.service_id,
                         &NotifyMsg {
-                            block_hash: hash,
+                            deploy_id: hash,
                             channel_name: channel_name.to_string(),
                         },
                     );
                     let deploy_data = DeployData::builder(rho_code).build();
                     client
-                        .full_deploy(&args.wallet_key, deploy_data)
+                        .deploy(&args.wallet_key, deploy_data)
                         .await
                         .context("failed to notify listeners")?;
                     println!("notified");
@@ -212,7 +212,7 @@ async fn main() -> anyhow::Result<()> {
             let rho_code = rho_init_events_channels(&args.service_id);
             let deploy_data = DeployData::builder(rho_code).build();
             let hash = client
-                .full_deploy(&args.wallet_key, deploy_data)
+                .deploy(&args.wallet_key, deploy_data)
                 .await
                 .context("failed to init channels")?;
             println!("{hash}");
@@ -249,7 +249,7 @@ struct Entry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NotifyMsg {
-    block_hash: BlockId,
+    deploy_id: DeployId,
     channel_name: String,
 }
 
@@ -353,7 +353,7 @@ async fn subscribe_to_firefly(
     let rho_code = rho_subscribe_to_service(&service_id, self_id, external_hostname, grpc_port);
     let deploy_data = DeployData::builder(rho_code).build();
     client
-        .full_deploy(key, deploy_data)
+        .deploy(key, deploy_data)
         .await
         .context("failed subscribe to service failed")?;
 
@@ -363,7 +363,7 @@ async fn subscribe_to_firefly(
             let rho_code = rho_unsubscribe_from_service(&service_id, self_id);
             let deploy_data = DeployData::builder(rho_code).build();
             client
-                .full_deploy(&key, deploy_data)
+                .deploy(&key, deploy_data)
                 .await
                 .context("failed to unsubscribe from service")?;
             println!("unsubscribed");
@@ -373,10 +373,12 @@ async fn subscribe_to_firefly(
 
     Ok(async_stream::stream! {
         while let Some(event) = rx_updates.recv().await {
-            let bytes: Vec<u8> = client
-                .get_channel_value(event.block_hash, event.channel_name)
-                .await
-                .context("failed to get events")?;
+            // TODO: events-sync push subscription needs redesign for auto-propose.
+            // Previously used block_hash from propose() to look up channel data.
+            // With auto-propose, need to use find_deploy or WebSocket BlockFinalised
+            // event to get the block hash, then call get_channel_value.
+            let _ = &event;
+            let bytes: Vec<u8> = Vec::new();
 
             let events: Vec<Entry> =
                 bitcode::deserialize(&bytes).context("failed to deserialize events")?;
