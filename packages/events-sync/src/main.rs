@@ -373,12 +373,24 @@ async fn subscribe_to_firefly(
 
     Ok(async_stream::stream! {
         while let Some(event) = rx_updates.recv().await {
-            // TODO: events-sync push subscription needs redesign for auto-propose.
-            // Previously used block_hash from propose() to look up channel data.
-            // With auto-propose, need to use find_deploy or WebSocket BlockFinalised
-            // event to get the block hash, then call get_channel_value.
-            let _ = &event;
-            let bytes: Vec<u8> = Vec::new();
+            let block_id = match client.find_deploy(&event.deploy_id).await {
+                Ok(block_id) => block_id,
+                Err(err) => {
+                    println!("failed to find deploy {}: {err}", event.deploy_id);
+                    continue;
+                }
+            };
+
+            let bytes: Vec<u8> = match client
+                .get_channel_value(block_id, event.channel_name)
+                .await
+            {
+                Ok(bytes) => bytes,
+                Err(err) => {
+                    println!("failed to get channel value: {err}");
+                    continue;
+                }
+            };
 
             let events: Vec<Entry> =
                 bitcode::deserialize(&bytes).context("failed to deserialize events")?;

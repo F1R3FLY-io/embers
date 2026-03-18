@@ -110,12 +110,10 @@ async fn main() -> anyhow::Result<()> {
                 return Err(anyhow!("no data"));
             };
 
-            // TODO: state-sync download needs redesign for auto-propose.
-            // Previously used block_hash from propose() to look up channel data.
-            // With auto-propose, need to use find_deploy or WebSocket BlockFinalised
-            // event to resolve deploy_id → block_hash before calling get_channel_value.
-            let _ = entry;
-            let sql = String::new();
+            let block_id = client.find_deploy(&entry.deploy_id).await?;
+            let sql: String = client
+                .get_channel_value(block_id, entry.channel_name.to_string())
+                .await?;
             let sql = BASE64_STANDARD.decode(sql)?;
             let sql = String::from_utf8(sql)?;
             println!("{sql}");
