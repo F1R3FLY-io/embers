@@ -79,21 +79,61 @@ where
     serde_json::from_slice(&data).map_err(Into::into)
 }
 
+const MAX_BLOB_SIZE: usize = 950_000;
+
 pub async fn upload_blob_from_url<S>(agent: &Agent<S>, url: &str) -> anyhow::Result<BlobRef>
 where
     S: atrium_api::agent::SessionManager + Send + Sync,
 {
     let resp = reqwest::get(url).await?;
     let bytes = resp.bytes().await?;
+
+    let upload_bytes = if bytes.len() > MAX_BLOB_SIZE {
+        tracing::info!(
+            "image too large ({} bytes), compressing to JPEG",
+            bytes.len()
+        );
+        compress_image(&bytes)?
+    } else {
+        bytes.to_vec()
+    };
+
     let blob_ref = agent
         .api
         .com
         .atproto
         .repo
-        .upload_blob(bytes.to_vec())
+        .upload_blob(upload_bytes)
         .await?;
 
     Ok(blob_ref.data.blob)
+}
+
+fn compress_image(bytes: &[u8]) -> anyhow::Result<Vec<u8>> {
+    use image::ImageReader;
+    use std::io::Cursor;
+
+    let img = ImageReader::new(Cursor::new(bytes))
+        .with_guessed_format()?
+        .decode()?;
+
+    let mut quality = 85u8;
+    loop {
+        let mut buf = Cursor::new(Vec::new());
+        img.write_with_encoder(image::codecs::jpeg::JpegEncoder::new_with_quality(
+            &mut buf, quality,
+        ))?;
+        let result = buf.into_inner();
+        if result.len() <= MAX_BLOB_SIZE || quality <= 20 {
+            tracing::info!(
+                "compressed to {} bytes (quality={})",
+                result.len(),
+                quality
+            );
+            return Ok(result);
+        }
+        quality -= 10;
+    }
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]

@@ -97,6 +97,14 @@ impl NodeEvents {
                             }
                         };
 
+                        if let Some(deploys) = event_deploys(event.clone()) {
+                            tracing::info!(
+                                "ws block event with {} deploys: {:?}",
+                                deploys.len(),
+                                deploys.iter().map(|d| &d.id).collect::<Vec<_>>()
+                            );
+                        }
+
                         let _ = tx.send(event);
                     }
                 }
