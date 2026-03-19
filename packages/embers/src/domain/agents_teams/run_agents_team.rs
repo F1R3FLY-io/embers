@@ -66,10 +66,11 @@ impl AgentsTeamsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
+        tracing::info!("run deploy_id: {deploy_id}");
 
         let deploy_waiter = self
             .observer_node_events
-            .wait_for_deploy(&deploy_id, Duration::from_mins(1));
+            .wait_for_deploy(&deploy_id, Duration::from_mins(2));
         let finalized = deploy_waiter.await;
 
         if !finalized {

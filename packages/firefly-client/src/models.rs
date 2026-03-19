@@ -233,8 +233,6 @@ pub use f1r3fly_shared::rust::shared::f1r3fly_event::{
 pub fn event_deploys(event: F1r3flyEvent) -> Option<Vec<NodeDeployEvent>> {
     match event {
         F1r3flyEvent::BlockFinalised(b) => Some(b.deploys),
-        F1r3flyEvent::BlockAdded(b) => Some(b.deploys),
-        F1r3flyEvent::BlockCreated(b) => Some(b.deploys),
         _ => None,
     }
 }

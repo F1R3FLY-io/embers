@@ -97,8 +97,8 @@ impl AgentsTeamsService {
             .create_record(
                 create_record::InputData {
                     collection: feed::Post::nsid(),
-                    record: KnownRecord::from(
-                        transform_to_post(
+                    record: KnownRecord::from({
+                        let mut post = transform_to_post(
                             feed::post::RecordData {
                                 created_at: Datetime::now(),
                                 embed: None,
@@ -113,8 +113,13 @@ impl AgentsTeamsService {
                             &agent,
                             resp,
                         )
-                        .await,
-                    )
+                        .await;
+                        if post.text.len() > 300 {
+                            let truncated: String = post.text.chars().take(297).collect();
+                            post.text = format!("{truncated}...");
+                        }
+                        post
+                    })
                     .try_into_unknown()?,
                     repo: AtIdentifier::Did(did),
                     rkey: None,
