@@ -1,3 +1,15 @@
+[tasks.check]
+args      = ["check", "--workspace"]
+command   = "cargo"
+toolchain = "nightly"
+workspace = false
+
+[tasks.test]
+args      = ["test", "--workspace"]
+command   = "cargo"
+toolchain = "nightly"
+workspace = false
+
 [tasks.clippy]
 args          = ["clippy", "--workspace", "--all-targets", "--all-features"]
 command       = "cargo"
