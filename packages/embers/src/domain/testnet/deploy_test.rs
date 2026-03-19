@@ -72,7 +72,6 @@ impl TestnetService {
                     error: err.to_string(),
                 });
             }
-
         }
 
         let result = write_client.deploy_signed_contract(request.test).await;

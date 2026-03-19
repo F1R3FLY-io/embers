@@ -8,16 +8,13 @@ use crc::Crc;
 use derive_more::{AsRef, Display, From, Into};
 use digest::OutputSizeUser;
 use digest::typenum::Unsigned;
+pub use f1r3fly_models::{casper, rhoapi, servicemodelapi};
 use secp256k1::PublicKey;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use thiserror::Error;
 
 use crate::helpers::ShortHex;
 use crate::rendering::{IntoValue, Value};
-
-pub use f1r3fly_models::casper;
-pub use f1r3fly_models::rhoapi;
-pub use f1r3fly_models::servicemodelapi;
 
 #[derive(
     Debug,
@@ -227,7 +224,11 @@ pub struct DeployData {
 }
 
 pub use f1r3fly_shared::rust::shared::f1r3fly_event::{
-    BlockAdded, BlockCreated, BlockFinalised, DeployEvent as NodeDeployEvent, F1r3flyEvent,
+    BlockAdded,
+    BlockCreated,
+    BlockFinalised,
+    DeployEvent as NodeDeployEvent,
+    F1r3flyEvent,
 };
 
 pub fn event_deploys(event: F1r3flyEvent) -> Option<Vec<NodeDeployEvent>> {

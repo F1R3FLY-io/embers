@@ -12,8 +12,13 @@ use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::models::{
-    DeployId, F1r3flyEvent, NodeDeployEvent, WalletAddress, deploy_event_id,
-    deploy_event_wallet_address, event_deploys,
+    DeployId,
+    F1r3flyEvent,
+    NodeDeployEvent,
+    WalletAddress,
+    deploy_event_id,
+    deploy_event_wallet_address,
+    event_deploys,
 };
 
 #[derive(Debug, Clone)]
@@ -80,7 +85,9 @@ impl NodeEvents {
                         //   {"event": "block-finalised", "block-hash": "...", "deploys": [...]}
                         // Unwrap: merge payload fields into the top-level object.
                         if let Some(payload) = envelope.get("payload").cloned() {
-                            if let (Some(top), Some(inner)) = (envelope.as_object_mut(), payload.as_object()) {
+                            if let (Some(top), Some(inner)) =
+                                (envelope.as_object_mut(), payload.as_object())
+                            {
                                 for (k, v) in inner {
                                     top.insert(k.clone(), v.clone());
                                 }
@@ -137,9 +144,7 @@ impl NodeEvents {
                             .for_each(|(_, w)| w.notify_waiters());
 
                         if let Some(wallet_addr) = deploy_event_wallet_address(&deploy) {
-                            if let Some(subscription) =
-                                wallet_subscriptions.get(&wallet_addr)
-                            {
+                            if let Some(subscription) = wallet_subscriptions.get(&wallet_addr) {
                                 let _ = subscription.send(deploy.into());
                             }
                         }

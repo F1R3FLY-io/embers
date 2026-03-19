@@ -26,7 +26,9 @@ impl ReadNodeClient {
 
         tracing::debug!(
             "explore-deploy response keys: {:?}",
-            response_json.as_object().map(|o| o.keys().collect::<Vec<_>>())
+            response_json
+                .as_object()
+                .map(|o| o.keys().collect::<Vec<_>>())
         );
         tracing::debug!(
             "explore-deploy expr: {}",

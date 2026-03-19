@@ -53,10 +53,7 @@ async fn main() -> anyhow::Result<()> {
     let ((agents_service, agents_teams_service, oslfs_service, wallets_service), testnet_service) =
         try_join!(
             async {
-                let write_client = WriteNodeClient::new(
-                    config.mainnet.deploy_service_url,
-                )
-                .await?;
+                let write_client = WriteNodeClient::new(config.mainnet.deploy_service_url).await?;
 
                 let agents_service = AgentsService::bootstrap(
                     write_client.clone(),
@@ -102,10 +99,8 @@ async fn main() -> anyhow::Result<()> {
                 ))
             },
             async {
-                let testnet_write_client = WriteNodeClient::new(
-                    config.testnet.deploy_service_url,
-                )
-                .await?;
+                let testnet_write_client =
+                    WriteNodeClient::new(config.testnet.deploy_service_url).await?;
 
                 let testnet_service = TestnetService::bootstrap(
                     testnet_write_client.clone(),

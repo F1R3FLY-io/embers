@@ -8,9 +8,17 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 use crate::helpers::FromExpr;
 use crate::models::casper::v1::deploy_service_client::DeployServiceClient;
 use crate::models::casper::v1::{
-    block_info_response, deploy_response, find_deploy_response, rho_data_response,
+    block_info_response,
+    deploy_response,
+    find_deploy_response,
+    rho_data_response,
 };
-use crate::models::casper::{BlocksQuery, DataAtNameByBlockQuery, DeployDataProto, FindDeployQuery};
+use crate::models::casper::{
+    BlocksQuery,
+    DataAtNameByBlockQuery,
+    DeployDataProto,
+    FindDeployQuery,
+};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
 use crate::models::{BlockId, DeployData, DeployId, SignedCode, ValidAfter};
@@ -140,8 +148,7 @@ impl WriteNodeClient {
     }
 
     pub async fn find_deploy(&mut self, deploy_id: &DeployId) -> anyhow::Result<BlockId> {
-        let deploy_id_bytes = hex::decode(deploy_id.as_ref())
-            .context("invalid deploy_id hex")?;
+        let deploy_id_bytes = hex::decode(deploy_id.as_ref()).context("invalid deploy_id hex")?;
 
         let resp = self
             .deploy_client
@@ -155,12 +162,8 @@ impl WriteNodeClient {
             .context("missing find_deploy response")?;
 
         match resp {
-            find_deploy_response::Message::BlockInfo(info) => {
-                Ok(BlockId::from(info.block_hash))
-            }
-            find_deploy_response::Message::Error(err) => {
-                Err(anyhow!("find_deploy error: {err:?}"))
-            }
+            find_deploy_response::Message::BlockInfo(info) => Ok(BlockId::from(info.block_hash)),
+            find_deploy_response::Message::Error(err) => Err(anyhow!("find_deploy error: {err:?}")),
         }
     }
 

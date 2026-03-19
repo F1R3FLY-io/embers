@@ -98,20 +98,15 @@ where
         bytes.to_vec()
     };
 
-    let blob_ref = agent
-        .api
-        .com
-        .atproto
-        .repo
-        .upload_blob(upload_bytes)
-        .await?;
+    let blob_ref = agent.api.com.atproto.repo.upload_blob(upload_bytes).await?;
 
     Ok(blob_ref.data.blob)
 }
 
 fn compress_image(bytes: &[u8]) -> anyhow::Result<Vec<u8>> {
-    use image::ImageReader;
     use std::io::Cursor;
+
+    use image::ImageReader;
 
     let img = ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()?
@@ -125,11 +120,7 @@ fn compress_image(bytes: &[u8]) -> anyhow::Result<Vec<u8>> {
         ))?;
         let result = buf.into_inner();
         if result.len() <= MAX_BLOB_SIZE || quality <= 20 {
-            tracing::info!(
-                "compressed to {} bytes (quality={})",
-                result.len(),
-                quality
-            );
+            tracing::info!("compressed to {} bytes (quality={})", result.len(), quality);
             return Ok(result);
         }
         quality -= 10;

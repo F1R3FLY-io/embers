@@ -65,9 +65,7 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut client =
-        firefly_client::WriteNodeClient::new(args.deploy_service_url)
-            .await?;
+    let mut client = firefly_client::WriteNodeClient::new(args.deploy_service_url).await?;
 
     match args.command {
         Commands::Upload { db_url, interval } => {

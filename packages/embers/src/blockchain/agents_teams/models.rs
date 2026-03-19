@@ -40,11 +40,17 @@ impl<'de> Deserialize<'de> for Graph {
         D: serde::Deserializer<'de>,
     {
         let graphl = String::deserialize(deserializer)?;
-        tracing::debug!("graphl raw (first 200): {}", &graphl[..graphl.len().min(200)]);
+        tracing::debug!(
+            "graphl raw (first 200): {}",
+            &graphl[..graphl.len().min(200)]
+        );
         // Rholang string storage adds escape sequences for quotes.
         // Unescape: \" -> " and \\ -> \
         let graphl = graphl.replace("\\\"", "\"").replace("\\\\", "\\");
-        tracing::debug!("graphl unescaped (first 200): {}", &graphl[..graphl.len().min(200)]);
+        tracing::debug!(
+            "graphl unescaped (first 200): {}",
+            &graphl[..graphl.len().min(200)]
+        );
         models::Graph::new(graphl)
             .map(Self)
             .map_err(de::Error::custom)
