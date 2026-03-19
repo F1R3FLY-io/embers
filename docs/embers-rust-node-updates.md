@@ -324,3 +324,47 @@ Evidence:
 **Files:**
 - `packages/embers/Cargo.toml` — added `image` dependency
 - `packages/embers/src/domain/common.rs` — `compress_image()` function, updated `upload_blob_from_url()`
+
+---
+
+## 14. BlockFinalised-Only Event Matching
+
+**Problem:** `wait_for_deploy` triggered on `block-created` and `block-added` events, not just `block-finalised`. This caused embers to attempt result retrieval before the block was finalized and the AI execution completed. The explore-deploy would read from the pre-execution state and return empty.
+
+Timeline of the bug:
+- Deploy submitted → `block-created` event arrives ~3 seconds later → `wait_for_deploy` returns true (premature)
+- Embers immediately queries for result → empty (AI hasn't executed yet)
+- `block-finalised` arrives 20+ seconds later (too late)
+
+**Fix:** Changed `event_deploys()` in `models.rs` to only match `F1r3flyEvent::BlockFinalised`, ignoring `BlockCreated` and `BlockAdded`. This ensures `wait_for_deploy` only triggers after the block state is committed and the AI execution result is in the tuplespace.
+
+**Status:** Fixed.
+
+**Files:**
+- `packages/firefly-client/src/models.rs` — `event_deploys()` only matches `BlockFinalised`
+
+---
+
+## 15. Run Finalization Timeout Increased to 2 Minutes
+
+**Problem:** The `deploy_signed_run_agents_team` timeout was 1 minute, but AI execution (GPT-4 + DALL-E 3) plus block finalization takes 60-80 seconds, exceeding the timeout.
+
+**Fix:** Increased `wait_for_deploy` timeout from `Duration::from_mins(1)` to `Duration::from_mins(2)` in `run_agents_team.rs`.
+
+**Status:** Fixed.
+
+**Files:**
+- `packages/embers/src/domain/agents_teams/run_agents_team.rs` — 2-minute timeout
+
+---
+
+## 16. Post Text Truncation for AT Protocol
+
+**Problem:** GPT-4 responses exceeded the AT Protocol 300-grapheme post limit, causing `InvalidRequest: Record/text must not be longer than 300 graphemes` when posting agent replies to F1R3Sky.
+
+**Fix:** Added text truncation after `transform_to_post()` in `run_on_firesky.rs`. If `post.text` exceeds 300 characters, it takes the first 297 characters and appends `...`.
+
+**Status:** Fixed.
+
+**Files:**
+- `packages/embers/src/domain/agents_teams/run_on_firesky.rs` — text truncation
