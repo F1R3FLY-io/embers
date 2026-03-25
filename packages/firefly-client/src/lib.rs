@@ -1,3 +1,4 @@
+pub mod bootstrap;
 mod communication_service;
 pub mod errors;
 pub mod helpers;

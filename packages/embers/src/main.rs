@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use anyhow::Context;
+use firefly_client::bootstrap::BootstrapConfig;
 use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
@@ -42,6 +45,11 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    let bootstrap_config = BootstrapConfig {
+        finalization_timeout: Duration::from_secs(config.bootstrap_timeout_secs),
+        ..Default::default()
+    };
+
     let read_client = ReadNodeClient::new(config.mainnet.observer_url);
     let validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
     let observer_node_events = NodeEvents::new(&config.mainnet.observer_ws_api_url);
@@ -58,8 +66,10 @@ async fn main() -> anyhow::Result<()> {
                 let agents_service = AgentsService::bootstrap(
                     write_client.clone(),
                     read_client.clone(),
+                    &observer_node_events,
                     &config.mainnet.service_key,
                     &config.mainnet.agents_env_key,
+                    &bootstrap_config,
                 )
                 .await?;
 
@@ -70,14 +80,17 @@ async fn main() -> anyhow::Result<()> {
                     &config.mainnet.service_key,
                     &config.mainnet.agents_teams_env_key,
                     config.aes_encryption_key.into(),
+                    &bootstrap_config,
                 )
                 .await?;
 
                 let oslfs_service = OslfsService::bootstrap(
                     write_client.clone(),
                     read_client.clone(),
+                    &observer_node_events,
                     &config.mainnet.service_key,
                     &config.mainnet.oslfs_env_key,
+                    &bootstrap_config,
                 )
                 .await?;
 
@@ -88,6 +101,7 @@ async fn main() -> anyhow::Result<()> {
                     observer_node_events,
                     &config.mainnet.service_key,
                     &config.mainnet.wallets_env_key,
+                    &bootstrap_config,
                 )
                 .await?;
 
@@ -108,6 +122,7 @@ async fn main() -> anyhow::Result<()> {
                     testnet_observer_node_events,
                     config.testnet.service_key,
                     &config.testnet.env_key,
+                    &bootstrap_config,
                 )
                 .await?;
 

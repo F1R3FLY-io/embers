@@ -1,11 +1,12 @@
 use std::sync::Arc;
 
 use aes_gcm::{Aes256Gcm, Key};
-use anyhow::{Context, anyhow};
+use anyhow::anyhow;
 use dashmap::DashMap;
+use firefly_client::bootstrap::{BootstrapConfig, deploy_and_await};
 use firefly_client::errors::ReadNodeError;
 use firefly_client::helpers::insert_signed_signature;
-use firefly_client::models::{DeployData, Uri};
+use firefly_client::models::Uri;
 use firefly_client::rendering::Render;
 use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
@@ -64,6 +65,7 @@ impl AgentsTeamsService {
         deployer_key: &SecretKey,
         env_key: &SecretKey,
         aes_encryption_key: Key<Aes256Gcm>,
+        bootstrap_config: &BootstrapConfig,
     ) -> anyhow::Result<Self> {
         let secp = Secp256k1::new();
         let env_public_key = PublicKey::from_secret_key(&secp, env_key);
@@ -84,12 +86,18 @@ impl AgentsTeamsService {
 
         tracing::debug!("code = {code}");
 
-        let deploy_data = DeployData::builder(code).timestamp(timestamp).build();
-
-        write_client
-            .deploy(deployer_key, deploy_data)
-            .await
-            .context("failed to deploy agents teams env")?;
+        deploy_and_await(
+            &mut write_client,
+            deployer_key,
+            code,
+            timestamp,
+            &observer_node_events,
+            &read_client,
+            env_uri.as_ref(),
+            "agents_teams",
+            bootstrap_config,
+        )
+        .await?;
 
         let code = GetFireskyTokens {
             env_uri: env_uri.clone(),

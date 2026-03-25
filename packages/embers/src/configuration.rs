@@ -38,6 +38,12 @@ pub struct Config {
     pub testnet: TestNet,
     #[serde(deserialize_with = "deserialize_hex_key")]
     pub aes_encryption_key: [u8; 32],
+    #[serde(default = "default_bootstrap_timeout")]
+    pub bootstrap_timeout_secs: u64,
+}
+
+fn default_bootstrap_timeout() -> u64 {
+    120
 }
 
 pub fn collect_config() -> anyhow::Result<Config> {

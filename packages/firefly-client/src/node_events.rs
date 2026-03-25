@@ -31,11 +31,13 @@ pub enum DeployEvent {
 }
 
 type DeploySubscriptions = Arc<DashMap<DeployId, DashMap<Uuid, Arc<Notify>>>>;
+type DeployErrors = Arc<DashMap<DeployId, bool>>;
 type WalletSubscriptions = Arc<DashMap<WalletAddress, broadcast::Sender<DeployEvent>>>;
 
 #[derive(Clone)]
 pub struct NodeEvents {
     deploy_subscriptions: DeploySubscriptions,
+    deploy_errors: DeployErrors,
     wallet_subscriptions: WalletSubscriptions,
 }
 
@@ -44,6 +46,7 @@ impl NodeEvents {
         let url = format!("{url}/ws/events");
         let tx = broadcast::Sender::<F1r3flyEvent>::new(32);
         let deploy_subscriptions = DeploySubscriptions::default();
+        let deploy_errors = DeployErrors::default();
         let wallet_subscriptions = WalletSubscriptions::default();
 
         tokio::spawn({
@@ -122,6 +125,7 @@ impl NodeEvents {
         tokio::spawn({
             let mut rx = tx.subscribe();
             let deploy_subscriptions = deploy_subscriptions.clone();
+            let deploy_errors = deploy_errors.clone();
             let wallet_subscriptions = wallet_subscriptions.clone();
             async move {
                 loop {
@@ -136,6 +140,7 @@ impl NodeEvents {
 
                     for deploy in deploys {
                         let did = deploy_event_id(&deploy);
+                        deploy_errors.insert(did.clone(), deploy.errored);
                         deploy_subscriptions
                             .remove(&did)
                             .map(|(_, waiters)| waiters)
@@ -156,6 +161,7 @@ impl NodeEvents {
 
         Self {
             deploy_subscriptions,
+            deploy_errors,
             wallet_subscriptions,
         }
     }
@@ -194,6 +200,12 @@ impl NodeEvents {
                 _ = tokio::time::sleep(max_wait) => false,
             }
         }
+    }
+
+    /// Check if a finalized deploy had execution errors.
+    /// Returns None if the deploy hasn't been seen yet.
+    pub fn deploy_errored(&self, deploy_id: &DeployId) -> Option<bool> {
+        self.deploy_errors.get(deploy_id).map(|v| *v)
     }
 
     pub fn subscribe_for_deploys(&self, wallet_address: WalletAddress) -> WalletSubscription {
