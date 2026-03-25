@@ -8,6 +8,7 @@
 new rl(`rho:registry:lookup`),
     vaultAddress(`rho:vault:address`),
     devNull(`rho:io:devNull`),
+    stdout(`rho:io:stdout`),
     abort(`rho:execution:abort`),
     deployData(`rho:deploy:data`),
     treeHashMapCh,
@@ -38,7 +39,9 @@ in {
     } |
 
     contract visit(@"agentsTeams", @address, f, notFound) = {
+        stdout!("visit agentsTeams: waiting for treeHashMapCh") |
         for(treeHashMap, @map <- treeHashMapCh) {
+            stdout!("visit agentsTeams: got treeHashMapCh, resending") |
             treeHashMapCh!(*treeHashMap, map) |
             treeHashMap!("getOrElse", map, address, *f, *notFound)
         }
@@ -67,6 +70,7 @@ in {
     } |
 
     contract agentsTeams(@"create", @id, @version, @created_at, @name, @description, @shard, @logo, @graph) = {
+        stdout!(["agentsTeams.create called", id]) |
         new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
             deployData!(*deployDataCh) |
 
@@ -75,9 +79,11 @@ in {
             } |
 
             for(@address <- deployerAddressCh) {
+                stdout!(["agentsTeams.create: address resolved", address]) |
                 visit!("agentsTeams", address, *valueCh, *nilCh) |
 
                 for(<- nilCh; treeHashMap, @map <- treeHashMapCh) {
+                    stdout!("agentsTeams.create: new address, waiting for treeHashMapCh") |
                     treeHashMapCh!(*treeHashMap, map) |
                     new agentsTeamsCh in {
                         treeHashMap!("init", 3, *agentsTeamsCh) |
@@ -91,6 +97,7 @@ in {
             } |
 
             for(@agentsTeams <- valueCh; treeHashMap, @map <- treeHashMapCh) {
+                stdout!("agentsTeams.create: existing address, got treeHashMapCh") |
                 treeHashMapCh!(*treeHashMap, map) |
                 new insertAgentsTeamCh, agentsTeamVersionsCh in {
                     treeHashMap!("getOrElse", agentsTeams, id, *errCh, *insertAgentsTeamCh) |

@@ -51,6 +51,7 @@ async fn main() -> anyhow::Result<()> {
     };
 
     let read_client = ReadNodeClient::new(config.mainnet.observer_url);
+    let api_read_client = read_client.clone();
     let validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
     let observer_node_events = NodeEvents::new(&config.mainnet.observer_ws_api_url);
 
@@ -155,6 +156,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/openapi.yaml", spec_yaml)
         .data(jsonwebtoken::EncodingKey::from_secret(secret.as_ref()))
         .data(jsonwebtoken::DecodingKey::from_secret(secret.as_ref()))
+        .data(api_read_client)
         .data(agents_service)
         .data(agents_teams_service)
         .data(oslfs_service)

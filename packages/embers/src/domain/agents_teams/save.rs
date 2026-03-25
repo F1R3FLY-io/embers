@@ -39,12 +39,23 @@ impl AgentsTeamsService {
         record_trace!(id, request);
 
         // Verify team exists on observer before generating contract.
-        // Without this, the Rholang would abort!() if the prior create
-        // hasn't propagated yet, wasting gas and returning a confusing error.
-        let teams = self.list(address).await?;
-        if !teams.agents_teams.iter().any(|t| t.id == id) {
+        // Retries to account for observer propagation delay after create finalization.
+        // Without this, the Rholang would abort!() if the create hasn't propagated yet.
+        let mut found = false;
+        for attempt in 1..=15u32 {
+            let teams = self.list(address.clone()).await?;
+            if teams.agents_teams.iter().any(|t| t.id == id) {
+                found = true;
+                break;
+            }
+            if attempt < 15 {
+                tracing::debug!(id, attempt, "team not visible yet, retrying");
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+        }
+        if !found {
             bail!(
-                "agents team {id} not found (create may still be finalizing)"
+                "agents team {id} not found after 30s (create may have failed)"
             );
         }
 

@@ -123,7 +123,9 @@ impl WriteNodeClient {
             }
         };
 
-        extract_deploy_id(&deploy_id)
+        let id = extract_deploy_id(&deploy_id)?;
+        tracing::info!(deploy_id = %id, "deploy_signed_contract: deploy accepted by node");
+        Ok(id)
     }
 
     pub async fn get_head_block_index(&mut self) -> anyhow::Result<u64> {
