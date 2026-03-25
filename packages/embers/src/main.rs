@@ -66,7 +66,6 @@ async fn main() -> anyhow::Result<()> {
                 let agents_service = AgentsService::bootstrap(
                     write_client.clone(),
                     read_client.clone(),
-                    &observer_node_events,
                     &config.mainnet.service_key,
                     &config.mainnet.agents_env_key,
                     &bootstrap_config,
@@ -87,7 +86,6 @@ async fn main() -> anyhow::Result<()> {
                 let oslfs_service = OslfsService::bootstrap(
                     write_client.clone(),
                     read_client.clone(),
-                    &observer_node_events,
                     &config.mainnet.service_key,
                     &config.mainnet.oslfs_env_key,
                     &bootstrap_config,

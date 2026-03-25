@@ -2,7 +2,7 @@ use anyhow::Context;
 use serde_json::Value;
 
 use crate::errors::ReadNodeError;
-use crate::models::ReadNodeExpr;
+use crate::models::{DeployId, ReadNodeExpr};
 
 #[derive(Clone)]
 pub struct ReadNodeClient {
@@ -47,6 +47,55 @@ impl ReadNodeClient {
         serde_json::from_value(intermediate.into())
             .context("failed to deserialize filed model")
             .map_err(ReadNodeError::Deserialization)
+    }
+
+    /// Check if a deploy has been included in a block.
+    /// Returns the block hash if found, None if not yet included.
+    pub async fn find_deploy(&self, deploy_id: &DeployId) -> Result<Option<String>, ReadNodeError> {
+        let response = self
+            .client
+            .get(format!("{}/api/deploy/{}", self.url, deploy_id))
+            .send()
+            .await?;
+
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Ok(None);
+        }
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await?;
+            // "deploy not found" style errors mean not yet in a block
+            if body.contains("not found") || body.contains("NOT_FOUND") {
+                return Ok(None);
+            }
+            return Err(ReadNodeError::Api(status, body));
+        }
+
+        let data: Value = response.json().await?;
+        let block_hash = data
+            .get("blockHash")
+            .and_then(|v| v.as_str())
+            .map(String::from);
+
+        Ok(block_hash)
+    }
+
+    /// Check if a block is finalized.
+    pub async fn is_finalized(&self, block_hash: &str) -> Result<bool, ReadNodeError> {
+        let response = self
+            .client
+            .get(format!("{}/api/is-finalized/{}", self.url, block_hash))
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let body = response.text().await?;
+            return Err(ReadNodeError::Api(status, body));
+        }
+
+        Ok(response.json().await?)
     }
 
     async fn explore_deploy(&self, rholang_code: String) -> Result<Value, ReadNodeError> {

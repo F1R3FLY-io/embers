@@ -193,9 +193,10 @@ impl AgentsTeamsApi {
         Ok(())
     }
 
-    #[oai(path = "/:id/save/prepare", method = "post")]
+    #[oai(path = "/:address/:id/save/prepare", method = "post")]
     async fn prepare_save(
         &self,
+        Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Json(body): Json<SaveAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
@@ -203,7 +204,7 @@ impl AgentsTeamsApi {
     ) -> poem::Result<Json<PrepareResponse<SaveAgentsTeamResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_save_contract(id, body.into()),
+            |body| agents_teams.prepare_save_contract(address.0, id, body.into()),
             encoding_key,
         )
         .await
@@ -211,9 +212,10 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/:id/save/send", method = "post")]
+    #[oai(path = "/:address/:id/save/send", method = "post")]
     async fn save(
         &self,
+        #[allow(unused_variables)] Path(_address): Path<Stringified<WalletAddress>>,
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, SaveAgentsTeamReq, SaveAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,

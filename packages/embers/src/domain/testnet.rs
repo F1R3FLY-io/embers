@@ -63,7 +63,6 @@ impl TestnetService {
             &deployer_key,
             code,
             timestamp,
-            &observer_node_events,
             &read_client,
             env_uri.as_ref(),
             "testnet",

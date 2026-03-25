@@ -2,7 +2,7 @@ use firefly_client::bootstrap::{BootstrapConfig, deploy_and_await};
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::Uri;
 use firefly_client::rendering::Render;
-use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
+use firefly_client::{ReadNodeClient, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 mod create;
@@ -36,7 +36,6 @@ impl OslfsService {
     pub async fn bootstrap(
         mut write_client: WriteNodeClient,
         read_client: ReadNodeClient,
-        observer_node_events: &NodeEvents,
         deployer_key: &SecretKey,
         env_key: &SecretKey,
         bootstrap_config: &BootstrapConfig,
@@ -65,7 +64,6 @@ impl OslfsService {
             deployer_key,
             code,
             timestamp,
-            observer_node_events,
             &read_client,
             env_uri.as_ref(),
             "oslfs",

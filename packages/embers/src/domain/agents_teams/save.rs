@@ -1,5 +1,6 @@
+use anyhow::bail;
 use chrono::{DateTime, Utc};
-use firefly_client::models::{DeployId, SignedCode, Uri};
+use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 use uuid::Uuid;
 
@@ -31,10 +32,21 @@ impl AgentsTeamsService {
     )]
     pub async fn prepare_save_contract(
         &self,
+        address: WalletAddress,
         id: String,
         request: SaveReq,
     ) -> anyhow::Result<SaveResp> {
         record_trace!(id, request);
+
+        // Verify team exists on observer before generating contract.
+        // Without this, the Rholang would abort!() if the prior create
+        // hasn't propagated yet, wasting gas and returning a confusing error.
+        let teams = self.list(address).await?;
+        if !teams.agents_teams.iter().any(|t| t.id == id) {
+            bail!(
+                "agents team {id} not found (create may still be finalizing)"
+            );
+        }
 
         let version = Uuid::now_v7();
 
