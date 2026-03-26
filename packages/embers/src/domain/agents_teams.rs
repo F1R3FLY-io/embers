@@ -31,9 +31,11 @@ mod save;
 #[derive(Clone)]
 pub struct AgentsTeamsService {
     pub uri: Uri,
+    pub service_key: SecretKey,
     pub write_client: WriteNodeClient,
     pub read_client: ReadNodeClient,
     pub observer_node_events: NodeEvents,
+    pub observer_sync: crate::domain::common::ObserverSyncConfig,
     pub aes_encryption_key: Key<Aes256Gcm>,
     pub firesky_accounts: Arc<DashMap<Uri, FireskyCredentials>>,
 }
@@ -66,6 +68,7 @@ impl AgentsTeamsService {
         env_key: &SecretKey,
         aes_encryption_key: Key<Aes256Gcm>,
         bootstrap_config: &BootstrapConfig,
+        observer_sync_config: &crate::domain::common::ObserverSyncConfig,
     ) -> anyhow::Result<Self> {
         let secp = Secp256k1::new();
         let env_public_key = PublicKey::from_secret_key(&secp, env_key);
@@ -141,9 +144,11 @@ impl AgentsTeamsService {
 
         Ok(Self {
             uri: env_uri,
+            service_key: deployer_key.clone(),
             write_client,
             read_client,
             observer_node_events,
+            observer_sync: observer_sync_config.clone(),
             aes_encryption_key,
             firesky_accounts: Arc::new(firesky_accounts),
         })

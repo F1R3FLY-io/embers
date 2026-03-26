@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use anyhow::anyhow;
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
@@ -69,16 +67,41 @@ impl AgentsTeamsService {
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
         tracing::info!("run deploy_id: {deploy_id}");
 
-        let deploy_waiter = self
-            .observer_node_events
-            .wait_for_deploy(&deploy_id, Duration::from_mins(2));
-        let finalized = deploy_waiter.await;
-
-        if !finalized {
-            return Err(anyhow!("block is not finalized"));
+        // Wait for finalization via HTTP polling
+        let deadline = tokio::time::Instant::now() + self.observer_sync.finalization_timeout;
+        loop {
+            match self.read_client.find_deploy_info(&deploy_id).await {
+                Ok(Some(info)) => {
+                    if self.read_client.is_finalized(&info.block_hash).await.unwrap_or(false) {
+                        if info.errored {
+                            return Err(anyhow!("run deploy errored"));
+                        }
+                        tracing::info!("run deploy finalized at block {}", info.block_number);
+                        break;
+                    }
+                }
+                _ => {}
+            }
+            if tokio::time::Instant::now() >= deadline {
+                return Err(anyhow!("run deploy not finalized within timeout"));
+            }
+            tokio::time::sleep(self.observer_sync.interval).await;
         }
 
+        // Retry read — observer explore-deploy may lag behind finalized state
         let code = GetAgentsTeamResult { deploy_id }.render()?;
-        self.read_client.get_data(code).await.map_err(Into::into)
+        for attempt in 1..=self.observer_sync.read_after_finalize_attempts {
+            match self.read_client.get_data::<serde_json::Value>(code.clone()).await {
+                Ok(result) => return Ok(result),
+                Err(err) => {
+                    if attempt >= self.observer_sync.read_after_finalize_attempts {
+                        return Err(err.into());
+                    }
+                    tracing::debug!(attempt, "run result not readable yet, retrying");
+                    tokio::time::sleep(self.observer_sync.interval).await;
+                }
+            }
+        }
+        Err(anyhow!("run result not readable after retries"))
     }
 }

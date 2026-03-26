@@ -11,6 +11,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::agents_teams::models::EncryptedMsg;
 
+/// Configuration for observer sync retries. Shared across domain layer.
+#[derive(Debug, Clone)]
+pub struct ObserverSyncConfig {
+    pub max_attempts: u32,
+    pub interval: std::time::Duration,
+    pub finalization_timeout: std::time::Duration,
+    pub read_after_finalize_attempts: u32,
+}
+
 macro_rules! record_trace {
     ($($value:ident),+ $(,)?) => {
         if ::tracing::enabled!(::tracing::Level::TRACE) {

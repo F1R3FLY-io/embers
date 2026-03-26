@@ -50,6 +50,13 @@ async fn main() -> anyhow::Result<()> {
         ..Default::default()
     };
 
+    let observer_sync_config = crate::domain::common::ObserverSyncConfig {
+        max_attempts: config.observer_sync_attempts,
+        interval: Duration::from_secs(config.observer_sync_interval_secs),
+        finalization_timeout: Duration::from_secs(config.deploy_finalization_timeout_secs),
+        read_after_finalize_attempts: config.read_after_finalize_attempts,
+    };
+
     let read_client = ReadNodeClient::new(config.mainnet.observer_url);
     let api_read_client = read_client.clone();
     let validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
@@ -81,6 +88,7 @@ async fn main() -> anyhow::Result<()> {
                     &config.mainnet.agents_teams_env_key,
                     config.aes_encryption_key.into(),
                     &bootstrap_config,
+                    &observer_sync_config,
                 )
                 .await?;
 

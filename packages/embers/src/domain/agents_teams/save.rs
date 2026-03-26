@@ -42,19 +42,19 @@ impl AgentsTeamsService {
         // Verify team exists before generating contract.
         // Retries because explore-deploy on observer may lag behind finalized state.
         let mut team_found = false;
-        for attempt in 1..=15u32 {
+        for attempt in 1..=self.observer_sync.max_attempts {
             if let Ok(teams) = self.list(address.clone()).await {
                 if teams.agents_teams.iter().any(|t| t.id == id) {
                     team_found = true;
                     break;
                 }
             }
-            if attempt < 15 {
-                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            if attempt < self.observer_sync.max_attempts {
+                tokio::time::sleep(self.observer_sync.interval).await;
             }
         }
         if !team_found {
-            bail!("agents team {id} not found after 30s");
+            bail!("agents team {id} not visible on observer");
         }
 
         let version = Uuid::now_v7();
