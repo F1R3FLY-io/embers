@@ -1,7 +1,7 @@
 use firefly_client::models::WalletAddress;
 use poem::web::Data;
 use poem_openapi::OpenApi;
-use poem_openapi::param::Path;
+use poem_openapi::param::{Header, Path};
 use poem_openapi::payload::Json;
 
 use crate::api::agents_teams::models::{
@@ -100,13 +100,14 @@ impl AgentsTeamsApi {
     #[oai(path = "/deploy/prepare", method = "post")]
     async fn prepare_deploy(
         &self,
+        #[oai(name = "X-Valid-After-Block")] Header(valid_after): Header<Option<u64>>,
         Json(body): Json<DeployAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<DeployAgentsTeamResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_deploy_contract(body.into()),
+            |body| agents_teams.prepare_deploy_contract(body.into(), valid_after),
             encoding_key,
         )
         .await
@@ -198,13 +199,14 @@ impl AgentsTeamsApi {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
+        #[oai(name = "X-Valid-After-Block")] Header(valid_after): Header<Option<u64>>,
         Json(body): Json<SaveAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<SaveAgentsTeamResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_save_contract(address.0, id, body.into()),
+            |body| agents_teams.prepare_save_contract(address.0, id, body.into(), valid_after),
             encoding_key,
         )
         .await

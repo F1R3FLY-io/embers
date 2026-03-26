@@ -35,28 +35,26 @@ impl AgentsTeamsService {
         address: WalletAddress,
         id: String,
         request: SaveReq,
+        valid_after: Option<u64>,
     ) -> anyhow::Result<SaveResp> {
         record_trace!(id, request);
 
-        // Verify team exists on observer before generating contract.
-        // Retries to account for observer propagation delay after create finalization.
-        // Without this, the Rholang would abort!() if the create hasn't propagated yet.
-        let mut found = false;
+        // Verify team exists before generating contract.
+        // Retries because explore-deploy on observer may lag behind finalized state.
+        let mut team_found = false;
         for attempt in 1..=15u32 {
-            let teams = self.list(address.clone()).await?;
-            if teams.agents_teams.iter().any(|t| t.id == id) {
-                found = true;
-                break;
+            if let Ok(teams) = self.list(address.clone()).await {
+                if teams.agents_teams.iter().any(|t| t.id == id) {
+                    team_found = true;
+                    break;
+                }
             }
             if attempt < 15 {
-                tracing::debug!(id, attempt, "team not visible yet, retrying");
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
             }
         }
-        if !found {
-            bail!(
-                "agents team {id} not found after 30s (create may have failed)"
-            );
+        if !team_found {
+            bail!("agents team {id} not found after 30s");
         }
 
         let version = Uuid::now_v7();
@@ -74,7 +72,12 @@ impl AgentsTeamsService {
         }
         .render()?;
 
-        let valid_after = self.write_client.clone().get_head_block_index().await?;
+        // Use client-provided block number if available, otherwise fall back to validator head
+        let valid_after = match valid_after {
+            Some(n) => n,
+            None => self.write_client.clone().get_head_block_index().await?,
+        };
+
         Ok(SaveResp {
             version: version.into(),
             contract: prepare_for_signing()

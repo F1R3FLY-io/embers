@@ -3,7 +3,7 @@ use std::sync::Arc;
 use aes_gcm::{Aes256Gcm, Key};
 use anyhow::anyhow;
 use dashmap::DashMap;
-use firefly_client::bootstrap::{BootstrapConfig, deploy_and_await};
+use firefly_client::bootstrap::{BootstrapConfig, BootstrapDeploy, deploy_and_await};
 use firefly_client::errors::ReadNodeError;
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::Uri;
@@ -87,13 +87,15 @@ impl AgentsTeamsService {
         tracing::debug!("code = {code}");
 
         deploy_and_await(
-            &mut write_client,
-            deployer_key,
-            code,
-            timestamp,
-            &read_client,
-            env_uri.as_ref(),
-            "agents_teams",
+            BootstrapDeploy {
+                write_client: &mut write_client,
+                deployer_key,
+                code,
+                timestamp,
+                read_client: &read_client,
+                env_uri: env_uri.as_ref(),
+                service_name: "agents_teams",
+            },
             bootstrap_config,
         )
         .await?;

@@ -26,10 +26,13 @@ impl AgentsTeamsService {
         err(Debug),
         ret(Debug, level = "trace")
     )]
-    pub async fn prepare_deploy_contract(&self, request: DeployReq) -> anyhow::Result<DeployResp> {
+    pub async fn prepare_deploy_contract(
+        &self,
+        request: DeployReq,
+        valid_after: Option<u64>,
+    ) -> anyhow::Result<DeployResp> {
         record_trace!(request);
 
-        let valid_after = self.write_client.clone().get_head_block_index().await?;
         let (graph, phlo_limit, deploy, system) = match request {
             DeployReq::AgentsTeam {
                 id,
@@ -38,11 +41,24 @@ impl AgentsTeamsService {
                 phlo_limit,
                 deploy,
             } => {
-                let agents_team = self
-                    .get(address, id.clone(), version.clone())
-                    .await?
-                    .context("agents team not found")?;
+                // Retry because explore-deploy on observer may lag behind finalized state
+                let mut agents_team = None;
+                for attempt in 1..=15u32 {
+                    match self.get(address.clone(), id.clone(), version.clone()).await {
+                        Ok(Some(team)) => { agents_team = Some(team); break; }
+                        _ => if attempt < 15 {
+                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        }
+                    }
+                }
+                let agents_team = agents_team.context("agents team not found after 30s")?;
                 let graph = agents_team.graph.context("agents team has no graph")?;
+
+                // Use client-provided block number, fall back to validator head
+                let va = match valid_after {
+                    Some(n) => n,
+                    None => self.write_client.clone().get_head_block_index().await?,
+                };
 
                 let system_code = RecordDeploy {
                     env_uri: self.uri.clone(),
@@ -60,7 +76,7 @@ impl AgentsTeamsService {
                     Some(
                         prepare_for_signing()
                             .code(system_code)
-                            .valid_after_block_number(valid_after)
+                            .valid_after_block_number(va)
                             .call(),
                     ),
                 )
@@ -77,10 +93,16 @@ impl AgentsTeamsService {
         let code = parse(&graph)?;
         let code = render(code, deploy)?;
 
+        // Use client-provided block number, fall back to validator head
+        let va = match valid_after {
+            Some(n) => n,
+            None => self.write_client.clone().get_head_block_index().await?,
+        };
+
         Ok(DeployResp {
             contract: prepare_for_signing()
                 .code(code)
-                .valid_after_block_number(valid_after)
+                .valid_after_block_number(va)
                 .timestamp(timestamp)
                 .phlo_limit(phlo_limit)
                 .call(),

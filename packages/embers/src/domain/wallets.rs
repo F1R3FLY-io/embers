@@ -1,4 +1,4 @@
-use firefly_client::bootstrap::{BootstrapConfig, deploy_and_await};
+use firefly_client::bootstrap::{BootstrapConfig, BootstrapDeploy, deploy_and_await};
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::Uri;
 use firefly_client::rendering::Render;
@@ -62,13 +62,15 @@ impl WalletsService {
         tracing::debug!("code = {code}");
 
         deploy_and_await(
-            &mut write_client,
-            deployer_key,
-            code,
-            timestamp,
-            &read_client,
-            env_uri.as_ref(),
-            "wallets",
+            BootstrapDeploy {
+                write_client: &mut write_client,
+                deployer_key,
+                code,
+                timestamp,
+                read_client: &read_client,
+                env_uri: env_uri.as_ref(),
+                service_name: "wallets",
+            },
             bootstrap_config,
         )
         .await?;

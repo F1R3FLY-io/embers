@@ -5,6 +5,7 @@ use secp256k1::SecretKey;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct MainNet {
     pub deploy_service_url: String,
     pub propose_service_url: String,
@@ -19,6 +20,7 @@ pub struct MainNet {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct TestNet {
     pub deploy_service_url: String,
     pub propose_service_url: String,

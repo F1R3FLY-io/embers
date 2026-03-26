@@ -32,6 +32,17 @@ impl Default for BootstrapConfig {
     }
 }
 
+/// Parameters for a bootstrap init deploy.
+pub struct BootstrapDeploy<'a> {
+    pub write_client: &'a mut WriteNodeClient,
+    pub deployer_key: &'a SecretKey,
+    pub code: String,
+    pub timestamp: DateTime<Utc>,
+    pub read_client: &'a ReadNodeClient,
+    pub env_uri: &'a str,
+    pub service_name: &'a str,
+}
+
 /// Deploys an init contract and waits for finalization + observer readability.
 ///
 /// Uses HTTP polling (find_deploy + is_finalized) instead of WebSocket events
@@ -40,15 +51,19 @@ impl Default for BootstrapConfig {
 /// The deploy is idempotent — re-deploying the same init contract against
 /// existing blockchain state is a no-op due to the version check in insert_signed.rho.
 pub async fn deploy_and_await(
-    write_client: &mut WriteNodeClient,
-    deployer_key: &SecretKey,
-    code: String,
-    timestamp: DateTime<Utc>,
-    read_client: &ReadNodeClient,
-    env_uri: &str,
-    service_name: &str,
+    deploy: BootstrapDeploy<'_>,
     config: &BootstrapConfig,
 ) -> anyhow::Result<DeployId> {
+    let BootstrapDeploy {
+        write_client,
+        deployer_key,
+        code,
+        timestamp,
+        read_client,
+        env_uri,
+        service_name,
+    } = deploy;
+
     let mut last_error = None;
 
     for attempt in 1..=config.max_deploy_attempts {

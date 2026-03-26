@@ -13,8 +13,12 @@ pub struct DeployStatus {
     pub found: bool,
     /// Block hash containing the deploy (if found)
     pub block_hash: Option<String>,
+    /// Block number containing the deploy (if found)
+    pub block_number: Option<u64>,
     /// Whether the block is finalized
     pub finalized: bool,
+    /// Whether the deploy execution errored (null if not yet known)
+    pub errored: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -38,35 +42,31 @@ impl ServiceApi {
     ) -> poem::Result<Json<DeployStatus>> {
         let deploy_id_typed = deploy_id.into();
 
-        // Check if deploy is in a block
-        let block_hash = match read_client.find_deploy(&deploy_id_typed).await {
-            Ok(Some(hash)) => hash,
-            Ok(None) => {
+        // Check if deploy is in a block and get deploy info
+        let info = match read_client.find_deploy_info(&deploy_id_typed).await {
+            Ok(Some(info)) => info,
+            Ok(None) | Err(_) => {
                 return Ok(Json(DeployStatus {
                     found: false,
                     block_hash: None,
+                    block_number: None,
                     finalized: false,
-                }));
-            }
-            Err(_) => {
-                return Ok(Json(DeployStatus {
-                    found: false,
-                    block_hash: None,
-                    finalized: false,
+                    errored: None,
                 }));
             }
         };
 
-        // Check if block is finalized
         let finalized = read_client
-            .is_finalized(&block_hash)
+            .is_finalized(&info.block_hash)
             .await
             .unwrap_or(false);
 
         Ok(Json(DeployStatus {
             found: true,
-            block_hash: Some(block_hash),
+            block_hash: Some(info.block_hash),
+            block_number: Some(info.block_number),
             finalized,
+            errored: Some(info.errored),
         }))
     }
 }
