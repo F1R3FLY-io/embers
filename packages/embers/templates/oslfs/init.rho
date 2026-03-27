@@ -6,7 +6,7 @@
 {%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
-    revAddress(`rho:rev:address`),
+    vaultAddress(`rho:vault:address`),
     devNull(`rho:io:devNull`),
     abort(`rho:execution:abort`),
     deployData(`rho:deploy:data`),
@@ -59,7 +59,7 @@ in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
-                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+                vaultAddress!("fromDeployerId", deployerId, *deployerAddressCh)
             } |
 
             for(@address <- deployerAddressCh) {
@@ -197,7 +197,7 @@ in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
-                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+                vaultAddress!("fromDeployerId", deployerId, *deployerAddressCh)
             } |
 
             for(@address <- deployerAddressCh) {
@@ -237,7 +237,7 @@ in {
             deployData!(*deployDataCh) |
 
             for(_, @deployerId, _ <- deployDataCh) {
-                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+                vaultAddress!("fromDeployerId", deployerId, *deployerAddressCh)
             } |
 
             for(@address <- deployerAddressCh) {

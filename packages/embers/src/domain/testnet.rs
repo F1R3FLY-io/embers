@@ -1,6 +1,6 @@
-use anyhow::Context;
+use firefly_client::bootstrap::{BootstrapConfig, BootstrapDeploy, deploy_and_await};
 use firefly_client::helpers::insert_signed_signature;
-use firefly_client::models::{DeployData, Uri};
+use firefly_client::models::Uri;
 use firefly_client::rendering::Render;
 use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
@@ -37,6 +37,7 @@ impl TestnetService {
         observer_node_events: NodeEvents,
         deployer_key: SecretKey,
         env_key: &SecretKey,
+        bootstrap_config: &BootstrapConfig,
     ) -> anyhow::Result<Self> {
         let secp = Secp256k1::new();
         let env_public_key = PublicKey::from_secret_key(&secp, env_key);
@@ -57,12 +58,19 @@ impl TestnetService {
 
         tracing::debug!("code = {code}");
 
-        let deploy_data = DeployData::builder(code).timestamp(timestamp).build();
-
-        write_client
-            .deploy(&deployer_key, deploy_data)
-            .await
-            .context("failed to deploy testnet env")?;
+        deploy_and_await(
+            BootstrapDeploy {
+                write_client: &mut write_client,
+                deployer_key: &deployer_key,
+                code,
+                timestamp,
+                read_client: &read_client,
+                env_uri: env_uri.as_ref(),
+                service_name: "testnet",
+            },
+            bootstrap_config,
+        )
+        .await?;
 
         Ok(Self {
             uri: env_uri,

@@ -1,5 +1,6 @@
+use anyhow::bail;
 use chrono::{DateTime, Utc};
-use firefly_client::models::{DeployId, SignedCode, Uri};
+use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
 use uuid::Uuid;
 
@@ -31,10 +32,30 @@ impl AgentsTeamsService {
     )]
     pub async fn prepare_save_contract(
         &self,
+        address: WalletAddress,
         id: String,
         request: SaveReq,
+        valid_after: Option<u64>,
     ) -> anyhow::Result<SaveResp> {
         record_trace!(id, request);
+
+        // Verify team exists before generating contract.
+        // Retries because explore-deploy on observer may lag behind finalized state.
+        let mut team_found = false;
+        for attempt in 1..=self.observer_sync.max_attempts {
+            if let Ok(teams) = self.list(address.clone()).await {
+                if teams.agents_teams.iter().any(|t| t.id == id) {
+                    team_found = true;
+                    break;
+                }
+            }
+            if attempt < self.observer_sync.max_attempts {
+                tokio::time::sleep(self.observer_sync.interval).await;
+            }
+        }
+        if !team_found {
+            bail!("agents team {id} not visible on observer");
+        }
 
         let version = Uuid::now_v7();
 
@@ -51,7 +72,12 @@ impl AgentsTeamsService {
         }
         .render()?;
 
-        let valid_after = self.write_client.clone().get_head_block_index().await?;
+        // Use client-provided block number if available, otherwise fall back to validator head
+        let valid_after = match valid_after {
+            Some(n) => n,
+            None => self.write_client.clone().get_head_block_index().await?,
+        };
+
         Ok(SaveResp {
             version: version.into(),
             contract: prepare_for_signing()
@@ -74,7 +100,6 @@ impl AgentsTeamsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
-        write_client.propose().await?;
         Ok(deploy_id)
     }
 }

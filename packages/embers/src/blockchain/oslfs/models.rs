@@ -11,6 +11,7 @@ pub struct OslfHeader {
     pub version: String,
     pub created_at: DateTime,
     pub name: String,
+    #[serde(default)]
     pub description: Option<String>,
 }
 
@@ -21,6 +22,8 @@ pub struct Oslf {
     pub version: String,
     pub created_at: DateTime,
     pub name: String,
+    #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
     pub query: Option<String>,
 }

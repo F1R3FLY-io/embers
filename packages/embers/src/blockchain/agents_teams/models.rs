@@ -15,13 +15,19 @@ pub struct AgentsTeams {
 #[convert(into(models::AgentsTeamHeader))]
 pub struct AgentsTeamHeader {
     pub id: String,
+    #[serde(default)]
     pub version: String,
     pub created_at: DateTime,
+    #[serde(default)]
     pub last_deploy: Option<DateTime>,
+    #[serde(default)]
     pub uri: Option<Uri>,
     pub name: String,
+    #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
     pub shard: Option<String>,
+    #[serde(default)]
     pub logo: Option<String>,
 }
 
@@ -34,6 +40,17 @@ impl<'de> Deserialize<'de> for Graph {
         D: serde::Deserializer<'de>,
     {
         let graphl = String::deserialize(deserializer)?;
+        tracing::debug!(
+            "graphl raw (first 200): {}",
+            &graphl[..graphl.len().min(200)]
+        );
+        // Rholang string storage adds escape sequences for quotes.
+        // Unescape: \" -> " and \\ -> \
+        let graphl = graphl.replace("\\\"", "\"").replace("\\\\", "\\");
+        tracing::debug!(
+            "graphl unescaped (first 200): {}",
+            &graphl[..graphl.len().min(200)]
+        );
         models::Graph::new(graphl)
             .map(Self)
             .map_err(de::Error::custom)
@@ -44,14 +61,21 @@ impl<'de> Deserialize<'de> for Graph {
 #[convert(into(models::AgentsTeam))]
 pub struct AgentsTeam {
     pub id: String,
+    #[serde(default)]
     pub version: String,
     pub created_at: DateTime,
+    #[serde(default)]
     pub last_deploy: Option<DateTime>,
+    #[serde(default)]
     pub uri: Option<Uri>,
     pub name: String,
+    #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
     pub shard: Option<String>,
+    #[serde(default)]
     pub logo: Option<String>,
+    #[serde(default)]
     pub graph: Option<Graph>,
 }
 

@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use anyhow::Context;
+use firefly_client::bootstrap::BootstrapConfig;
 use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
 use poem::listener::TcpListener;
 use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
@@ -42,7 +45,20 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    let bootstrap_config = BootstrapConfig {
+        finalization_timeout: Duration::from_secs(config.bootstrap_timeout_secs),
+        ..Default::default()
+    };
+
+    let observer_sync_config = crate::domain::common::ObserverSyncConfig {
+        max_attempts: config.observer_sync_attempts,
+        interval: Duration::from_secs(config.observer_sync_interval_secs),
+        finalization_timeout: Duration::from_secs(config.deploy_finalization_timeout_secs),
+        read_after_finalize_attempts: config.read_after_finalize_attempts,
+    };
+
     let read_client = ReadNodeClient::new(config.mainnet.observer_url);
+    let api_read_client = read_client.clone();
     let validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
     let observer_node_events = NodeEvents::new(&config.mainnet.observer_ws_api_url);
 
@@ -53,17 +69,14 @@ async fn main() -> anyhow::Result<()> {
     let ((agents_service, agents_teams_service, oslfs_service, wallets_service), testnet_service) =
         try_join!(
             async {
-                let mut write_client = WriteNodeClient::new(
-                    config.mainnet.deploy_service_url,
-                    config.mainnet.propose_service_url,
-                )
-                .await?;
+                let write_client = WriteNodeClient::new(config.mainnet.deploy_service_url).await?;
 
                 let agents_service = AgentsService::bootstrap(
                     write_client.clone(),
                     read_client.clone(),
                     &config.mainnet.service_key,
                     &config.mainnet.agents_env_key,
+                    &bootstrap_config,
                 )
                 .await?;
 
@@ -74,6 +87,8 @@ async fn main() -> anyhow::Result<()> {
                     &config.mainnet.service_key,
                     &config.mainnet.agents_teams_env_key,
                     config.aes_encryption_key.into(),
+                    &bootstrap_config,
+                    &observer_sync_config,
                 )
                 .await?;
 
@@ -82,6 +97,7 @@ async fn main() -> anyhow::Result<()> {
                     read_client.clone(),
                     &config.mainnet.service_key,
                     &config.mainnet.oslfs_env_key,
+                    &bootstrap_config,
                 )
                 .await?;
 
@@ -92,10 +108,9 @@ async fn main() -> anyhow::Result<()> {
                     observer_node_events,
                     &config.mainnet.service_key,
                     &config.mainnet.wallets_env_key,
+                    &bootstrap_config,
                 )
                 .await?;
-
-                write_client.propose().await?;
 
                 anyhow::Ok((
                     agents_service,
@@ -105,11 +120,8 @@ async fn main() -> anyhow::Result<()> {
                 ))
             },
             async {
-                let mut testnet_write_client = WriteNodeClient::new(
-                    config.testnet.deploy_service_url,
-                    config.testnet.propose_service_url,
-                )
-                .await?;
+                let testnet_write_client =
+                    WriteNodeClient::new(config.testnet.deploy_service_url).await?;
 
                 let testnet_service = TestnetService::bootstrap(
                     testnet_write_client.clone(),
@@ -117,10 +129,9 @@ async fn main() -> anyhow::Result<()> {
                     testnet_observer_node_events,
                     config.testnet.service_key,
                     &config.testnet.env_key,
+                    &bootstrap_config,
                 )
                 .await?;
-
-                testnet_write_client.propose().await?;
 
                 anyhow::Ok(testnet_service)
             },
@@ -153,6 +164,7 @@ async fn main() -> anyhow::Result<()> {
         .nest("/swagger-ui/openapi.yaml", spec_yaml)
         .data(jsonwebtoken::EncodingKey::from_secret(secret.as_ref()))
         .data(jsonwebtoken::DecodingKey::from_secret(secret.as_ref()))
+        .data(api_read_client)
         .data(agents_service)
         .data(agents_teams_service)
         .data(oslfs_service)

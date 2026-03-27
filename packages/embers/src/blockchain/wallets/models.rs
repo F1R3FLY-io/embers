@@ -13,6 +13,7 @@ pub struct TransferRecord {
     pub from: String,
     pub to: String,
     pub amount: i64,
+    #[serde(default)]
     pub description: Option<String>,
 }
 
@@ -23,8 +24,10 @@ pub struct BoostRecord {
     pub from: String,
     pub to: String,
     pub amount: i64,
+    #[serde(default)]
     pub description: Option<String>,
     pub post_author_did: String,
+    #[serde(default)]
     pub post_id: Option<String>,
 }
 

@@ -11,7 +11,15 @@ use tokio_tungstenite::tungstenite::Message;
 use tracing::Instrument;
 use uuid::Uuid;
 
-use crate::models::{BlockEventDeploy, DeployId, NodeEvent, WalletAddress};
+use crate::models::{
+    DeployId,
+    F1r3flyEvent,
+    NodeDeployEvent,
+    WalletAddress,
+    deploy_event_id,
+    deploy_event_wallet_address,
+    event_deploys,
+};
 
 #[derive(Debug, Clone)]
 pub enum DeployEvent {
@@ -23,19 +31,22 @@ pub enum DeployEvent {
 }
 
 type DeploySubscriptions = Arc<DashMap<DeployId, DashMap<Uuid, Arc<Notify>>>>;
+type DeployErrors = Arc<DashMap<DeployId, bool>>;
 type WalletSubscriptions = Arc<DashMap<WalletAddress, broadcast::Sender<DeployEvent>>>;
 
 #[derive(Clone)]
 pub struct NodeEvents {
     deploy_subscriptions: DeploySubscriptions,
+    deploy_errors: DeployErrors,
     wallet_subscriptions: WalletSubscriptions,
 }
 
 impl NodeEvents {
     pub fn new(url: &str) -> Self {
         let url = format!("{url}/ws/events");
-        let tx = broadcast::Sender::<NodeEvent>::new(32);
+        let tx = broadcast::Sender::<F1r3flyEvent>::new(32);
         let deploy_subscriptions = DeploySubscriptions::default();
+        let deploy_errors = DeployErrors::default();
         let wallet_subscriptions = WalletSubscriptions::default();
 
         tokio::spawn({
@@ -63,13 +74,46 @@ impl NodeEvents {
                             }
                         };
 
-                        let event = match serde_json::from_str(&buff) {
-                            Ok(event) => event,
+                        let mut envelope: serde_json::Value = match serde_json::from_str(&buff) {
+                            Ok(v) => v,
                             Err(err) => {
-                                tracing::debug!("serde ws error: {err:?}");
+                                tracing::warn!("ws json parse error: {err:?}");
                                 continue;
                             }
                         };
+
+                        // The node sends events wrapped in an envelope:
+                        //   {"event": "block-finalised", "schema-version": 1, "payload": {...}}
+                        // F1r3flyEvent expects fields at the top level (internally tagged):
+                        //   {"event": "block-finalised", "block-hash": "...", "deploys": [...]}
+                        // Unwrap: merge payload fields into the top-level object.
+                        if let Some(payload) = envelope.get("payload").cloned() {
+                            if let (Some(top), Some(inner)) =
+                                (envelope.as_object_mut(), payload.as_object())
+                            {
+                                for (k, v) in inner {
+                                    top.insert(k.clone(), v.clone());
+                                }
+                                top.remove("payload");
+                                top.remove("schema-version");
+                            }
+                        }
+
+                        let event: F1r3flyEvent = match serde_json::from_value(envelope) {
+                            Ok(event) => event,
+                            Err(err) => {
+                                tracing::warn!("serde ws event error: {err:?}");
+                                continue;
+                            }
+                        };
+
+                        if let Some(deploys) = event_deploys(event.clone()) {
+                            tracing::info!(
+                                "ws block event with {} deploys: {:?}",
+                                deploys.len(),
+                                deploys.iter().map(|d| &d.id).collect::<Vec<_>>()
+                            );
+                        }
 
                         let _ = tx.send(event);
                     }
@@ -81,30 +125,33 @@ impl NodeEvents {
         tokio::spawn({
             let mut rx = tx.subscribe();
             let deploy_subscriptions = deploy_subscriptions.clone();
+            let deploy_errors = deploy_errors.clone();
             let wallet_subscriptions = wallet_subscriptions.clone();
             async move {
                 loop {
                     let deploys = match rx.recv().await {
-                        Ok(NodeEvent::Started) => continue,
-                        Ok(NodeEvent::BlockAdded { .. }) => continue,
-                        Ok(NodeEvent::BlockCreated { .. }) => continue,
-                        Ok(NodeEvent::BlockFinalised { payload }) => payload.deploys,
+                        Ok(event) => match event_deploys(event) {
+                            Some(deploys) => deploys,
+                            None => continue,
+                        },
                         Err(broadcast::error::RecvError::Closed) => return,
                         Err(broadcast::error::RecvError::Lagged(_)) => continue,
                     };
 
                     for deploy in deploys {
+                        let did = deploy_event_id(&deploy);
+                        deploy_errors.insert(did.clone(), deploy.errored);
                         deploy_subscriptions
-                            .remove(&deploy.id)
+                            .remove(&did)
                             .map(|(_, waiters)| waiters)
                             .into_iter()
                             .flatten()
                             .for_each(|(_, w)| w.notify_waiters());
 
-                        if let Some(subscription) =
-                            wallet_subscriptions.get(&deploy.deployer.into())
-                        {
-                            let _ = subscription.send(deploy.into());
+                        if let Some(wallet_addr) = deploy_event_wallet_address(&deploy) {
+                            if let Some(subscription) = wallet_subscriptions.get(&wallet_addr) {
+                                let _ = subscription.send(deploy.into());
+                            }
                         }
                     }
                 }
@@ -114,6 +161,7 @@ impl NodeEvents {
 
         Self {
             deploy_subscriptions,
+            deploy_errors,
             wallet_subscriptions,
         }
     }
@@ -154,6 +202,12 @@ impl NodeEvents {
         }
     }
 
+    /// Check if a finalized deploy had execution errors.
+    /// Returns None if the deploy hasn't been seen yet.
+    pub fn deploy_errored(&self, deploy_id: &DeployId) -> Option<bool> {
+        self.deploy_errors.get(deploy_id).map(|v| *v)
+    }
+
     pub fn subscribe_for_deploys(&self, wallet_address: WalletAddress) -> WalletSubscription {
         let tx = self
             .wallet_subscriptions
@@ -168,11 +222,11 @@ impl NodeEvents {
     }
 }
 
-impl From<BlockEventDeploy> for DeployEvent {
-    fn from(value: BlockEventDeploy) -> Self {
+impl From<NodeDeployEvent> for DeployEvent {
+    fn from(value: NodeDeployEvent) -> Self {
         Self::Finalized {
-            id: value.id,
-            cost: value.cost,
+            id: DeployId::from(value.id),
+            cost: value.cost as u64,
             errored: value.errored,
         }
     }

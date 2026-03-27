@@ -1,3 +1,4 @@
+pub mod bootstrap;
 mod communication_service;
 pub mod errors;
 pub mod helpers;
@@ -9,5 +10,5 @@ mod write_node_client;
 
 pub use communication_service::CommunicationService;
 pub use node_events::NodeEvents;
-pub use read_node_client::ReadNodeClient;
+pub use read_node_client::{DeployInfo, ReadNodeClient};
 pub use write_node_client::WriteNodeClient;
