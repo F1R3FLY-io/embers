@@ -11,7 +11,7 @@ use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use contracts::{rho_init_events_channels, rho_subscribe_to_service, rho_unsubscribe_from_service};
 use firefly_client::CommunicationService;
-use firefly_client::models::{BlockId, DeployData};
+use firefly_client::models::{BlockId, DeployData, DeployId};
 use futures::stream::select_all;
 use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, future};
 use secp256k1::SecretKey;
@@ -33,10 +33,6 @@ struct Args {
     /// Firefly deploy service url
     #[arg(long)]
     deploy_service_url: String,
-
-    /// Firefly propose service url
-    #[arg(long)]
-    propose_service_url: String,
 
     /// Globally unique service identifier
     #[arg(long)]
@@ -91,7 +87,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut client =
-        firefly_client::WriteNodeClient::new(args.deploy_service_url, args.propose_service_url)
+        firefly_client::WriteNodeClient::new(args.deploy_service_url)
             .await
             .context("failed to create firefly client")?;
 
@@ -179,16 +175,16 @@ async fn main() -> anyhow::Result<()> {
                     println!("events: {}", events.len());
                     let rho_code = rho_save_events(channel_name, &events)?;
                     let deploy_data = DeployData::builder(rho_code).build();
-                    let hash = client
+                    let deploy_id = client
                         .full_deploy(&args.wallet_key, deploy_data)
                         .await
                         .context("failed save events")?;
-                    println!("events deployed");
+                    println!("events deployed: {deploy_id}");
 
                     let rho_code = rho_notify_listeners(
                         &args.service_id,
                         &NotifyMsg {
-                            block_hash: hash,
+                            deploy_id,
                             channel_name: channel_name.to_string(),
                         },
                     );
@@ -211,11 +207,11 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init => {
             let rho_code = rho_init_events_channels(&args.service_id);
             let deploy_data = DeployData::builder(rho_code).build();
-            let hash = client
+            let deploy_id = client
                 .full_deploy(&args.wallet_key, deploy_data)
                 .await
                 .context("failed to init channels")?;
-            println!("{hash}");
+            println!("{deploy_id}");
         }
     }
 
@@ -249,7 +245,7 @@ struct Entry {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NotifyMsg {
-    block_hash: BlockId,
+    deploy_id: DeployId,
     channel_name: String,
 }
 
@@ -373,8 +369,11 @@ async fn subscribe_to_firefly(
 
     Ok(async_stream::stream! {
         while let Some(event) = rx_updates.recv().await {
+            // NOTE: With auto-propose, deploy_id is no longer a valid block hash.
+            // events-sync needs redesign to obtain the block hash from NodeEvents.
+            let block_hash: BlockId = Into::<String>::into(event.deploy_id).into();
             let bytes: Vec<u8> = client
-                .get_channel_value(event.block_hash, event.channel_name)
+                .get_channel_value(block_hash, event.channel_name)
                 .await
                 .context("failed to get events")?;
 

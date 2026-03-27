@@ -19,6 +19,7 @@ crc                   = { version = "3.4" }
 dashmap               = { version = "6.1" }
 derive_more           = { version = "2.1", features = ["full"] }
 digest                = { version = "0.10" }
+f1r3node-models       = { package = "models", path = "../../../f1r3node/models" }
 firefly-client-macros = { path = "../firefly-client-macros" }
 futures               = { version = "0.3" }
 hex                   = { version = "0.4" }
@@ -30,7 +31,7 @@ serde                 = { version = "1.0", features = ["derive"] }
 serde_json            = { version = "1.0" }
 sha3                  = { version = "0.10" }
 thiserror             = { version = "2.0" }
-tokio                 = { version = "1.49" }
+tokio                 = { version = "1.49", features = ["time"] }
 tokio-stream          = { version = "0.1", features = ["sync"] }
 tokio-tungstenite     = { version = "0.28" }
 tonic                 = { version = "0.14" }
@@ -38,9 +39,6 @@ tonic-prost           = { version = "0.14" }
 tracing               = { version = "0.1" }
 uuid                  = { version = "1.20", features = ["v7"] }
 zbase32               = { version = "0.1" }
-
-[build-dependencies]
-tonic-prost-build = { version = "0.14" }
 
 [lints.clippy]
 cast_possible_wrap    = "allow"

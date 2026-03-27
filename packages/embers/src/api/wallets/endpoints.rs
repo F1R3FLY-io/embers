@@ -113,8 +113,7 @@ impl WalletsApi {
                 let msg = DeployEvent::from(msg).to_json_string();
                 future::ok(websocket::Message::Text(msg))
             });
-            wallets.subscribe_to_deploys(address.0, sink);
-            future::ready(())
+            wallets.subscribe_to_deploys(address.0, sink)
         })
         .boxed()
     }

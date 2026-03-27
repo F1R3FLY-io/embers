@@ -29,12 +29,13 @@ impl AgentsService {
             address,
         }
         .render()?;
-        self.read_client
-            .get_data(code)
-            .await
-            .map(|agents: Vec<models::AgentHeader>| Agents {
-                agents: agents.into_iter().map(Into::into).collect(),
-            })
-            .map_err(Into::into)
+        let agents: Vec<models::AgentHeader> = self
+            .read_client
+            .get_data_or_none(code)
+            .await?
+            .unwrap_or_default();
+        Ok(Agents {
+            agents: agents.into_iter().map(Into::into).collect(),
+        })
     }
 }

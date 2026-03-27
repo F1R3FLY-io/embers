@@ -33,7 +33,6 @@ impl TestnetService {
 
         let mut write_client = self.write_client.clone();
         write_client.deploy(&self.service_key, deploy_data).await?;
-        write_client.propose().await?;
 
         Ok(CreateTestwalletResp {
             key: test_account_secret_key,

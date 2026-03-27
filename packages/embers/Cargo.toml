@@ -12,6 +12,7 @@ path = "src/generate_schema.rs"
 name = "embers"
 path = "src/main.rs"
 
+
 [dependencies]
 aes-gcm            = { version = "0.10", features = ["std", "zeroize"] }
 anyhow             = { version = "1.0", features = ["std"] }

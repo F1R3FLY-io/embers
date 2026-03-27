@@ -43,8 +43,6 @@ impl AgentsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
-        write_client.propose().await?;
-
         Ok(deploy_id)
     }
 }

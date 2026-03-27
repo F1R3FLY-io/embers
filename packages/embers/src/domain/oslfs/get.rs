@@ -39,7 +39,7 @@ impl OslfsService {
         }
         .render()?;
 
-        let oslf: Option<models::Oslf> = self.read_client.get_data(code).await?;
+        let oslf: Option<models::Oslf> = self.read_client.get_data_or_none(code).await?.flatten();
         Ok(oslf.map(Into::into))
     }
 }

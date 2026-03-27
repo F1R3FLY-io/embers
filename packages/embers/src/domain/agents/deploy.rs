@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, Uri};
@@ -35,12 +37,17 @@ impl AgentsService {
                 address,
                 phlo_limit,
             } => {
-                let code = self
-                    .get(address, id.clone(), version.clone())
+                let agent = self
+                    .get_with_retry(
+                        address,
+                        id.clone(),
+                        version.clone(),
+                        30,
+                        Duration::from_secs(1),
+                    )
                     .await?
-                    .context("agent not found")?
-                    .code
-                    .context("agent has no code")?;
+                    .context("agent not found")?;
+                let code = agent.code.context("agent has no code")?;
 
                 let system_code = UpdateLastDeploy {
                     env_uri: self.uri.clone(),
@@ -94,7 +101,6 @@ impl AgentsService {
             write_client.deploy_signed_contract(system).await?;
         }
 
-        write_client.propose().await?;
         Ok(deploy_id)
     }
 }

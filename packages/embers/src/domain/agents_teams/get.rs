@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
 
@@ -39,7 +41,42 @@ impl AgentsTeamsService {
         }
         .render()?;
 
-        let agents_team: Option<models::AgentsTeam> = self.read_client.get_data(code).await?;
+        let agents_team: Option<models::AgentsTeam> =
+            self.read_client.get_data_or_none(code).await?.flatten();
+        Ok(agents_team.map(Into::into))
+    }
+
+    /// Like `get`, but retries on empty explore-deploy results to handle observer tuplespace lag.
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        fields(address, id, version),
+        err(Debug),
+        ret(Debug, level = "trace")
+    )]
+    pub async fn get_with_retry(
+        &self,
+        address: WalletAddress,
+        id: String,
+        version: String,
+        max_retries: u32,
+        delay: Duration,
+    ) -> anyhow::Result<Option<AgentsTeam>> {
+        record_trace!(address, id, version);
+
+        let code = Get {
+            env_uri: self.uri.clone(),
+            address,
+            id,
+            version,
+        }
+        .render()?;
+
+        let agents_team: Option<models::AgentsTeam> = self
+            .read_client
+            .get_data_or_none_with_retry(code, max_retries, delay)
+            .await?
+            .flatten();
         Ok(agents_team.map(Into::into))
     }
 }

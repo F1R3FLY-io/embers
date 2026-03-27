@@ -9,7 +9,7 @@ use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
 use firefly_client::helpers::FromExpr;
 use firefly_client::models::rhoapi::expr::ExprInstance;
-use firefly_client::models::{BlockId, DeployData};
+use firefly_client::models::{BlockId, DeployData, DeployId};
 use secp256k1::SecretKey;
 use serde::{Deserialize, Serialize};
 use tokio::select;
@@ -24,10 +24,6 @@ struct Args {
     /// Firefly deploy service url
     #[arg(long)]
     deploy_service_url: String,
-
-    /// Firefly propose service url
-    #[arg(long)]
-    propose_service_url: String,
 
     /// Globally unique service identifier
     #[arg(long)]
@@ -66,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
     let mut client =
-        firefly_client::WriteNodeClient::new(args.deploy_service_url, args.propose_service_url)
+        firefly_client::WriteNodeClient::new(args.deploy_service_url)
             .await?;
 
     match args.command {
@@ -86,24 +82,24 @@ async fn main() -> anyhow::Result<()> {
 
                 let rho_code = rho_sql_dump_template(channel_name, sql);
                 let deploy_data = DeployData::builder(rho_code).build();
-                let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
-                println!("dump hash: {hash}");
+                let deploy_id = client.full_deploy(&args.wallet_key, deploy_data).await?;
+                println!("dump deploy_id: {deploy_id}");
 
                 let rho_code = rho_save_hash_template(
                     &args.service_id,
                     &ServiceHash {
-                        block_hash: hash,
+                        deploy_id,
                         channel_name,
                     },
                 );
                 let deploy_data = DeployData::builder(rho_code).build();
-                let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
-                println!("save hash: {hash}");
+                let deploy_id = client.full_deploy(&args.wallet_key, deploy_data).await?;
+                println!("save deploy_id: {deploy_id}");
             }
         }
         Commands::Download { hash } => {
             let entries: Vec<ServiceHash> = client
-                .get_channel_value(hash, format!("{}-hashes", args.service_id))
+                .get_channel_value(hash.clone(), format!("{}-hashes", args.service_id))
                 .await?;
 
             let Some(entry) = entries.into_iter().next_back() else {
@@ -111,7 +107,7 @@ async fn main() -> anyhow::Result<()> {
             };
 
             let sql: String = client
-                .get_channel_value(entry.block_hash, entry.channel_name.to_string())
+                .get_channel_value(hash, entry.channel_name.to_string())
                 .await?;
             let sql = BASE64_STANDARD.decode(sql)?;
             let sql = String::from_utf8(sql)?;
@@ -120,8 +116,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init => {
             let rho_code = rho_save_hash_contract(&args.service_id);
             let deploy_data = DeployData::builder(rho_code).build();
-            let hash = client.full_deploy(&args.wallet_key, deploy_data).await?;
-            println!("{hash}");
+            let deploy_id = client.full_deploy(&args.wallet_key, deploy_data).await?;
+            println!("{deploy_id}");
         }
     }
 
@@ -155,7 +151,7 @@ fn rho_save_hash_contract(service_id: &str) -> String {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ServiceHash {
-    block_hash: BlockId,
+    deploy_id: DeployId,
     channel_name: Uuid,
 }
 
@@ -163,14 +159,14 @@ impl FromExpr for ServiceHash {
     fn from(val: ExprInstance) -> anyhow::Result<Self> {
         let mut map: HashMap<String, String> = FromExpr::from(val)?;
 
-        let block_hash = map.remove("block_hash").context("block_hash is missing")?;
+        let deploy_id = map.remove("deploy_id").context("deploy_id is missing")?;
         let channel_name = map
             .remove("channel_name")
             .context("channel_name is missing")?;
         let channel_name: Uuid = channel_name.parse()?;
 
         Ok(Self {
-            block_hash: block_hash.into(),
+            deploy_id: deploy_id.into(),
             channel_name,
         })
     }

@@ -37,7 +37,7 @@ impl AgentsTeamsService {
         .render()?;
 
         let agents_teams: Option<Vec<models::AgentsTeamHeader>> =
-            self.read_client.get_data(code).await?;
+            self.read_client.get_data_or_none(code).await?.flatten();
         Ok(agents_teams.map(|mut agents_teams| {
             agents_teams.sort_by(|l, r| l.version.cmp(&r.version));
             AgentsTeams {

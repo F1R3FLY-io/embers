@@ -36,7 +36,8 @@ impl OslfsService {
         }
         .render()?;
 
-        let oslfs: Option<Vec<models::OslfHeader>> = self.read_client.get_data(code).await?;
+        let oslfs: Option<Vec<models::OslfHeader>> =
+            self.read_client.get_data_or_none(code).await?.flatten();
         Ok(oslfs.map(|mut oslfs| {
             oslfs.sort_by(|l, r| l.version.cmp(&r.version));
             Oslfs {

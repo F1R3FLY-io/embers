@@ -29,12 +29,13 @@ impl OslfsService {
             address,
         }
         .render()?;
-        self.read_client
-            .get_data(code)
-            .await
-            .map(|oslfs: Vec<models::OslfHeader>| Oslfs {
-                oslfs: oslfs.into_iter().map(Into::into).collect(),
-            })
-            .map_err(Into::into)
+        let oslfs: Vec<models::OslfHeader> = self
+            .read_client
+            .get_data_or_none(code)
+            .await?
+            .unwrap_or_default();
+        Ok(Oslfs {
+            oslfs: oslfs.into_iter().map(Into::into).collect(),
+        })
     }
 }

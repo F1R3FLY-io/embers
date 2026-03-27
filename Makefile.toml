@@ -34,33 +34,23 @@ toolchain     = "nightly"
 workspace     = false
 
 [tasks.docker-up]
-args = [
-    "compose",
-    "--file",
-    "docker/docker-compose.yaml",
-    "--project-name",
-    "embers",
-    "${@}",
-    "up",
-    "--build",
-    "--force-recreate",
-    "--detach",
-    "--wait",
-]
-command = "docker"
+script = '''
+COMPOSE_FILES="--file docker/docker-compose.yaml"
+if [ -f docker/docker-compose.override.yaml ]; then
+    COMPOSE_FILES="$COMPOSE_FILES --file docker/docker-compose.override.yaml"
+fi
+docker compose $COMPOSE_FILES --project-name embers "$@" up --build --force-recreate --detach --wait
+'''
 workspace = false
 
 [tasks.docker-down]
-args = [
-    "compose",
-    "--file",
-    "docker/docker-compose.yaml",
-    "--project-name",
-    "embers",
-    "${@}",
-    "down",
-]
-command = "docker"
+script = '''
+COMPOSE_FILES="--file docker/docker-compose.yaml"
+if [ -f docker/docker-compose.override.yaml ]; then
+    COMPOSE_FILES="$COMPOSE_FILES --file docker/docker-compose.override.yaml"
+fi
+docker compose $COMPOSE_FILES --project-name embers "$@" down
+'''
 workspace = false
 
 [tasks.embers]

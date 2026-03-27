@@ -7,7 +7,6 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Deserialize)]
 pub struct MainNet {
     pub deploy_service_url: String,
-    pub propose_service_url: String,
     pub validator_ws_api_url: String,
     pub observer_url: String,
     pub observer_ws_api_url: String,
@@ -21,7 +20,6 @@ pub struct MainNet {
 #[derive(Debug, Clone, Deserialize)]
 pub struct TestNet {
     pub deploy_service_url: String,
-    pub propose_service_url: String,
     pub validator_ws_api_url: String,
     pub observer_url: String,
     pub observer_ws_api_url: String,

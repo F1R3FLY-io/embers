@@ -7,14 +7,12 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 
 use crate::helpers::FromExpr;
 use crate::models::casper::v1::deploy_service_client::DeployServiceClient;
-use crate::models::casper::v1::propose_service_client::ProposeServiceClient;
 use crate::models::casper::v1::{
     block_info_response,
     deploy_response,
-    propose_response,
     rho_data_response,
 };
-use crate::models::casper::{BlocksQuery, DataAtNameByBlockQuery, DeployDataProto, ProposeQuery};
+use crate::models::casper::{BlocksQuery, DataAtNameByBlockQuery, DeployDataProto};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
 use crate::models::{BlockId, DeployData, DeployId, SignedCode, ValidAfter};
@@ -22,25 +20,29 @@ use crate::models::{BlockId, DeployData, DeployId, SignedCode, ValidAfter};
 #[derive(Clone)]
 pub struct WriteNodeClient {
     deploy_client: DeployServiceClient<tonic::transport::Channel>,
-    propose_client: ProposeServiceClient<tonic::transport::Channel>,
+}
+
+/// Extract a deploy ID from the node's response string.
+/// The Scala node returns `"Success! DeployId is: <id>"` while the
+/// Rust node returns `"Success!\nDeployId is: <id>"`.
+fn extract_deploy_id(response: &str) -> anyhow::Result<DeployId> {
+    response
+        .strip_prefix("Success! DeployId is: ")
+        .or_else(|| response.strip_prefix("Success!\nDeployId is: "))
+        .map(|id| DeployId::from(id.to_owned()))
+        .context(format!("failed to extract deploy_id from response: {response:?}"))
 }
 
 impl WriteNodeClient {
     pub async fn new(
         deploy_service_url: String,
-        propose_service_url: String,
     ) -> anyhow::Result<Self> {
         let deploy_client = DeployServiceClient::connect(deploy_service_url)
             .await
             .context("failed to connect to deploy service")?;
 
-        let propose_client = ProposeServiceClient::connect(propose_service_url)
-            .await
-            .context("failed to connect to propose service")?;
-
         Ok(Self {
             deploy_client,
-            propose_client,
         })
     }
 
@@ -72,11 +74,11 @@ impl WriteNodeClient {
 
         let signature = secp.sign_ecdsa(Message::from_digest(hash.into()), key);
 
-        msg.sig = signature.serialize_der().to_vec();
+        msg.sig = signature.serialize_der().to_vec().into();
         msg.sig_algorithm = "secp256k1".into();
 
         let public_key = key.public_key(&secp);
-        msg.deployer = public_key.serialize_uncompressed().into();
+        msg.deployer = public_key.serialize_uncompressed().to_vec().into();
 
         let resp = self
             .deploy_client
@@ -86,17 +88,12 @@ impl WriteNodeClient {
             .message
             .context("missing do_deploy responce")?;
 
-        let deploy_id = match resp {
-            deploy_response::Message::Result(deploy_id) => deploy_id,
+        match resp {
+            deploy_response::Message::Result(msg) => extract_deploy_id(&msg),
             deploy_response::Message::Error(err) => {
-                return Err(anyhow!("do_deploy error: {err:?}"));
+                Err(anyhow!("do_deploy error: {err:?}"))
             }
-        };
-
-        deploy_id
-            .strip_prefix("Success! DeployId is: ")
-            .map(|id| DeployId::from(id.to_owned()))
-            .context("failed to extract deploy_id")
+        }
     }
 
     pub async fn deploy_signed_contract(
@@ -105,9 +102,9 @@ impl WriteNodeClient {
     ) -> anyhow::Result<DeployId> {
         let mut msg = DeployDataProto::decode(contract.contract.as_slice())?;
 
-        msg.sig = contract.sig;
+        msg.sig = contract.sig.into();
         msg.sig_algorithm = contract.sig_algorithm;
-        msg.deployer = contract.deployer;
+        msg.deployer = contract.deployer.into();
 
         let resp = self
             .deploy_client
@@ -117,48 +114,20 @@ impl WriteNodeClient {
             .message
             .context("missing do_deploy responce")?;
 
-        let deploy_id = match resp {
-            deploy_response::Message::Result(deploy_id) => deploy_id,
+        match resp {
+            deploy_response::Message::Result(msg) => extract_deploy_id(&msg),
             deploy_response::Message::Error(err) => {
-                return Err(anyhow!("do_deploy error: {err:?}"));
+                Err(anyhow!("do_deploy error: {err:?}"))
             }
-        };
-
-        deploy_id
-            .strip_prefix("Success! DeployId is: ")
-            .map(|id| DeployId::from(id.to_owned()))
-            .context("failed to extract deploy_id")
-    }
-
-    pub async fn propose(&mut self) -> anyhow::Result<BlockId> {
-        let resp = self
-            .propose_client
-            .propose(ProposeQuery { is_async: false })
-            .await
-            .context("propose grpc error")?
-            .into_inner()
-            .message
-            .context("missing propose responce")?;
-
-        let block_hash = match resp {
-            propose_response::Message::Result(block_hash) => block_hash,
-            propose_response::Message::Error(err) => return Err(anyhow!("propose error: {err:?}")),
-        };
-
-        block_hash
-            .strip_prefix("Success! Block ")
-            .and_then(|block_hash| block_hash.strip_suffix(" created and added."))
-            .map(|id| BlockId::from(id.to_owned()))
-            .context("failed to extract block hash")
+        }
     }
 
     pub async fn full_deploy(
         &mut self,
         key: &SecretKey,
         deploy_data: DeployData,
-    ) -> anyhow::Result<BlockId> {
-        self.deploy(key, deploy_data).await?;
-        self.propose().await
+    ) -> anyhow::Result<DeployId> {
+        self.deploy(key, deploy_data).await
     }
 
     pub async fn get_head_block_index(&mut self) -> anyhow::Result<u64> {

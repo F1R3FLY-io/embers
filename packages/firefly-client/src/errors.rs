@@ -8,4 +8,6 @@ pub enum ReadNodeError {
     Deserialization(anyhow::Error),
     #[error("http transport error: {0}")]
     Transport(#[from] reqwest::Error),
+    #[error("explore-deploy timed out after {0:?}")]
+    Timeout(std::time::Duration),
 }

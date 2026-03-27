@@ -15,33 +15,9 @@ use thiserror::Error;
 use crate::helpers::ShortHex;
 use crate::rendering::{IntoValue, Value};
 
-pub mod servicemodelapi {
-    #![allow(warnings)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
-    #![allow(clippy::nursery)]
-    tonic::include_proto!("servicemodelapi");
-}
-
-pub mod rhoapi {
-    #![allow(warnings)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
-    #![allow(clippy::nursery)]
-    tonic::include_proto!("rhoapi");
-}
-
-pub mod casper {
-    #![allow(warnings)]
-    #![allow(clippy::all)]
-    #![allow(clippy::pedantic)]
-    #![allow(clippy::nursery)]
-    tonic::include_proto!("casper");
-
-    pub mod v1 {
-        tonic::include_proto!("casper.v1");
-    }
-}
+pub use f1r3node_models::casper;
+pub use f1r3node_models::rhoapi;
+pub use f1r3node_models::servicemodelapi;
 
 #[derive(
     Debug,

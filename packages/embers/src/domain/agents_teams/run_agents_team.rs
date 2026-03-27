@@ -3,7 +3,6 @@ use std::time::Duration;
 use anyhow::anyhow;
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
-use futures::FutureExt;
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::models::{RunReq, RunResp};
@@ -69,16 +68,21 @@ impl AgentsTeamsService {
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
 
-        let deploy_waiter = self
+        let result = self
             .observer_node_events
-            .wait_for_deploy(&deploy_id, Duration::from_mins(1));
-        let (_, finalized) = tokio::try_join!(write_client.propose(), deploy_waiter.map(Ok))?;
+            .wait_for_deploy(&deploy_id, Duration::from_mins(1))
+            .await;
 
-        if !finalized {
-            return Err(anyhow!("block is not finalized"));
+        match result {
+            Some(true) => return Err(anyhow!("deploy {deploy_id} errored on chain")),
+            None => return Err(anyhow!("block is not finalized")),
+            Some(false) => {}
         }
 
         let code = GetAgentsTeamResult { deploy_id }.render()?;
-        self.read_client.get_data(code).await.map_err(Into::into)
+        self.read_client
+            .get_data_with_retry(code, 5, Duration::from_millis(500))
+            .await
+            .map_err(Into::into)
     }
 }

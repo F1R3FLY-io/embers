@@ -72,8 +72,6 @@ impl TestnetService {
                     error: err.to_string(),
                 });
             }
-
-            write_client.propose().await?;
         }
 
         let result = write_client.deploy_signed_contract(request.test).await;
@@ -86,14 +84,15 @@ impl TestnetService {
             }
         };
 
-        let deploy_waiter = self
+        let result = self
             .observer_node_events
-            .wait_for_deploy(&deploy_id, Duration::from_mins(1));
-        let (_, finalized) =
-            tokio::try_join!(write_client.propose(), async { Ok(deploy_waiter.await) })?;
+            .wait_for_deploy(&deploy_id, Duration::from_mins(1))
+            .await;
 
-        if !finalized {
-            return Err(anyhow!("block is not finalized"));
+        match result {
+            Some(true) => return Err(anyhow!("deploy {deploy_id} errored on chain")),
+            None => return Err(anyhow!("block is not finalized")),
+            Some(false) => {}
         }
 
         let code = GetLogs {
