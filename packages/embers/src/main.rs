@@ -96,6 +96,14 @@ async fn main() -> anyhow::Result<()> {
                 )
                 .await?;
 
+                tracing::info!(
+                    agents = %agents_deploy_id,
+                    agents_teams = %agents_teams_deploy_id,
+                    oslfs = %oslfs_deploy_id,
+                    wallets = %wallets_deploy_id,
+                    "mainnet init deploys submitted, waiting for finalization"
+                );
+
                 let init_timeout = Duration::from_secs(60);
                 let agents_waiter =
                     validator_node_events.wait_for_deploy(&agents_deploy_id, init_timeout);
@@ -152,6 +160,8 @@ async fn main() -> anyhow::Result<()> {
                     &config.testnet.env_key,
                 )
                 .await?;
+
+                tracing::info!(deploy_id = %testnet_deploy_id, "testnet init deploy submitted");
 
                 let testnet_waiter = testnet_observer_node_events
                     .wait_for_deploy(&testnet_deploy_id, Duration::from_secs(60));

@@ -26,6 +26,8 @@ services:
       - --no-upnp
       - --allow-private-addresses
       - --synchrony-constraint-threshold=0.0
+      - --heartbeat-enabled
+      - --fault-tolerance-threshold=0.0
       - --protocol-port=40400
       - --discovery-port=40404
       - --tls-key-path=/var/lib/rnode/node.key.pem
@@ -78,6 +80,8 @@ services:
       - --no-upnp
       - --allow-private-addresses
       - --synchrony-constraint-threshold=0.0
+      - --heartbeat-enabled
+      - --fault-tolerance-threshold=0.0
       - --protocol-port=40400
       - --discovery-port=40404
       - --tls-key-path=/var/lib/rnode/node.key.pem
