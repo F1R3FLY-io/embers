@@ -94,8 +94,7 @@ impl ReadNode for MockReadNode {
         rholang_code: String,
     ) -> Result<T, ReadNodeError> {
         let value = self.find_response(&rholang_code)?;
-        serde_json::from_value(value)
-            .map_err(|e| ReadNodeError::Deserialization(e.into()))
+        serde_json::from_value(value).map_err(|e| ReadNodeError::Deserialization(e.into()))
     }
 
     async fn get_data_or_none<T: serde::de::DeserializeOwned + Send>(
@@ -182,10 +181,7 @@ impl WriteNode for MockWriteNode {
         self.next_deploy_response()
     }
 
-    async fn deploy_signed_contract(
-        &mut self,
-        contract: SignedCode,
-    ) -> anyhow::Result<DeployId> {
+    async fn deploy_signed_contract(&mut self, contract: SignedCode) -> anyhow::Result<DeployId> {
         self.deployed_contracts
             .lock()
             .unwrap()

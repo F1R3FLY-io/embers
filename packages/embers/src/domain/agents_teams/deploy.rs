@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use firefly_client::errors::ReadNodeError;
 use firefly_client::models::{DeployId, Uri};
 use firefly_client::rendering::Render;
-use firefly_client::{ReadNode, WriteNode, NodeEventSource};
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::compilation::{parse, render};
@@ -201,15 +201,16 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::domain::test_helpers::*;
+    use std::sync::Arc;
+
     use aes_gcm::{Aes256Gcm, Key};
     use dashmap::DashMap;
     use firefly_client::models::SignedCode;
-    use std::sync::Arc;
 
+    use super::*;
     use crate::domain::agents_teams::AgentsTeamsService;
     use crate::domain::agents_teams::models::DeploySignedReq;
+    use crate::domain::test_helpers::*;
 
     /// Build a minimal `AgentsTeamsService` wired to mock backends.
     fn make_service(
@@ -332,10 +333,7 @@ mod tests {
         let result = service.deploy_signed_deploy(request).await;
         assert!(result.is_err(), "should propagate write client error");
         assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("node unavailable"),
+            result.unwrap_err().to_string().contains("node unavailable"),
             "error message should contain the original cause"
         );
     }
@@ -357,10 +355,7 @@ mod tests {
         };
 
         let result = service.deploy_signed_deploy(request).await;
-        assert!(
-            result.is_err(),
-            "should propagate system deploy error"
-        );
+        assert!(result.is_err(), "should propagate system deploy error");
         assert!(
             result
                 .unwrap_err()

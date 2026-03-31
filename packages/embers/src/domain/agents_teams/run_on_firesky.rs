@@ -8,7 +8,7 @@ use atrium_api::record::KnownRecord;
 use atrium_api::types::string::{AtIdentifier, Datetime};
 use atrium_api::types::{Collection, TryIntoUnknown, Union};
 use atrium_xrpc_client::reqwest::ReqwestClient;
-use firefly_client::{ReadNode, WriteNode, NodeEventSource};
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use futures::{StreamExt, stream};
 
 use crate::domain::agents_teams::AgentsTeamsService;

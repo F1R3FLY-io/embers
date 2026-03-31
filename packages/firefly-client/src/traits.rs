@@ -61,9 +61,7 @@ pub trait WriteNode: Clone + Send + Sync + 'static {
         deploy_data: DeployData,
     ) -> impl Future<Output = anyhow::Result<DeployId>> + Send;
 
-    fn get_head_block_index(
-        &mut self,
-    ) -> impl Future<Output = anyhow::Result<u64>> + Send;
+    fn get_head_block_index(&mut self) -> impl Future<Output = anyhow::Result<u64>> + Send;
 }
 
 /// Trait abstracting event subscriptions from a blockchain node.

@@ -105,10 +105,7 @@ impl NodeEvents {
                         Ok(NodeEvent::BlockAdded { .. }) => continue,
                         Ok(NodeEvent::BlockCreated { .. }) => continue,
                         Ok(NodeEvent::BlockFinalised { payload }) => {
-                            tracing::info!(
-                                deploy_count = payload.deploys.len(),
-                                "block finalised"
-                            );
+                            tracing::info!(deploy_count = payload.deploys.len(), "block finalised");
                             for deploy in &payload.deploys {
                                 tracing::info!(
                                     deploy_id = ?deploy.id,
@@ -118,7 +115,7 @@ impl NodeEvents {
                                 );
                             }
                             payload.deploys
-                        },
+                        }
                         Err(broadcast::error::RecvError::Closed) => return,
                         Err(broadcast::error::RecvError::Lagged(_)) => continue,
                     };
@@ -127,10 +124,8 @@ impl NodeEvents {
                         let errored = deploy.errored;
 
                         // Cache the finalization result so late subscribers can find it.
-                        finalized_deploys.insert(
-                            deploy.id.clone(),
-                            (errored, tokio::time::Instant::now()),
-                        );
+                        finalized_deploys
+                            .insert(deploy.id.clone(), (errored, tokio::time::Instant::now()));
 
                         // Notify any existing waiters via oneshot channels.
                         deploy_subscriptions
@@ -138,12 +133,12 @@ impl NodeEvents {
                             .map(|(_, waiters)| waiters)
                             .into_iter()
                             .flatten()
-                            .for_each(|(_, sender)| { let _ = sender.send(errored); });
+                            .for_each(|(_, sender)| {
+                                let _ = sender.send(errored);
+                            });
 
                         let wallet_address: WalletAddress = deploy.deployer.into();
-                        if let Some(subscription) =
-                            wallet_subscriptions.get(&wallet_address)
-                        {
+                        if let Some(subscription) = wallet_subscriptions.get(&wallet_address) {
                             let _ = subscription.send(deploy.into());
                         } else {
                             tracing::debug!(
@@ -326,10 +321,8 @@ impl NodeEvents {
                     for deploy in deploys {
                         let errored = deploy.errored;
 
-                        finalized_deploys.insert(
-                            deploy.id.clone(),
-                            (errored, tokio::time::Instant::now()),
-                        );
+                        finalized_deploys
+                            .insert(deploy.id.clone(), (errored, tokio::time::Instant::now()));
 
                         deploy_subscriptions
                             .remove(&deploy.id)
@@ -341,9 +334,7 @@ impl NodeEvents {
                             });
 
                         let wallet_address: WalletAddress = deploy.deployer.into();
-                        if let Some(subscription) =
-                            wallet_subscriptions.get(&wallet_address)
-                        {
+                        if let Some(subscription) = wallet_subscriptions.get(&wallet_address) {
                             let _ = subscription.send(deploy.into());
                         }
                     }
@@ -502,15 +493,11 @@ mod tests {
 
         let e1 = events.clone();
         let d1 = deploy_id.clone();
-        let w1 = tokio::spawn(async move {
-            e1.wait_for_deploy(&d1, Duration::from_secs(5)).await
-        });
+        let w1 = tokio::spawn(async move { e1.wait_for_deploy(&d1, Duration::from_secs(5)).await });
 
         let e2 = events.clone();
         let d2 = deploy_id.clone();
-        let w2 = tokio::spawn(async move {
-            e2.wait_for_deploy(&d2, Duration::from_secs(5)).await
-        });
+        let w2 = tokio::spawn(async move { e2.wait_for_deploy(&d2, Duration::from_secs(5)).await });
 
         tokio::task::yield_now().await;
         tokio::time::sleep(Duration::from_millis(10)).await;

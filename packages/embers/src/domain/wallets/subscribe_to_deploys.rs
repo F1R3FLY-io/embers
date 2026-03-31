@@ -1,8 +1,7 @@
 use std::io;
 
 use firefly_client::models::WalletAddress;
-use firefly_client::node_events;
-use firefly_client::{NodeEventSource, ReadNode, WriteNode};
+use firefly_client::{NodeEventSource, ReadNode, WriteNode, node_events};
 use futures::{Sink, SinkExt, StreamExt, stream};
 
 use crate::domain::wallets::WalletsService;

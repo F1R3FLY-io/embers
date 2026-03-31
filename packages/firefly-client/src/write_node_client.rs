@@ -7,16 +7,12 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 
 use crate::helpers::FromExpr;
 use crate::models::casper::v1::deploy_service_client::DeployServiceClient;
-use crate::traits::WriteNode;
-use crate::models::casper::v1::{
-    block_info_response,
-    deploy_response,
-    rho_data_response,
-};
+use crate::models::casper::v1::{block_info_response, deploy_response, rho_data_response};
 use crate::models::casper::{BlocksQuery, DataAtNameByBlockQuery, DeployDataProto};
 use crate::models::rhoapi::expr::ExprInstance;
 use crate::models::rhoapi::{Expr, Par};
 use crate::models::{BlockId, DeployData, DeployId, SignedCode, ValidAfter};
+use crate::traits::WriteNode;
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -31,20 +27,18 @@ fn extract_deploy_id(response: &str) -> anyhow::Result<DeployId> {
         .strip_prefix("Success! DeployId is: ")
         .or_else(|| response.strip_prefix("Success!\nDeployId is: "))
         .map(|id| DeployId::from(id.to_owned()))
-        .context(format!("failed to extract deploy_id from response: {response:?}"))
+        .context(format!(
+            "failed to extract deploy_id from response: {response:?}"
+        ))
 }
 
 impl WriteNodeClient {
-    pub async fn new(
-        deploy_service_url: String,
-    ) -> anyhow::Result<Self> {
+    pub async fn new(deploy_service_url: String) -> anyhow::Result<Self> {
         let deploy_client = DeployServiceClient::connect(deploy_service_url)
             .await
             .context("failed to connect to deploy service")?;
 
-        Ok(Self {
-            deploy_client,
-        })
+        Ok(Self { deploy_client })
     }
 
     pub async fn deploy(
@@ -91,9 +85,7 @@ impl WriteNodeClient {
 
         match resp {
             deploy_response::Message::Result(msg) => extract_deploy_id(&msg),
-            deploy_response::Message::Error(err) => {
-                Err(anyhow!("do_deploy error: {err:?}"))
-            }
+            deploy_response::Message::Error(err) => Err(anyhow!("do_deploy error: {err:?}")),
         }
     }
 
@@ -117,9 +109,7 @@ impl WriteNodeClient {
 
         match resp {
             deploy_response::Message::Result(msg) => extract_deploy_id(&msg),
-            deploy_response::Message::Error(err) => {
-                Err(anyhow!("do_deploy error: {err:?}"))
-            }
+            deploy_response::Message::Error(err) => Err(anyhow!("do_deploy error: {err:?}")),
         }
     }
 
@@ -212,10 +202,7 @@ impl WriteNode for WriteNodeClient {
         self.deploy(key, deploy_data).await
     }
 
-    async fn deploy_signed_contract(
-        &mut self,
-        contract: SignedCode,
-    ) -> anyhow::Result<DeployId> {
+    async fn deploy_signed_contract(&mut self, contract: SignedCode) -> anyhow::Result<DeployId> {
         self.deploy_signed_contract(contract).await
     }
 
@@ -242,8 +229,7 @@ mod tests {
 
     #[test]
     fn test_extract_deploy_id_scala_format() {
-        let result =
-            extract_deploy_id("Success! DeployId is: abc123def456").expect("should parse");
+        let result = extract_deploy_id("Success! DeployId is: abc123def456").expect("should parse");
         assert_eq!(result, DeployId::from("abc123def456".to_owned()));
     }
 
@@ -271,7 +257,10 @@ mod tests {
         // The prefix includes a trailing space: "Success! DeployId is: "
         // Without that space, the prefix doesn't match
         let result = extract_deploy_id("Success! DeployId is:");
-        assert!(result.is_err(), "expected error when trailing space is missing");
+        assert!(
+            result.is_err(),
+            "expected error when trailing space is missing"
+        );
     }
 
     #[test]
@@ -295,7 +284,10 @@ mod tests {
         assert!(matches!(data.valid_after_block_number, ValidAfter::Head));
         // Timestamp should be very close to now
         let diff = (data.timestamp - now).num_milliseconds().unsigned_abs();
-        assert!(diff < 1000, "timestamp should be close to now, diff={diff}ms");
+        assert!(
+            diff < 1000,
+            "timestamp should be close to now, diff={diff}ms"
+        );
     }
 
     #[test]

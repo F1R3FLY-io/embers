@@ -12,7 +12,7 @@ use atrium_api::types::{Collection, TryIntoUnknown};
 use atrium_xrpc_client::reqwest::ReqwestClient;
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
-use firefly_client::{ReadNode, WriteNode, NodeEventSource};
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use futures::FutureExt;
 use futures::future::OptionFuture;
 use serde::{Deserialize, Serialize};

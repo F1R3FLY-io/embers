@@ -7,7 +7,14 @@ use firefly_client::errors::ReadNodeError;
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::{DeployData, DeployId, Uri};
 use firefly_client::rendering::Render;
-use firefly_client::{NodeEvents, NodeEventSource, ReadNode, ReadNodeClient, WriteNode, WriteNodeClient};
+use firefly_client::{
+    NodeEventSource,
+    NodeEvents,
+    ReadNode,
+    ReadNodeClient,
+    WriteNode,
+    WriteNodeClient,
+};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 use crate::blockchain;
@@ -150,8 +157,9 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
 #[cfg(test)]
 mod template_tests {
-    use super::*;
     use firefly_client::rendering::Render;
+
+    use super::*;
 
     #[test]
     fn test_init_template_renders_valid_rholang() {

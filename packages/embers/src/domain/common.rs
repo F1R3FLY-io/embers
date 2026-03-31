@@ -137,9 +137,10 @@ pub struct RegistryDeploy {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use aes_gcm::Aes256Gcm;
     use aes_gcm::aead::KeyInit;
+
+    use super::*;
 
     // -------------------------------------------------------
     // prepare_for_signing tests
@@ -215,8 +216,7 @@ mod tests {
         let key = test_aes_key();
         let original = "hello, world!".to_string();
         let encrypted = serialize_encrypted(&original, &key).expect("should encrypt");
-        let decrypted: String =
-            deserialize_decrypted(encrypted, &key).expect("should decrypt");
+        let decrypted: String = deserialize_decrypted(encrypted, &key).expect("should decrypt");
         assert_eq!(decrypted, original);
     }
 

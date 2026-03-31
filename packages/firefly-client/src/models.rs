@@ -8,16 +8,13 @@ use crc::Crc;
 use derive_more::{AsRef, Display, From, Into};
 use digest::OutputSizeUser;
 use digest::typenum::Unsigned;
+pub use f1r3node_models::{casper, rhoapi, servicemodelapi};
 use secp256k1::PublicKey;
 use serde::{Deserialize, Deserializer, Serialize, de};
 use thiserror::Error;
 
 use crate::helpers::ShortHex;
 use crate::rendering::{IntoValue, Value};
-
-pub use f1r3node_models::casper;
-pub use f1r3node_models::rhoapi;
-pub use f1r3node_models::servicemodelapi;
 
 #[derive(
     Debug,
@@ -406,15 +403,15 @@ impl IntoValue for Uri {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use serde_json::json;
+
+    use super::*;
 
     /// Helper: deterministic key pair for tests.
     fn test_keypair() -> (secp256k1::SecretKey, secp256k1::PublicKey) {
         let secp = secp256k1::Secp256k1::new();
         let secret_key =
-            secp256k1::SecretKey::from_byte_array([1u8; 32])
-                .expect("valid 32-byte secret key");
+            secp256k1::SecretKey::from_byte_array([1u8; 32]).expect("valid 32-byte secret key");
         let public_key = secp256k1::PublicKey::from_secret_key(&secp, &secret_key);
         (secret_key, public_key)
     }
@@ -620,11 +617,7 @@ mod tests {
         let expr = ReadNodeExpr::ExprString {
             data: "hello".to_string(),
         };
-        assert_eq!(
-            serde_json::Value::from(expr),
-            json!("hello"),
-            "ExprString"
-        );
+        assert_eq!(serde_json::Value::from(expr), json!("hello"), "ExprString");
     }
 
     #[test]
@@ -661,11 +654,7 @@ mod tests {
                 ReadNodeExpr::ExprBool { data: true },
             ],
         };
-        assert_eq!(
-            serde_json::Value::from(expr),
-            json!([1, true]),
-            "ExprTuple"
-        );
+        assert_eq!(serde_json::Value::from(expr), json!([1, true]), "ExprTuple");
     }
 
     #[test]
@@ -680,11 +669,7 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(
-            serde_json::Value::from(expr),
-            json!(["a", "b"]),
-            "ExprList"
-        );
+        assert_eq!(serde_json::Value::from(expr), json!(["a", "b"]), "ExprList");
     }
 
     #[test]
@@ -767,8 +752,7 @@ mod tests {
     #[test]
     fn deserialize_expr_nil() {
         let v = json!({"ExprNil": {}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprNil should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprNil should deserialize");
         assert!(
             matches!(expr, ReadNodeExpr::ExprNil {}),
             "expected ExprNil variant"
@@ -778,8 +762,7 @@ mod tests {
     #[test]
     fn deserialize_expr_bool() {
         let v = json!({"ExprBool": {"data": true}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprBool should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprBool should deserialize");
         assert!(
             matches!(expr, ReadNodeExpr::ExprBool { data: true }),
             "expected ExprBool {{ data: true }}"
@@ -789,8 +772,7 @@ mod tests {
     #[test]
     fn deserialize_expr_int() {
         let v = json!({"ExprInt": {"data": -7}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprInt should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprInt should deserialize");
         match expr {
             ReadNodeExpr::ExprInt { data } => {
                 assert_eq!(data, serde_json::Number::from(-7), "expected -7");
@@ -802,8 +784,7 @@ mod tests {
     #[test]
     fn deserialize_expr_string() {
         let v = json!({"ExprString": {"data": "hello world"}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprString should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprString should deserialize");
         match expr {
             ReadNodeExpr::ExprString { data } => {
                 assert_eq!(data, "hello world");
@@ -815,8 +796,7 @@ mod tests {
     #[test]
     fn deserialize_expr_bytes() {
         let v = json!({"ExprBytes": {"data": "cafebabe"}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprBytes should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprBytes should deserialize");
         match expr {
             ReadNodeExpr::ExprBytes { data } => {
                 assert_eq!(data, "cafebabe");
@@ -828,8 +808,7 @@ mod tests {
     #[test]
     fn deserialize_expr_uri() {
         let v = json!({"ExprUri": {"data": "rho:id:xyz"}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprUri should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprUri should deserialize");
         match expr {
             ReadNodeExpr::ExprUri { data } => {
                 assert_eq!(data, "rho:id:xyz");
@@ -841,8 +820,7 @@ mod tests {
     #[test]
     fn deserialize_expr_tuple() {
         let v = json!({"ExprTuple": {"data": [{"ExprInt": {"data": 1}}, {"ExprBool": {"data": false}}]}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprTuple should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprTuple should deserialize");
         match expr {
             ReadNodeExpr::ExprTuple { data } => {
                 assert_eq!(data.len(), 2, "tuple should have 2 elements");
@@ -854,8 +832,7 @@ mod tests {
     #[test]
     fn deserialize_expr_list() {
         let v = json!({"ExprList": {"data": [{"ExprString": {"data": "a"}}]}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprList should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprList should deserialize");
         match expr {
             ReadNodeExpr::ExprList { data } => {
                 assert_eq!(data.len(), 1, "list should have 1 element");
@@ -867,8 +844,7 @@ mod tests {
     #[test]
     fn deserialize_expr_set() {
         let v = json!({"ExprSet": {"data": []}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprSet should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprSet should deserialize");
         match expr {
             ReadNodeExpr::ExprSet { data } => {
                 assert!(data.is_empty(), "set should be empty");
@@ -880,8 +856,7 @@ mod tests {
     #[test]
     fn deserialize_expr_map() {
         let v = json!({"ExprMap": {"data": {"k": {"ExprNil": {}}}}});
-        let expr: ReadNodeExpr =
-            serde_json::from_value(v).expect("ExprMap should deserialize");
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprMap should deserialize");
         match expr {
             ReadNodeExpr::ExprMap { data } => {
                 assert!(data.contains_key("k"), "map should contain key 'k'");
@@ -944,10 +919,7 @@ mod tests {
         let v = json!([true, 42]);
         let either: Either<String, i32> =
             serde_json::from_value(v).expect("Either Right should deserialize");
-        assert!(
-            matches!(either, Either::Right(42)),
-            "expected Right(42)"
-        );
+        assert!(matches!(either, Either::Right(42)), "expected Right(42)");
     }
 
     #[test]
@@ -972,11 +944,7 @@ mod tests {
     fn either_to_result_err() {
         let either: Either<String, i32> = Either::Left("fail".to_string());
         let result = either.to_result();
-        assert_eq!(
-            result,
-            Err("fail".to_string()),
-            "Left should become Err"
-        );
+        assert_eq!(result, Err("fail".to_string()), "Left should become Err");
     }
 
     #[test]
@@ -997,8 +965,7 @@ mod tests {
     #[test]
     fn node_event_started() {
         let v = json!({"event": "started"});
-        let event: NodeEvent =
-            serde_json::from_value(v).expect("Started event should deserialize");
+        let event: NodeEvent = serde_json::from_value(v).expect("Started event should deserialize");
         assert!(
             matches!(event, NodeEvent::Started),
             "expected Started variant"
@@ -1091,10 +1058,7 @@ mod tests {
             serde_json::from_value(v).expect("BlockFinalised with empty deploys should parse");
         match event {
             NodeEvent::BlockFinalised { payload } => {
-                assert!(
-                    payload.deploys.is_empty(),
-                    "deploys should be empty"
-                );
+                assert!(payload.deploys.is_empty(), "deploys should be empty");
             }
             other => panic!("expected BlockFinalised, got {other:?}"),
         }
@@ -1145,10 +1109,9 @@ mod tests {
 
     #[test]
     fn deploy_data_builder_custom_values() {
-        let custom_time =
-            DateTime::parse_from_rfc3339("2025-06-15T12:00:00Z")
-                .expect("valid rfc3339")
-                .with_timezone(&Utc);
+        let custom_time = DateTime::parse_from_rfc3339("2025-06-15T12:00:00Z")
+            .expect("valid rfc3339")
+            .with_timezone(&Utc);
 
         let deploy = DeployData::builder("@0!(true)".to_string())
             .phlo_limit(1_000)
@@ -1167,9 +1130,7 @@ mod tests {
 
     #[test]
     fn deploy_data_builder_zero_phlo_limit() {
-        let deploy = DeployData::builder("Nil".to_string())
-            .phlo_limit(0)
-            .build();
+        let deploy = DeployData::builder("Nil".to_string()).phlo_limit(0).build();
         assert_eq!(deploy.phlo_limit, 0, "phlo_limit of 0 should be allowed");
     }
 }

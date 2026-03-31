@@ -116,10 +116,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetService<R, W, N> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
     use crate::domain::test_helpers::*;
     use crate::domain::testnet::models::{DeployTestReq, LogLevel};
-    use serde_json::json;
 
     fn make_service_with(
         write_client: MockWriteNode,
@@ -269,18 +270,14 @@ mod tests {
     #[tokio::test]
     async fn test_deploy_chain_error() {
         let deploy_id = test_deploy_id();
-        let observer = MockNodeEventSource::new()
-            .with_wait_result(&deploy_id.to_string(), Some(true));
+        let observer =
+            MockNodeEventSource::new().with_wait_result(&deploy_id.to_string(), Some(true));
 
         let write_client = MockWriteNode::new()
             .with_head_block_index(10)
             .with_deploy_response(Ok(deploy_id));
 
-        let service = make_service_with(
-            write_client,
-            MockReadNode::new(),
-            observer,
-        );
+        let service = make_service_with(write_client, MockReadNode::new(), observer);
 
         let request = DeploySignedTestReq {
             env: None,
@@ -299,18 +296,13 @@ mod tests {
     #[tokio::test]
     async fn test_deploy_not_finalized() {
         let deploy_id = test_deploy_id();
-        let observer = MockNodeEventSource::new()
-            .with_wait_result(&deploy_id.to_string(), None);
+        let observer = MockNodeEventSource::new().with_wait_result(&deploy_id.to_string(), None);
 
         let write_client = MockWriteNode::new()
             .with_head_block_index(10)
             .with_deploy_response(Ok(deploy_id));
 
-        let service = make_service_with(
-            write_client,
-            MockReadNode::new(),
-            observer,
-        );
+        let service = make_service_with(write_client, MockReadNode::new(), observer);
 
         let request = DeploySignedTestReq {
             env: None,
@@ -331,8 +323,8 @@ mod tests {
         let deploy_id = test_deploy_id();
 
         // wait_for_deploy returns Some(false) -> success (no error)
-        let observer = MockNodeEventSource::new()
-            .with_wait_result(&deploy_id.to_string(), Some(false));
+        let observer =
+            MockNodeEventSource::new().with_wait_result(&deploy_id.to_string(), Some(false));
 
         let write_client = MockWriteNode::new()
             .with_head_block_index(10)

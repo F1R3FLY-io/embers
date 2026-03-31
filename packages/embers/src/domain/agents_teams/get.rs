@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
-use firefly_client::{ReadNode, WriteNode, NodeEventSource};
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::blockchain::agents_teams::models;
 use crate::domain::agents_teams::AgentsTeamsService;

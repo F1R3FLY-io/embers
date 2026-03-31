@@ -86,10 +86,9 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut client =
-        firefly_client::WriteNodeClient::new(args.deploy_service_url)
-            .await
-            .context("failed to create firefly client")?;
+    let mut client = firefly_client::WriteNodeClient::new(args.deploy_service_url)
+        .await
+        .context("failed to create firefly client")?;
 
     match args.command {
         Commands::Listen {

@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
-use firefly_client::{ReadNode, WriteNode, NodeEventSource};
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::models::{RunReq, RunResp};
@@ -90,11 +90,13 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::domain::test_helpers::*;
+    use std::sync::Arc;
+
     use aes_gcm::{Aes256Gcm, Key};
     use dashmap::DashMap;
-    use std::sync::Arc;
+
+    use super::*;
+    use crate::domain::test_helpers::*;
 
     fn make_service(
         event_source: MockNodeEventSource,
@@ -136,10 +138,7 @@ mod tests {
             .deploy_signed_run_agents_team(test_signed_code())
             .await;
 
-        assert!(
-            result.is_err(),
-            "expected Err when block is not finalized"
-        );
+        assert!(result.is_err(), "expected Err when block is not finalized");
         let err_msg = result.unwrap_err().to_string();
         assert!(
             err_msg.contains("not finalized"),

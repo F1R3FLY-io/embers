@@ -97,7 +97,10 @@ impl ReadNodeClient {
             })
     }
 
-    pub async fn get_data_or_none<T>(&self, rholang_code: String) -> Result<Option<T>, ReadNodeError>
+    pub async fn get_data_or_none<T>(
+        &self,
+        rholang_code: String,
+    ) -> Result<Option<T>, ReadNodeError>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -159,7 +162,10 @@ impl ReadNodeClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        match self.get_data_with_retry(rholang_code, max_retries, delay).await {
+        match self
+            .get_data_with_retry(rholang_code, max_retries, delay)
+            .await
+        {
             Ok(data) => Ok(Some(data)),
             Err(ReadNodeError::ReturnValueMissing) => Ok(None),
             Err(err) => Err(err),
@@ -291,7 +297,10 @@ mod tests {
         mount_explore_deploy(&server, string_expr_response("hello")).await;
 
         let client = ReadNodeClient::new(server.uri());
-        let result: String = client.get_data("code".into()).await.expect("should succeed");
+        let result: String = client
+            .get_data("code".into())
+            .await
+            .expect("should succeed");
         assert_eq!(result, "hello");
     }
 
@@ -301,7 +310,10 @@ mod tests {
         mount_explore_deploy(&server, bool_expr_response(true)).await;
 
         let client = ReadNodeClient::new(server.uri());
-        let result: bool = client.get_data("code".into()).await.expect("should succeed");
+        let result: bool = client
+            .get_data("code".into())
+            .await
+            .expect("should succeed");
         assert!(result);
     }
 
@@ -311,7 +323,10 @@ mod tests {
         mount_explore_deploy(&server, int_expr_response(42)).await;
 
         let client = ReadNodeClient::new(server.uri());
-        let result: i64 = client.get_data("code".into()).await.expect("should succeed");
+        let result: i64 = client
+            .get_data("code".into())
+            .await
+            .expect("should succeed");
         assert_eq!(result, 42);
     }
 
@@ -337,7 +352,10 @@ mod tests {
         mount_explore_deploy(&server, body).await;
 
         let client = ReadNodeClient::new(server.uri());
-        let result: TestStruct = client.get_data("code".into()).await.expect("should succeed");
+        let result: TestStruct = client
+            .get_data("code".into())
+            .await
+            .expect("should succeed");
         assert_eq!(
             result,
             TestStruct {
@@ -501,9 +519,7 @@ mod tests {
         // 3rd call returns data
         Mock::given(method("POST"))
             .and(path("/api/explore-deploy"))
-            .respond_with(
-                ResponseTemplate::new(200).set_body_json(string_expr_response("found")),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_json(string_expr_response("found")))
             .expect(1)
             .mount(&server)
             .await;
