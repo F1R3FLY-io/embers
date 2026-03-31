@@ -5,6 +5,8 @@ use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, Uri};
 use firefly_client::rendering::Render;
 
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
+
 use crate::domain::agents::AgentsService;
 use crate::domain::agents::models::{DeployReq, DeployResp, DeploySignedReq};
 use crate::domain::common::{prepare_for_signing, record_trace};
@@ -18,7 +20,7 @@ struct UpdateLastDeploy {
     last_deploy: DateTime<Utc>,
 }
 
-impl AgentsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -102,5 +104,62 @@ impl AgentsService {
         }
 
         Ok(deploy_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::test_helpers::*;
+
+    fn make_service() -> AgentsService<MockReadNode, MockWriteNode, MockNodeEventSource> {
+        AgentsService {
+            uri: test_uri(),
+            write_client: MockWriteNode::new()
+                .with_deploy_response(Ok(test_deploy_id()))
+                .with_deploy_response(Ok(test_deploy_id())),
+            read_client: MockReadNode::new(),
+            observer_node_events: MockNodeEventSource::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_deploy_signed_deploys_both() {
+        let service = make_service();
+        let request = DeploySignedReq {
+            contract: test_signed_code(),
+            system: Some(test_signed_code()),
+        };
+
+        let result = service.deploy_signed_deploy(request).await;
+        assert!(result.is_ok(), "expected Ok, got: {result:?}");
+
+        let deployed = service.write_client.deployed_contracts();
+        assert_eq!(
+            deployed.len(),
+            2,
+            "expected both contract and system to be deployed, but got {} deploys",
+            deployed.len()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deploy_signed_main_only() {
+        let service = make_service();
+        let request = DeploySignedReq {
+            contract: test_signed_code(),
+            system: None,
+        };
+
+        let result = service.deploy_signed_deploy(request).await;
+        assert!(result.is_ok(), "expected Ok, got: {result:?}");
+
+        let deployed = service.write_client.deployed_contracts();
+        assert_eq!(
+            deployed.len(),
+            1,
+            "expected only the main contract to be deployed, but got {} deploys",
+            deployed.len()
+        );
     }
 }

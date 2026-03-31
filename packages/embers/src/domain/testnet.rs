@@ -2,7 +2,7 @@ use anyhow::Context;
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::{DeployData, DeployId, Uri};
 use firefly_client::rendering::Render;
-use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
+use firefly_client::{NodeEvents, NodeEventSource, ReadNode, ReadNodeClient, WriteNode, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 mod create_test_wallet;
@@ -10,12 +10,16 @@ mod deploy_test;
 pub mod models;
 
 #[derive(Clone)]
-pub struct TestnetService {
+pub struct TestnetService<
+    R: ReadNode = ReadNodeClient,
+    W: WriteNode = WriteNodeClient,
+    N: NodeEventSource = NodeEvents,
+> {
     pub uri: Uri,
     pub service_key: SecretKey,
-    pub write_client: WriteNodeClient,
-    pub read_client: ReadNodeClient,
-    pub observer_node_events: NodeEvents,
+    pub write_client: W,
+    pub read_client: R,
+    pub observer_node_events: N,
 }
 
 #[allow(unused)]
@@ -29,12 +33,12 @@ struct InitTestnetEnv {
 }
 
 #[allow(unused)]
-impl TestnetService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetService<R, W, N> {
     #[tracing::instrument(level = "info", skip_all, err(Debug))]
     pub async fn bootstrap(
-        mut write_client: WriteNodeClient,
-        read_client: ReadNodeClient,
-        observer_node_events: NodeEvents,
+        mut write_client: W,
+        read_client: R,
+        observer_node_events: N,
         deployer_key: SecretKey,
         env_key: &SecretKey,
     ) -> anyhow::Result<(Self, DeployId)> {

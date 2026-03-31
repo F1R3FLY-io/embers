@@ -43,6 +43,10 @@ tracing            = { version = "0.1" }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid               = { version = "1.20", features = ["serde", "v7"] }
 
+[dev-dependencies]
+tokio        = { version = "1.49", features = ["macros", "rt-multi-thread", "time", "test-util"] }
+tracing-test = { version = "0.2" }
+
 [lints.clippy]
 cast_possible_wrap    = "allow"
 cast_sign_loss        = "allow"

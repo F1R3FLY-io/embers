@@ -134,3 +134,156 @@ pub struct RegistryDeploy {
     pub uri_pub_key: PublicKey,
     pub signature: Vec<u8>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use aes_gcm::Aes256Gcm;
+    use aes_gcm::aead::KeyInit;
+
+    // -------------------------------------------------------
+    // prepare_for_signing tests
+    // -------------------------------------------------------
+
+    #[test]
+    fn test_prepare_for_signing_default_phlo_limit() {
+        let contract = prepare_for_signing()
+            .code("new Nil".into())
+            .valid_after_block_number(0)
+            .call();
+
+        let proto = DeployDataProto::decode(contract.0.as_slice())
+            .expect("should decode as DeployDataProto");
+        assert_eq!(proto.phlo_limit, 5_000_000);
+        assert_eq!(proto.term, "new Nil");
+        assert_eq!(proto.shard_id, "root");
+        assert_eq!(proto.phlo_price, 1);
+    }
+
+    #[test]
+    fn test_prepare_for_signing_custom_phlo_limit() {
+        let contract = prepare_for_signing()
+            .code("code".into())
+            .valid_after_block_number(10)
+            .phlo_limit(PositiveNonZero(1_000_000))
+            .call();
+
+        let proto = DeployDataProto::decode(contract.0.as_slice())
+            .expect("should decode as DeployDataProto");
+        assert_eq!(proto.phlo_limit, 1_000_000);
+        assert_eq!(proto.valid_after_block_number, 10);
+    }
+
+    #[test]
+    fn test_prepare_for_signing_custom_timestamp() {
+        let ts = chrono::DateTime::parse_from_rfc3339("2025-06-15T12:00:00Z")
+            .unwrap()
+            .to_utc();
+        let contract = prepare_for_signing()
+            .code("code".into())
+            .valid_after_block_number(0)
+            .timestamp(ts)
+            .call();
+
+        let proto = DeployDataProto::decode(contract.0.as_slice())
+            .expect("should decode as DeployDataProto");
+        assert_eq!(proto.timestamp, ts.timestamp_millis());
+    }
+
+    #[test]
+    fn test_prepare_for_signing_shard_id_always_root() {
+        let contract = prepare_for_signing()
+            .code("test".into())
+            .valid_after_block_number(99)
+            .call();
+
+        let proto = DeployDataProto::decode(contract.0.as_slice())
+            .expect("should decode as DeployDataProto");
+        assert_eq!(proto.shard_id, "root");
+    }
+
+    // -------------------------------------------------------
+    // encrypt/decrypt round-trip tests
+    // -------------------------------------------------------
+
+    fn test_aes_key() -> Key<Aes256Gcm> {
+        *Key::<Aes256Gcm>::from_slice(&[42u8; 32])
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_round_trip_string() {
+        let key = test_aes_key();
+        let original = "hello, world!".to_string();
+        let encrypted = serialize_encrypted(&original, &key).expect("should encrypt");
+        let decrypted: String =
+            deserialize_decrypted(encrypted, &key).expect("should decrypt");
+        assert_eq!(decrypted, original);
+    }
+
+    #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    struct TestCredentials {
+        email: String,
+        token: String,
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_round_trip_struct() {
+        let key = test_aes_key();
+        let original = TestCredentials {
+            email: "test@example.com".into(),
+            token: "secret-token".into(),
+        };
+        let encrypted = serialize_encrypted(&original, &key).expect("should encrypt");
+        let decrypted: TestCredentials =
+            deserialize_decrypted(encrypted, &key).expect("should decrypt");
+        assert_eq!(decrypted, original);
+    }
+
+    #[test]
+    fn test_decrypt_wrong_key_fails() {
+        let key1 = *Key::<Aes256Gcm>::from_slice(&[1u8; 32]);
+        let key2 = *Key::<Aes256Gcm>::from_slice(&[2u8; 32]);
+        let encrypted = serialize_encrypted(&"secret", &key1).expect("should encrypt");
+        let result = deserialize_decrypted::<String>(encrypted, &key2);
+        assert!(result.is_err(), "decryption with wrong key should fail");
+    }
+
+    #[test]
+    fn test_decrypt_invalid_nonce_fails() {
+        let key = test_aes_key();
+        let msg = EncryptedMsg {
+            nonce: vec![0, 1, 2], // Too short -- AES-256-GCM needs 12 bytes
+            ciphertext: vec![0; 32],
+        };
+        let result = deserialize_decrypted::<String>(msg, &key);
+        assert!(result.is_err(), "invalid nonce length should fail");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("invalid nonce length"),
+            "expected 'invalid nonce length', got: {err_msg}"
+        );
+    }
+
+    // -------------------------------------------------------
+    // PositiveNonZero tests
+    // -------------------------------------------------------
+
+    #[test]
+    fn test_positive_non_zero_valid() {
+        let result = PositiveNonZero::<i64>::try_from(42);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().0, 42);
+    }
+
+    #[test]
+    fn test_positive_non_zero_zero() {
+        let result = PositiveNonZero::<i64>::try_from(0);
+        assert!(matches!(result, Err(PositiveNonZeroParsingError::Zero)));
+    }
+
+    #[test]
+    fn test_positive_non_zero_negative() {
+        let result = PositiveNonZero::<i64>::try_from(-1);
+        assert!(matches!(result, Err(PositiveNonZeroParsingError::Negative)));
+    }
+}

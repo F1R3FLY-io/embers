@@ -12,6 +12,7 @@ use tracing::Instrument;
 use uuid::Uuid;
 
 use crate::models::{BlockEventDeploy, DeployId, NodeEvent, WalletAddress};
+use crate::traits::NodeEventSource;
 
 #[derive(Debug, Clone)]
 pub enum DeployEvent {
@@ -291,5 +292,340 @@ impl Drop for WalletSubscription {
             .remove_if(&self.wallet_address, |_, sender| {
                 sender.receiver_count() == 0
             });
+    }
+}
+
+#[cfg(test)]
+impl NodeEvents {
+    /// Creates a `NodeEvents` without spawning the WebSocket connection or
+    /// cache-cleanup tasks.  Only the event dispatch task is started so that
+    /// tests can inject events through the returned `broadcast::Sender`.
+    pub(crate) fn new_for_test() -> (Self, broadcast::Sender<NodeEvent>) {
+        let tx = broadcast::Sender::<NodeEvent>::new(32);
+        let deploy_subscriptions = DeploySubscriptions::default();
+        let wallet_subscriptions = WalletSubscriptions::default();
+        let finalized_deploys = FinalizedDeploys::default();
+
+        // Spawn only the event dispatch task (same logic as production).
+        tokio::spawn({
+            let mut rx = tx.subscribe();
+            let deploy_subscriptions = deploy_subscriptions.clone();
+            let wallet_subscriptions = wallet_subscriptions.clone();
+            let finalized_deploys = finalized_deploys.clone();
+            async move {
+                loop {
+                    let deploys = match rx.recv().await {
+                        Ok(NodeEvent::Started) => continue,
+                        Ok(NodeEvent::BlockAdded { .. }) => continue,
+                        Ok(NodeEvent::BlockCreated { .. }) => continue,
+                        Ok(NodeEvent::BlockFinalised { payload }) => payload.deploys,
+                        Err(broadcast::error::RecvError::Closed) => return,
+                        Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    };
+
+                    for deploy in deploys {
+                        let errored = deploy.errored;
+
+                        finalized_deploys.insert(
+                            deploy.id.clone(),
+                            (errored, tokio::time::Instant::now()),
+                        );
+
+                        deploy_subscriptions
+                            .remove(&deploy.id)
+                            .map(|(_, waiters)| waiters)
+                            .into_iter()
+                            .flatten()
+                            .for_each(|(_, sender)| {
+                                let _ = sender.send(errored);
+                            });
+
+                        let wallet_address: WalletAddress = deploy.deployer.into();
+                        if let Some(subscription) =
+                            wallet_subscriptions.get(&wallet_address)
+                        {
+                            let _ = subscription.send(deploy.into());
+                        }
+                    }
+                }
+            }
+        });
+
+        (
+            Self {
+                deploy_subscriptions,
+                wallet_subscriptions,
+                finalized_deploys,
+            },
+            tx,
+        )
+    }
+}
+
+impl NodeEventSource for NodeEvents {
+    fn wait_for_deploy(
+        &self,
+        deploy_id: &DeployId,
+        max_wait: Duration,
+    ) -> impl Future<Output = Option<bool>> + Send {
+        self.wait_for_deploy(deploy_id, max_wait)
+    }
+
+    fn subscribe_for_deploys(
+        &self,
+        wallet_address: WalletAddress,
+    ) -> impl Stream<Item = DeployEvent> + Send {
+        self.subscribe_for_deploys(wallet_address)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use futures::StreamExt;
+    use secp256k1::{PublicKey, Secp256k1, SecretKey};
+
+    use super::*;
+    use crate::models::{BlockEventPayload, BlockId, NodeEvent};
+
+    /// Helper to create a test public key deterministically from an index.
+    fn test_public_key(index: u8) -> PublicKey {
+        let secp = Secp256k1::new();
+        let mut bytes = [0u8; 32];
+        bytes[31] = index.max(1); // ensure non-zero
+        let sk = SecretKey::from_byte_array(bytes).expect("valid secret key");
+        PublicKey::from_secret_key(&secp, &sk)
+    }
+
+    /// Helper to create a BlockFinalised event with a single deploy.
+    fn finalize_event(deploy_id: &str, errored: bool, cost: u64) -> NodeEvent {
+        NodeEvent::BlockFinalised {
+            payload: BlockEventPayload {
+                block_hash: BlockId::from("block-1".to_owned()),
+                deploys: vec![BlockEventDeploy {
+                    id: DeployId::from(deploy_id.to_owned()),
+                    cost,
+                    deployer: test_public_key(1),
+                    errored,
+                }],
+            },
+        }
+    }
+
+    // -------------------------------------------------------
+    // wait_for_deploy tests
+    // -------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_wait_for_deploy_success() {
+        let (events, tx) = NodeEvents::new_for_test();
+        let deploy_id = DeployId::from("deploy-1".to_owned());
+
+        let events_clone = events.clone();
+        let deploy_id_clone = deploy_id.clone();
+        let handle = tokio::spawn(async move {
+            events_clone
+                .wait_for_deploy(&deploy_id_clone, Duration::from_secs(5))
+                .await
+        });
+
+        // Give the wait_for_deploy time to register
+        tokio::task::yield_now().await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let _ = tx.send(finalize_event("deploy-1", false, 100));
+
+        let result = handle.await.expect("task should not panic");
+        assert_eq!(result, Some(false));
+    }
+
+    #[tokio::test]
+    async fn test_wait_for_deploy_errored() {
+        let (events, tx) = NodeEvents::new_for_test();
+        let deploy_id = DeployId::from("deploy-err".to_owned());
+
+        let events_clone = events.clone();
+        let deploy_id_clone = deploy_id.clone();
+        let handle = tokio::spawn(async move {
+            events_clone
+                .wait_for_deploy(&deploy_id_clone, Duration::from_secs(5))
+                .await
+        });
+
+        tokio::task::yield_now().await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let _ = tx.send(finalize_event("deploy-err", true, 50));
+
+        let result = handle.await.expect("task should not panic");
+        assert_eq!(result, Some(true));
+    }
+
+    #[tokio::test]
+    async fn test_wait_for_deploy_timeout() {
+        let (events, _tx) = NodeEvents::new_for_test();
+        let deploy_id = DeployId::from("deploy-never".to_owned());
+
+        let result = events
+            .wait_for_deploy(&deploy_id, Duration::from_millis(50))
+            .await;
+        assert_eq!(result, None);
+
+        // Verify subscription was cleaned up via scopeguard
+        assert!(
+            !events.deploy_subscriptions.contains_key(&deploy_id),
+            "subscription should be cleaned up after timeout"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_wait_for_deploy_cached_result_immediate() {
+        let (events, _tx) = NodeEvents::new_for_test();
+        let deploy_id = DeployId::from("deploy-cached".to_owned());
+
+        // Pre-populate the cache
+        events
+            .finalized_deploys
+            .insert(deploy_id.clone(), (false, tokio::time::Instant::now()));
+
+        let result = events
+            .wait_for_deploy(&deploy_id, Duration::from_secs(5))
+            .await;
+        assert_eq!(result, Some(false));
+    }
+
+    #[tokio::test]
+    async fn test_wait_for_deploy_multiple_waiters() {
+        let (events, tx) = NodeEvents::new_for_test();
+        let deploy_id = DeployId::from("deploy-multi".to_owned());
+
+        let e1 = events.clone();
+        let d1 = deploy_id.clone();
+        let w1 = tokio::spawn(async move {
+            e1.wait_for_deploy(&d1, Duration::from_secs(5)).await
+        });
+
+        let e2 = events.clone();
+        let d2 = deploy_id.clone();
+        let w2 = tokio::spawn(async move {
+            e2.wait_for_deploy(&d2, Duration::from_secs(5)).await
+        });
+
+        tokio::task::yield_now().await;
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        let _ = tx.send(finalize_event("deploy-multi", true, 200));
+
+        assert_eq!(w1.await.unwrap(), Some(true));
+        assert_eq!(w2.await.unwrap(), Some(true));
+    }
+
+    // -------------------------------------------------------
+    // subscribe_for_deploys tests
+    // -------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_subscribe_receives_events() {
+        let (events, tx) = NodeEvents::new_for_test();
+        let wallet_address: WalletAddress = test_public_key(1).into();
+
+        let mut sub = events.subscribe_for_deploys(wallet_address);
+
+        // Send event
+        let _ = tx.send(finalize_event("deploy-sub", false, 300));
+
+        // Give dispatch task time to process
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Try to receive
+        match tokio::time::timeout(Duration::from_millis(100), sub.next()).await {
+            Ok(Some(DeployEvent::Finalized { id, cost, errored })) => {
+                assert_eq!(id, DeployId::from("deploy-sub".to_owned()));
+                assert_eq!(cost, 300);
+                assert!(!errored);
+            }
+            other => panic!("expected Finalized event, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_drop_with_multiple_subscribers() {
+        let (events, _tx) = NodeEvents::new_for_test();
+        let wallet_address: WalletAddress = test_public_key(1).into();
+
+        let sub1 = events.subscribe_for_deploys(wallet_address.clone());
+        let sub2 = events.subscribe_for_deploys(wallet_address.clone());
+        assert!(events.wallet_subscriptions.contains_key(&wallet_address));
+
+        // Drop one -- entry should still exist since the other subscriber is alive
+        drop(sub1);
+        assert!(
+            events.wallet_subscriptions.contains_key(&wallet_address),
+            "entry should remain with active subscriber"
+        );
+
+        drop(sub2);
+    }
+
+    // -------------------------------------------------------
+    // dispatch tests
+    // -------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_dispatch_ignores_non_finalised_events() {
+        let (events, tx) = NodeEvents::new_for_test();
+        let deploy_id = DeployId::from("deploy-ignored".to_owned());
+
+        // Start waiting
+        let events_clone = events.clone();
+        let deploy_id_clone = deploy_id.clone();
+        let handle = tokio::spawn(async move {
+            events_clone
+                .wait_for_deploy(&deploy_id_clone, Duration::from_millis(100))
+                .await
+        });
+
+        // Send non-finalised events
+        let _ = tx.send(NodeEvent::Started);
+        let _ = tx.send(NodeEvent::BlockAdded {
+            payload: BlockEventPayload {
+                block_hash: BlockId::from("b1".to_owned()),
+                deploys: vec![],
+            },
+        });
+        let _ = tx.send(NodeEvent::BlockCreated {
+            payload: BlockEventPayload {
+                block_hash: BlockId::from("b2".to_owned()),
+                deploys: vec![],
+            },
+        });
+
+        // Should timeout since no BlockFinalised was sent
+        let result = handle.await.unwrap();
+        assert_eq!(result, None, "non-finalised events should not trigger wait");
+    }
+
+    // -------------------------------------------------------
+    // DeployEvent conversion
+    // -------------------------------------------------------
+
+    #[test]
+    fn test_block_event_deploy_into_deploy_event() {
+        let deploy = BlockEventDeploy {
+            id: DeployId::from("d1".to_owned()),
+            cost: 42,
+            deployer: test_public_key(1),
+            errored: true,
+        };
+
+        let event: DeployEvent = deploy.into();
+        match event {
+            DeployEvent::Finalized { id, cost, errored } => {
+                assert_eq!(id, DeployId::from("d1".to_owned()));
+                assert_eq!(cost, 42);
+                assert!(errored);
+            }
+        }
     }
 }

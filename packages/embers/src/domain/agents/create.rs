@@ -3,6 +3,8 @@ use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
 use uuid::Uuid;
 
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
+
 use crate::domain::agents::AgentsService;
 use crate::domain::agents::models::{CreateReq, CreateResp};
 use crate::domain::common::{prepare_for_signing, record_trace};
@@ -21,7 +23,7 @@ struct Create {
     code: Option<String>,
 }
 
-impl AgentsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,

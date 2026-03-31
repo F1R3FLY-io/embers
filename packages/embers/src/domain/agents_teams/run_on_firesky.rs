@@ -8,13 +8,14 @@ use atrium_api::record::KnownRecord;
 use atrium_api::types::string::{AtIdentifier, Datetime};
 use atrium_api::types::{Collection, TryIntoUnknown, Union};
 use atrium_xrpc_client::reqwest::ReqwestClient;
+use firefly_client::{ReadNode, WriteNode, NodeEventSource};
 use futures::{StreamExt, stream};
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::models::{DeploySignedRunOnFireskyReq, RunReq, RunResp};
 use crate::domain::common::upload_blob_from_url;
 
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,

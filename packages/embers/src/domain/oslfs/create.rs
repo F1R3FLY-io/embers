@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use uuid::Uuid;
 
 use crate::domain::common::{prepare_for_signing, record_trace};
@@ -19,7 +20,7 @@ struct Create {
     query: Option<String>,
 }
 
-impl OslfsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,

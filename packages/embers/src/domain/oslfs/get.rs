@@ -1,5 +1,6 @@
 use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::blockchain::oslfs::models;
 use crate::domain::common::record_trace;
@@ -15,7 +16,7 @@ struct Get {
     version: String,
 }
 
-impl OslfsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,

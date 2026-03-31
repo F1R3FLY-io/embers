@@ -1,5 +1,6 @@
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::common::{prepare_for_signing, record_trace};
 use crate::domain::oslfs::OslfsService;
@@ -12,7 +13,7 @@ struct Delete {
     id: String,
 }
 
-impl OslfsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsService<R, W, N> {
     #[tracing::instrument(level = "info", skip(self), err(Debug), ret(Debug, level = "trace"))]
     pub async fn prepare_delete_contract(&self, id: String) -> anyhow::Result<DeleteResp> {
         let contract = Delete {

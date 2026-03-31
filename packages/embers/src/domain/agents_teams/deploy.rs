@@ -5,6 +5,7 @@ use chrono::{DateTime, Utc};
 use firefly_client::errors::ReadNodeError;
 use firefly_client::models::{DeployId, Uri};
 use firefly_client::rendering::Render;
+use firefly_client::{ReadNode, WriteNode, NodeEventSource};
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::compilation::{parse, render};
@@ -21,7 +22,7 @@ struct RecordDeploy {
     uri: Uri,
 }
 
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -195,5 +196,205 @@ impl AgentsTeamsService {
         }
 
         Ok(deploy_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::test_helpers::*;
+    use aes_gcm::{Aes256Gcm, Key};
+    use dashmap::DashMap;
+    use firefly_client::models::SignedCode;
+    use std::sync::Arc;
+
+    use crate::domain::agents_teams::AgentsTeamsService;
+    use crate::domain::agents_teams::models::DeploySignedReq;
+
+    /// Build a minimal `AgentsTeamsService` wired to mock backends.
+    fn make_service(
+        read: MockReadNode,
+        write: MockWriteNode,
+    ) -> AgentsTeamsService<MockReadNode, MockWriteNode, MockNodeEventSource> {
+        AgentsTeamsService {
+            uri: test_uri(),
+            write_client: write,
+            read_client: read,
+            observer_node_events: MockNodeEventSource::new(),
+            aes_encryption_key: *Key::<Aes256Gcm>::from_slice(&[42u8; 32]),
+            firesky_accounts: Arc::new(DashMap::new()),
+        }
+    }
+
+    fn dummy_signed_code(tag: u8) -> SignedCode {
+        SignedCode {
+            contract: vec![tag; 16],
+            sig: vec![0; 64],
+            sig_algorithm: "secp256k1".into(),
+            deployer: vec![0; 65],
+        }
+    }
+
+    // -------------------------------------------------------
+    // deploy_signed_deploy tests
+    // -------------------------------------------------------
+
+    #[tokio::test]
+    async fn test_deploy_signed_forwards_to_write_client() {
+        let write = MockWriteNode::new()
+            .with_head_block_index(10)
+            .with_deploy_response(Ok(test_deploy_id()));
+        let read = MockReadNode::new();
+
+        let service = make_service(read, write.clone());
+
+        let contract = dummy_signed_code(0xAA);
+        let request = DeploySignedReq {
+            contract: contract.clone(),
+            system: None,
+        };
+
+        let deploy_id = service
+            .deploy_signed_deploy(request)
+            .await
+            .expect("deploy_signed_deploy should succeed");
+
+        assert_eq!(deploy_id, test_deploy_id());
+
+        // Exactly one contract should have been deployed
+        let deployed = write.deployed_contracts();
+        assert_eq!(deployed.len(), 1, "expected exactly 1 deployed contract");
+        assert_eq!(
+            deployed[0],
+            vec![0xAA; 16],
+            "deployed contract bytes should match the main contract"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deploy_signed_deploys_both_when_system_present() {
+        let main_id = DeployId::from("main-deploy-id".to_owned());
+        let system_id = DeployId::from("system-deploy-id".to_owned());
+
+        let write = MockWriteNode::new()
+            .with_head_block_index(10)
+            .with_deploy_response(Ok(main_id.clone()))
+            .with_deploy_response(Ok(system_id));
+        let read = MockReadNode::new();
+
+        let service = make_service(read, write.clone());
+
+        let main_contract = dummy_signed_code(0xBB);
+        let system_contract = dummy_signed_code(0xCC);
+
+        let request = DeploySignedReq {
+            contract: main_contract.clone(),
+            system: Some(system_contract.clone()),
+        };
+
+        let deploy_id = service
+            .deploy_signed_deploy(request)
+            .await
+            .expect("deploy_signed_deploy should succeed");
+
+        // The returned deploy ID should be from the first (main) deploy
+        assert_eq!(deploy_id, main_id);
+
+        // Both contracts should have been deployed in order
+        let deployed = write.deployed_contracts();
+        assert_eq!(deployed.len(), 2, "expected 2 deployed contracts");
+        assert_eq!(
+            deployed[0],
+            vec![0xBB; 16],
+            "first deployed contract should be the main contract"
+        );
+        assert_eq!(
+            deployed[1],
+            vec![0xCC; 16],
+            "second deployed contract should be the system contract"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deploy_signed_propagates_write_error() {
+        let write = MockWriteNode::new()
+            .with_head_block_index(10)
+            .with_deploy_response(Err(anyhow::anyhow!("node unavailable")));
+        let read = MockReadNode::new();
+
+        let service = make_service(read, write);
+
+        let request = DeploySignedReq {
+            contract: dummy_signed_code(0x01),
+            system: None,
+        };
+
+        let result = service.deploy_signed_deploy(request).await;
+        assert!(result.is_err(), "should propagate write client error");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("node unavailable"),
+            "error message should contain the original cause"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deploy_signed_system_error_propagates() {
+        // Main deploy succeeds but system deploy fails
+        let write = MockWriteNode::new()
+            .with_head_block_index(10)
+            .with_deploy_response(Ok(test_deploy_id()))
+            .with_deploy_response(Err(anyhow::anyhow!("system deploy failed")));
+        let read = MockReadNode::new();
+
+        let service = make_service(read, write);
+
+        let request = DeploySignedReq {
+            contract: dummy_signed_code(0x01),
+            system: Some(dummy_signed_code(0x02)),
+        };
+
+        let result = service.deploy_signed_deploy(request).await;
+        assert!(
+            result.is_err(),
+            "should propagate system deploy error"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("system deploy failed"),
+            "error message should contain the system deploy failure cause"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_deploy_signed_no_system_does_not_deploy_extra() {
+        // Enqueue two responses but only one should be consumed
+        let write = MockWriteNode::new()
+            .with_head_block_index(10)
+            .with_deploy_response(Ok(test_deploy_id()));
+        let read = MockReadNode::new();
+
+        let service = make_service(read, write.clone());
+
+        let request = DeploySignedReq {
+            contract: dummy_signed_code(0xDD),
+            system: None,
+        };
+
+        service
+            .deploy_signed_deploy(request)
+            .await
+            .expect("deploy should succeed");
+
+        let deployed = write.deployed_contracts();
+        assert_eq!(
+            deployed.len(),
+            1,
+            "with system=None, only the main contract should be deployed"
+        );
     }
 }

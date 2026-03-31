@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{ReadNode, WriteNode, NodeEventSource};
 
 use crate::blockchain::agents_teams::models;
 use crate::domain::agents_teams::AgentsTeamsService;
@@ -17,7 +18,7 @@ struct Get {
     version: String,
 }
 
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,

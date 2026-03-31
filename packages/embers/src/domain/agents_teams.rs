@@ -7,7 +7,7 @@ use firefly_client::errors::ReadNodeError;
 use firefly_client::helpers::insert_signed_signature;
 use firefly_client::models::{DeployData, DeployId, Uri};
 use firefly_client::rendering::Render;
-use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
+use firefly_client::{NodeEvents, NodeEventSource, ReadNode, ReadNodeClient, WriteNode, WriteNodeClient};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 use crate::blockchain;
@@ -28,11 +28,15 @@ mod run_on_firesky;
 mod save;
 
 #[derive(Clone)]
-pub struct AgentsTeamsService {
+pub struct AgentsTeamsService<
+    R: ReadNode = ReadNodeClient,
+    W: WriteNode = WriteNodeClient,
+    N: NodeEventSource = NodeEvents,
+> {
     pub uri: Uri,
-    pub write_client: WriteNodeClient,
-    pub read_client: ReadNodeClient,
-    pub observer_node_events: NodeEvents,
+    pub write_client: W,
+    pub read_client: R,
+    pub observer_node_events: N,
     pub aes_encryption_key: Key<Aes256Gcm>,
     pub firesky_accounts: Arc<DashMap<Uri, FireskyCredentials>>,
 }
@@ -55,12 +59,12 @@ struct GetFireskyTokens {
 }
 
 #[allow(unused)]
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(level = "info", skip_all, err(Debug))]
     pub async fn bootstrap(
-        mut write_client: WriteNodeClient,
-        read_client: ReadNodeClient,
-        observer_node_events: NodeEvents,
+        mut write_client: W,
+        read_client: R,
+        observer_node_events: N,
         deployer_key: &SecretKey,
         env_key: &SecretKey,
         aes_encryption_key: Key<Aes256Gcm>,
@@ -141,5 +145,51 @@ impl AgentsTeamsService {
             },
             deploy_id,
         ))
+    }
+}
+
+#[cfg(test)]
+mod template_tests {
+    use super::*;
+    use firefly_client::rendering::Render;
+
+    #[test]
+    fn test_init_template_renders_valid_rholang() {
+        let secp = secp256k1::Secp256k1::new();
+        let sk = secp256k1::SecretKey::from_byte_array([2u8; 32]).expect("valid key");
+        let pk = secp256k1::PublicKey::from_secret_key(&secp, &sk);
+        let env_uri: Uri = pk.into();
+
+        let code = InitAgentsTeamsEnv {
+            env_uri: env_uri.clone(),
+            version: 0,
+            public_key: pk.serialize_uncompressed().into(),
+            sig: vec![1, 2, 3, 4],
+        }
+        .render()
+        .expect("template should render");
+
+        assert!(!code.is_empty());
+        assert!(code.contains("rho:registry:insertSigned:secp256k1"));
+        let uri_str: &str = env_uri.as_ref();
+        assert!(code.contains(uri_str));
+    }
+
+    #[test]
+    fn test_get_firesky_tokens_template_renders() {
+        let secp = secp256k1::Secp256k1::new();
+        let sk = secp256k1::SecretKey::from_byte_array([3u8; 32]).expect("valid key");
+        let pk = secp256k1::PublicKey::from_secret_key(&secp, &sk);
+        let env_uri: Uri = pk.into();
+
+        let code = GetFireskyTokens {
+            env_uri: env_uri.clone(),
+        }
+        .render()
+        .expect("template should render");
+
+        assert!(!code.is_empty());
+        let uri_str: &str = env_uri.as_ref();
+        assert!(code.contains(uri_str));
     }
 }

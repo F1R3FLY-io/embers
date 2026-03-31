@@ -2,12 +2,13 @@ use std::io;
 
 use firefly_client::models::WalletAddress;
 use firefly_client::node_events;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use futures::{Sink, SinkExt, StreamExt, stream};
 
 use crate::domain::wallets::WalletsService;
 use crate::domain::wallets::models::{DeployDescription, DeployEvent, NodeType};
 
-impl WalletsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsService<R, W, N> {
     #[tracing::instrument(level = "info", skip_all)]
     pub async fn subscribe_to_deploys(
         self,

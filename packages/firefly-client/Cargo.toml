@@ -40,6 +40,10 @@ tracing               = { version = "0.1" }
 uuid                  = { version = "1.20", features = ["v7"] }
 zbase32               = { version = "0.1" }
 
+[dev-dependencies]
+tokio   = { version = "1.49", features = ["rt-multi-thread", "macros", "time", "test-util"] }
+wiremock = { version = "0.6" }
+
 [lints.clippy]
 cast_possible_wrap    = "allow"
 cast_sign_loss        = "allow"

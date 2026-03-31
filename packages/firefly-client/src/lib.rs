@@ -5,9 +5,11 @@ pub mod models;
 pub mod node_events;
 mod read_node_client;
 pub mod rendering;
+pub mod traits;
 mod write_node_client;
 
 pub use communication_service::CommunicationService;
 pub use node_events::NodeEvents;
 pub use read_node_client::ReadNodeClient;
+pub use traits::{NodeEventSource, ReadNode, WriteNode};
 pub use write_node_client::WriteNodeClient;
