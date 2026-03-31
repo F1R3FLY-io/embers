@@ -2,7 +2,6 @@
 args          = ["clippy", "--workspace", "--all-targets", "--all-features"]
 command       = "cargo"
 install_crate = "clippy"
-toolchain     = "nightly"
 workspace     = false
 
 [tasks.generate-schema]
@@ -20,7 +19,6 @@ workspace     = false
 args          = ["fmt", "--all"]
 command       = "cargo"
 install_crate = "rustfmt"
-toolchain     = "nightly"
 workspace     = false
 
 [tasks.fmt]
@@ -30,7 +28,6 @@ alias = "format"
 args          = ["fmt", "--all", "--check"]
 command       = "cargo"
 install_crate = "rustfmt"
-toolchain     = "nightly"
 workspace     = false
 
 [tasks.docker-up]
