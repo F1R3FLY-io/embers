@@ -21,7 +21,7 @@ requires      = ["poetry-core>=2.0.0,<3.0.0"]
 package-mode = false
 
 [tool.poetry.group.dev.dependencies]
-grpcio-tools = "^1.76"
+grpcio-tools = "^1.80"
 ruff         = "^0.15"
 
 [tool.ruff]
