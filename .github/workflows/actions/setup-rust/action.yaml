@@ -6,7 +6,6 @@ runs:
       id: setup-rust
       uses: actions-rust-lang/setup-rust-toolchain@v1
       with:
-        toolchain: nightly, stable
         components: rustfmt, clippy
         cache: true
 

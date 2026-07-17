@@ -1,8 +1,15 @@
 use anyhow::Context;
 use firefly_client::helpers::insert_signed_signature;
-use firefly_client::models::{DeployData, Uri};
+use firefly_client::models::{DeployData, DeployId, Uri};
 use firefly_client::rendering::Render;
-use firefly_client::{ReadNodeClient, WriteNodeClient};
+use firefly_client::{
+    NodeEventSource,
+    NodeEvents,
+    ReadNode,
+    ReadNodeClient,
+    WriteNode,
+    WriteNodeClient,
+};
 use secp256k1::{PublicKey, Secp256k1, SecretKey};
 
 mod create;
@@ -14,10 +21,15 @@ pub mod models;
 mod save;
 
 #[derive(Clone)]
-pub struct OslfsService {
+pub struct OslfsService<
+    R: ReadNode = ReadNodeClient,
+    W: WriteNode = WriteNodeClient,
+    N: NodeEventSource = NodeEvents,
+> {
     pub uri: Uri,
-    pub write_client: WriteNodeClient,
-    pub read_client: ReadNodeClient,
+    pub write_client: W,
+    pub read_client: R,
+    pub observer_node_events: N,
 }
 
 #[allow(unused)]
@@ -31,14 +43,15 @@ struct InitEnv {
 }
 
 #[allow(unused)]
-impl OslfsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsService<R, W, N> {
     #[tracing::instrument(level = "info", skip_all, err(Debug))]
     pub async fn bootstrap(
-        mut write_client: WriteNodeClient,
-        read_client: ReadNodeClient,
+        mut write_client: W,
+        read_client: R,
+        observer_node_events: N,
         deployer_key: &SecretKey,
         env_key: &SecretKey,
-    ) -> anyhow::Result<Self> {
+    ) -> anyhow::Result<(Self, DeployId)> {
         let secp = Secp256k1::new();
         let env_public_key = PublicKey::from_secret_key(&secp, env_key);
         let deployer_public_key = PublicKey::from_secret_key(&secp, deployer_key);
@@ -60,15 +73,19 @@ impl OslfsService {
 
         let deploy_data = DeployData::builder(code).timestamp(timestamp).build();
 
-        write_client
+        let deploy_id = write_client
             .deploy(deployer_key, deploy_data)
             .await
             .context("failed to deploy oslf env")?;
 
-        Ok(Self {
-            uri: env_uri,
-            write_client,
-            read_client,
-        })
+        Ok((
+            Self {
+                uri: env_uri,
+                write_client,
+                read_client,
+                observer_node_events,
+            },
+            deploy_id,
+        ))
     }
 }

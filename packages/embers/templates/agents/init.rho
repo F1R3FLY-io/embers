@@ -6,7 +6,7 @@
 {%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
-    revAddress(`rho:rev:address`),
+    revAddress(`rho:vault:address`),
     devNull(`rho:io:devNull`),
     abort(`rho:execution:abort`),
     deployData(`rho:deploy:data`),
@@ -173,8 +173,8 @@ in {
             visit!("agentVersions", address, id, *valueCh, *nilCh) |
 
             for(@agentVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh) {
-                contract toAgentHeader(@(version, agent), ret) = {
-                    ret!(agent.delete("code").union({"id": id, "version": version}))
+                contract toAgentHeader(@(version, agentData), ret) = {
+                    ret!(agentData.delete("code").union({"id": id, "version": version}))
                 } |
 
                 treeHashMap!("toMap", agentVersions, *agentVersionsMapCh) |
@@ -282,14 +282,14 @@ in {
 
             for(@agentVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh) {
                 treeHashMap!("getOrElse", agentVersions, version, *valueCh, *errCh) |
-                for(@agent <- valueCh) {
-                    treeHashMap!("set", agentVersions, version, agent.union({"last_deploy": last_deploy}), *devNull)
+                for(@agentData <- valueCh) {
+                    treeHashMap!("set", agentVersions, version, agentData.union({"last_deploy": last_deploy}), *devNull)
                 } |
 
                 treeHashMap!("getOrElse", agentVersions, "latest", *latestCh, *errCh) |
-                for(@agent <- latestCh) {
-                    if(agent.get("version") == version) {
-                        treeHashMap!("set", agentVersions, "latest", agent.union({"last_deploy": last_deploy}), *devNull)
+                for(@agentData <- latestCh) {
+                    if(agentData.get("version") == version) {
+                        treeHashMap!("set", agentVersions, "latest", agentData.union({"last_deploy": last_deploy}), *devNull)
                     }
                 }
             } |

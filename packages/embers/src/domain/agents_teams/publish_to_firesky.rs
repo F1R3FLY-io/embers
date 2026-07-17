@@ -12,6 +12,7 @@ use atrium_api::types::{Collection, TryIntoUnknown};
 use atrium_xrpc_client::reqwest::ReqwestClient;
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use futures::FutureExt;
 use futures::future::OptionFuture;
 use serde::{Deserialize, Serialize};
@@ -41,7 +42,7 @@ struct SaveFireskyToken {
     ciphertext: Vec<u8>,
 }
 
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
     pub async fn prepare_publish_to_firesky_contract(
         &self,
@@ -221,7 +222,6 @@ impl AgentsTeamsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
-        write_client.propose().await?;
         Ok(deploy_id)
     }
 }

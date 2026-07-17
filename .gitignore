@@ -4,6 +4,8 @@ index.scip
 .DS_Store
 *.pyc
 schema.json
+.pgmcp.toml
 
 docker/.env
 docker/**/default.conf
+docker/docker-compose.override.yaml

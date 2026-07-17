@@ -1,5 +1,6 @@
 use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::blockchain::agents_teams::models;
 use crate::domain::agents_teams::AgentsTeamsService;
@@ -14,7 +15,7 @@ struct ListVersions {
     id: String,
 }
 
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -37,7 +38,7 @@ impl AgentsTeamsService {
         .render()?;
 
         let agents_teams: Option<Vec<models::AgentsTeamHeader>> =
-            self.read_client.get_data(code).await?;
+            self.read_client.get_data_or_none(code).await?.flatten();
         Ok(agents_teams.map(|mut agents_teams| {
             agents_teams.sort_by(|l, r| l.version.cmp(&r.version));
             AgentsTeams {

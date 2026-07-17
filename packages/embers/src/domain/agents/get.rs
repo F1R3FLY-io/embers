@@ -1,5 +1,8 @@
+use std::time::Duration;
+
 use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::blockchain::agents::models;
 use crate::domain::agents::AgentsService;
@@ -15,7 +18,7 @@ struct Get {
     version: String,
 }
 
-impl AgentsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -39,7 +42,41 @@ impl AgentsService {
         }
         .render()?;
 
-        let agent: Option<models::Agent> = self.read_client.get_data(code).await?;
+        let agent: Option<models::Agent> = self.read_client.get_data_or_none(code).await?.flatten();
+        Ok(agent.map(Into::into))
+    }
+
+    /// Like `get`, but retries on empty explore-deploy results to handle observer tuplespace lag.
+    #[tracing::instrument(
+        level = "info",
+        skip_all,
+        fields(address, id, version),
+        err(Debug),
+        ret(Debug, level = "trace")
+    )]
+    pub async fn get_with_retry(
+        &self,
+        address: WalletAddress,
+        id: String,
+        version: String,
+        max_retries: u32,
+        delay: Duration,
+    ) -> anyhow::Result<Option<Agent>> {
+        record_trace!(address, id, version);
+
+        let code = Get {
+            env_uri: self.uri.clone(),
+            address,
+            id,
+            version,
+        }
+        .render()?;
+
+        let agent: Option<models::Agent> = self
+            .read_client
+            .get_data_or_none_with_retry(code, max_retries, delay)
+            .await?
+            .flatten();
         Ok(agent.map(Into::into))
     }
 }

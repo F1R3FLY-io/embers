@@ -6,7 +6,7 @@
 {%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
-    revAddress(`rho:rev:address`),
+    revAddress(`rho:vault:address`),
     devNull(`rho:io:devNull`),
     abort(`rho:execution:abort`),
     deployData(`rho:deploy:data`),

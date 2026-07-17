@@ -1,4 +1,5 @@
 use std::convert::Infallible;
+use std::sync::Mutex;
 
 use chrono::{DateTime, Utc};
 use firefly_client::models::{SignedCode, Uri, WalletAddress};
@@ -23,16 +24,30 @@ pub struct AgentsTeamHeader {
     pub logo: Option<String>,
 }
 
+/// Mutex serializing all access to the graphl_parser C FFI.
+///
+/// The underlying Flex/Bison parser and C printer use global mutable state
+/// (`buf_`, `cur_`, `buf_size`, `_n_`, and the Flex scanner buffer).
+/// Concurrent calls from different threads corrupt this state, causing
+/// intermittent `InvalidGraphL` / `InvalidCString` parse failures.
+static GRAPHL_PARSER_LOCK: Mutex<()> = Mutex::new(());
+
 #[derive(Debug, Hash, Clone)]
 pub struct Graph(graphl_parser::ast::Graph);
 
 impl Graph {
     pub fn new(graphl: String) -> Result<Self, graphl_parser::ast::Error> {
+        let _guard = GRAPHL_PARSER_LOCK
+            .lock()
+            .expect("GRAPHL_PARSER_LOCK poisoned");
         graphl_parser::parse_to_ast(graphl).map(Self)
     }
 
     pub fn graphl(self) -> String {
-        graphl_parser::ast_to_graphl(self.0).unwrap()
+        let _guard = GRAPHL_PARSER_LOCK
+            .lock()
+            .expect("GRAPHL_PARSER_LOCK poisoned");
+        graphl_parser::ast_to_graphl(self.0).expect("ast_to_graphl failed")
     }
 
     pub fn visit<'a, V, C>(&'a self, state: C, visitor: V) -> C
