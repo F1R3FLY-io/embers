@@ -92,18 +92,49 @@ impl From<ReadNodeExprUnforg> for serde_json::Value {
 
 #[derive(Debug, Clone, Deserialize)]
 pub enum ReadNodeExpr {
-    ExprTuple { data: Vec<Self> },
-    ExprList { data: Vec<Self> },
-    ExprSet { data: Vec<Self> },
-    ExprMap { data: HashMap<String, Self> },
+    ExprTuple {
+        data: Vec<Self>,
+    },
+    ExprList {
+        data: Vec<Self>,
+    },
+    ExprSet {
+        data: Vec<Self>,
+    },
+    ExprMap {
+        data: HashMap<String, Self>,
+    },
 
     ExprNil {},
-    ExprBool { data: bool },
-    ExprInt { data: serde_json::Number },
-    ExprString { data: String },
-    ExprBytes { data: String },
-    ExprUri { data: String },
-    ExprUnforg { data: ReadNodeExprUnforg },
+    ExprBool {
+        data: bool,
+    },
+    ExprInt {
+        data: serde_json::Number,
+    },
+    ExprString {
+        data: String,
+    },
+    ExprBytes {
+        data: String,
+    },
+    ExprUri {
+        data: String,
+    },
+    ExprUnforg {
+        data: ReadNodeExprUnforg,
+    },
+
+    // A bundle wraps an inner value with read/write permission flags. The read
+    // node returns bundled names from registry lookups (e.g. `rho:registry:lookup`
+    // yields a `bundle+{...}` around an unforgeable name). For JSON purposes the
+    // wrapper is transparent — we resolve to the inner value, mirroring how
+    // `ExprUnforg` unwraps to its data.
+    ExprBundle {
+        data: Box<Self>,
+        read: bool,
+        write: bool,
+    },
 }
 
 impl From<ReadNodeExpr> for serde_json::Value {
@@ -128,6 +159,7 @@ impl From<ReadNodeExpr> for serde_json::Value {
             ReadNodeExpr::ExprBytes { data } => Self::String(data),
             ReadNodeExpr::ExprUri { data } => Self::String(data),
             ReadNodeExpr::ExprUnforg { data } => data.into(),
+            ReadNodeExpr::ExprBundle { data, .. } => (*data).into(),
         }
     }
 }
@@ -227,9 +259,23 @@ pub struct DeployData {
 #[serde(tag = "event", rename_all = "kebab-case")]
 pub enum NodeEvent {
     Started,
-    BlockAdded { payload: BlockEventPayload },
-    BlockCreated { payload: BlockEventPayload },
-    BlockFinalised { payload: BlockEventPayload },
+    BlockAdded {
+        payload: BlockEventPayload,
+    },
+    BlockCreated {
+        payload: BlockEventPayload,
+    },
+    BlockFinalised {
+        payload: BlockEventPayload,
+    },
+
+    // Catch-all for lifecycle/status events embers does not act on. f1r3node
+    // >= 0.4.15 emits additional variants (`node-started`, `sent-approved-block`,
+    // `transfers-available`, ...); without this they would fail to deserialize
+    // and log spurious warnings on every tick. We only care about the block
+    // events above, so anything else is absorbed and ignored.
+    #[serde(other)]
+    Other,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -745,6 +791,79 @@ mod tests {
         );
     }
 
+    #[test]
+    fn read_node_expr_bundle_converts_transparently() {
+        // A bundle is a permission wrapper; converting it must resolve to the
+        // inner value (here an unforgeable private name -> its hex string).
+        let expr = ReadNodeExpr::ExprBundle {
+            data: Box::new(ReadNodeExpr::ExprUnforg {
+                data: ReadNodeExprUnforg::UnforgPrivate {
+                    data: "abc123".to_string(),
+                },
+            }),
+            read: false,
+            write: true,
+        };
+        assert_eq!(
+            serde_json::Value::from(expr),
+            json!("abc123"),
+            "ExprBundle should resolve to its inner value"
+        );
+    }
+
+    #[test]
+    fn deserialize_expr_bundle_from_read_node_json() {
+        // Exact shape returned by the f1r3node >= 0.4.15 read node when a
+        // registry lookup (`rho:registry:lookup`) yields a bundled unforgeable
+        // name. Prior to the ExprBundle variant this failed to deserialize and
+        // blocked embers startup ("failed to deserialize intermediate model").
+        let v = json!({
+            "ExprBundle": {
+                "data": {"ExprUnforg": {"data": {"UnforgPrivate": {"data": "deadbeef"}}}},
+                "read": false,
+                "write": true
+            }
+        });
+        let expr: ReadNodeExpr = serde_json::from_value(v).expect("ExprBundle should deserialize");
+        match &expr {
+            ReadNodeExpr::ExprBundle { read, write, .. } => {
+                assert!(!*read, "read flag");
+                assert!(*write, "write flag");
+            }
+            other => panic!("expected ExprBundle, got {other:?}"),
+        }
+        assert_eq!(
+            serde_json::Value::from(expr),
+            json!("deadbeef"),
+            "bundled unforgeable name resolves to its hex string"
+        );
+    }
+
+    #[test]
+    fn deserialize_bundled_registry_tuple_end_to_end() {
+        // The precise `/expr/0` payload observed from the read node for the
+        // agents-env registry lookup: a tuple of (nonce, bundle+{name}).
+        let v = json!({
+            "ExprTuple": {
+                "data": [
+                    {"ExprInt": {"data": 0}},
+                    {"ExprBundle": {
+                        "data": {"ExprUnforg": {"data": {"UnforgPrivate": {"data": "aadeb1f8"}}}},
+                        "read": false,
+                        "write": true
+                    }}
+                ]
+            }
+        });
+        let expr: ReadNodeExpr =
+            serde_json::from_value(v).expect("bundled registry tuple should deserialize");
+        assert_eq!(
+            serde_json::Value::from(expr),
+            json!([0, "aadeb1f8"]),
+            "tuple resolves with the bundle unwrapped to its inner name"
+        );
+    }
+
     // -----------------------------------------------------------------------
     // ReadNodeExpr deserialization from JSON
     // -----------------------------------------------------------------------
@@ -970,6 +1089,25 @@ mod tests {
             matches!(event, NodeEvent::Started),
             "expected Started variant"
         );
+    }
+
+    #[test]
+    fn node_event_unknown_variants_map_to_other() {
+        // f1r3node >= 0.4.15 lifecycle/status events embers does not model. They
+        // must deserialize as `Other` (with or without an extra payload) instead
+        // of erroring, so the deploy-tracking stream is not disrupted.
+        for v in [
+            json!({"event": "node-started"}),
+            json!({"event": "sent-approved-block"}),
+            json!({"event": "transfers-available", "payload": {"block-hash": "abc"}}),
+        ] {
+            let event: NodeEvent =
+                serde_json::from_value(v.clone()).unwrap_or_else(|e| panic!("{v} -> {e}"));
+            assert!(
+                matches!(event, NodeEvent::Other),
+                "unknown event {v} should map to Other, got {event:?}"
+            );
+        }
     }
 
     #[test]

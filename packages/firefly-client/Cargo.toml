@@ -19,7 +19,7 @@ crc                   = { version = "3.4" }
 dashmap               = { version = "6.1" }
 derive_more           = { version = "2.1", features = ["full"] }
 digest                = { version = "0.10" }
-f1r3node-models       = { package = "models", git = "https://github.com/F1R3FLY-io/f1r3node.git", branch = "rust/dev" }
+f1r3node-models       = { package = "models", git = "https://github.com/F1R3FLY-io/f1r3node-rust.git", rev = "91b5c70a0740f91c3ba2a414af3e29fe830263c3" }
 firefly-client-macros = { path = "../firefly-client-macros" }
 futures               = { version = "0.3" }
 hex                   = { version = "0.4" }
