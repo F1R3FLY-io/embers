@@ -154,7 +154,7 @@ async fn main() -> anyhow::Result<()> {
 
                 let (testnet_service, testnet_deploy_id) = TestnetService::bootstrap(
                     testnet_write_client.clone(),
-                    testnet_read_client,
+                    testnet_read_client.clone(),
                     testnet_observer_node_events.clone(),
                     config.testnet.service_key,
                     &config.testnet.env_key,
@@ -171,6 +171,13 @@ async fn main() -> anyhow::Result<()> {
                     None => anyhow::bail!("testnet init deploy not finalized within 60s"),
                     Some(false) => tracing::info!("testnet init deploy finalized successfully"),
                 }
+
+                // Verify the testnet env actually registered (consistent with the
+                // mainnet envs above). Without this the testnet env could silently
+                // fail to register — e.g. if the testnet service wallet is unfunded
+                // the init deploy finalizes as a no-op — and the failure would only
+                // surface later as empty testnet deploy logs.
+                verify_env_readable(&testnet_read_client, "testnet", &testnet_service.uri).await?;
 
                 anyhow::Ok(testnet_service)
             },

@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -27,6 +28,13 @@ struct MockReadResponse {
     contains: String,
     value: serde_json::Value,
     error: Option<ReadNodeError>,
+    /// Number of leading matching reads that should return `ReturnValueMissing`
+    /// before `value` is served — simulates the read-node visibility lag a
+    /// retrying caller must tolerate.
+    empty_before: usize,
+    /// How many times this response has matched so far (interior mutability so
+    /// `find_response` can sequence empty-then-data through `&self`).
+    hits: AtomicUsize,
 }
 
 impl MockReadNode {
@@ -45,6 +53,29 @@ impl MockReadNode {
                 contains: substr.to_owned(),
                 value,
                 error: None,
+                empty_before: 0,
+                hits: AtomicUsize::new(0),
+            });
+        self
+    }
+
+    /// Add a response that returns `ReturnValueMissing` for the first
+    /// `empty_before` matching reads and then serves `value`. Models the
+    /// read-after-write visibility lag that a retrying caller must tolerate.
+    pub fn on_code_containing_empty_then(
+        mut self,
+        substr: &str,
+        empty_before: usize,
+        value: serde_json::Value,
+    ) -> Self {
+        Arc::get_mut(&mut self.responses)
+            .expect("no other clones should exist during setup")
+            .push(MockReadResponse {
+                contains: substr.to_owned(),
+                value,
+                error: None,
+                empty_before,
+                hits: AtomicUsize::new(0),
             });
         self
     }
@@ -57,6 +88,8 @@ impl MockReadNode {
                 contains: substr.to_owned(),
                 value: serde_json::Value::Null,
                 error: Some(error),
+                empty_before: 0,
+                hits: AtomicUsize::new(0),
             });
         self
     }
@@ -70,6 +103,13 @@ impl MockReadNode {
         self.calls.lock().unwrap().push(code.to_owned());
         for resp in self.responses.iter() {
             if code.contains(&resp.contains) {
+                // Sequenced empty-then-data: the first `empty_before` matching
+                // reads return `ReturnValueMissing`, so a retrying caller only
+                // succeeds once the simulated visibility lag clears.
+                let hit = resp.hits.fetch_add(1, Ordering::SeqCst);
+                if hit < resp.empty_before {
+                    return Err(ReadNodeError::ReturnValueMissing);
+                }
                 if let Some(ref err) = resp.error {
                     return Err(match err {
                         ReadNodeError::ReturnValueMissing => ReadNodeError::ReturnValueMissing,
@@ -111,20 +151,34 @@ impl ReadNode for MockReadNode {
     async fn get_data_with_retry<T: serde::de::DeserializeOwned + Send>(
         &self,
         rholang_code: String,
-        _max_retries: u32,
+        max_retries: u32,
         _delay: Duration,
     ) -> Result<T, ReadNodeError> {
-        // Mock doesn't retry -- returns immediately
-        self.get_data(rholang_code).await
+        // Faithfully model the real client: retry only on an empty result
+        // (`ReturnValueMissing`), up to `max_retries` times. `delay` is ignored
+        // so tests stay fast.
+        let mut attempts = 0u32;
+        loop {
+            match self.get_data(rholang_code.clone()).await {
+                Err(ReadNodeError::ReturnValueMissing) if attempts < max_retries => {
+                    attempts += 1;
+                }
+                result => return result,
+            }
+        }
     }
 
     async fn get_data_or_none_with_retry<T: serde::de::DeserializeOwned + Send>(
         &self,
         rholang_code: String,
-        _max_retries: u32,
-        _delay: Duration,
+        max_retries: u32,
+        delay: Duration,
     ) -> Result<Option<T>, ReadNodeError> {
-        self.get_data_or_none(rholang_code).await
+        match self.get_data_with_retry(rholang_code, max_retries, delay).await {
+            Ok(data) => Ok(Some(data)),
+            Err(ReadNodeError::ReturnValueMissing) => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 }
 

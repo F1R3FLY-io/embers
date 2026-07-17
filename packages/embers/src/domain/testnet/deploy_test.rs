@@ -102,7 +102,23 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetService<R, W, N> {
         }
         .render()?;
 
-        let logs: Option<Vec<models::Log>> = self.read_client.get_data(code).await?;
+        // A test contract that produces no log entries (e.g. `Nil`) yields no
+        // value from the log-lookup explore-deploy. Treat that as "no logs"
+        // rather than propagating `ReturnValueMissing` as a 500.
+        //
+        // Retry on empty: after the observer's WS reports the deploy finalized,
+        // there is a brief window before that block's RSpace state is queryable
+        // via explore-deploy on the observer node, so a single-shot read can
+        // intermittently miss logs the deploy did write (read-after-write lag,
+        // worse under load). Mirror the analogous deploy-then-read retry in
+        // `run_agents_team.rs`. A genuinely empty (no-log) deploy simply exhausts
+        // the retries and resolves to `Ok(None)` -> `logs: []`; the worst-case
+        // retry window stays well under the client's 45s cap, so this never
+        // surfaces as a Timeout/500.
+        let logs: Option<Vec<models::Log>> = self
+            .read_client
+            .get_data_or_none_with_retry(code, 5, Duration::from_millis(500))
+            .await?;
 
         Ok(DeploySignedTestResp::Ok {
             logs: logs
@@ -368,6 +384,100 @@ mod tests {
                 assert_eq!(logs[1].message, "assertion failed");
             }
             other => panic!("expected Ok with logs, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_deploy_success_retries_until_logs_visible() {
+        let deploy_id = test_deploy_id();
+
+        // wait_for_deploy returns Some(false) -> finalized successfully
+        let observer =
+            MockNodeEventSource::new().with_wait_result(&deploy_id.to_string(), Some(false));
+
+        let write_client = MockWriteNode::new()
+            .with_head_block_index(10)
+            .with_deploy_response(Ok(deploy_id));
+
+        // The GetLogs read is empty for the first two attempts (simulating the
+        // read node's post-finalization visibility lag) then returns the log.
+        // A single-shot read would observe the first empty and return `[]`; the
+        // retry must poll until the logs materialize. This is the regression
+        // guard for the read-after-write flake.
+        let read_client = MockReadNode::new().on_code_containing_empty_then(
+            "get",
+            2,
+            json!([{ "level": "info", "message": "test passed" }]),
+        );
+
+        let service = make_service_with(write_client, read_client, observer);
+
+        let request = DeploySignedTestReq {
+            env: None,
+            test: test_signed_code(),
+        };
+
+        let resp = service
+            .deploy_test_contract(request)
+            .await
+            .expect("deploy_test_contract should succeed");
+
+        match resp {
+            DeploySignedTestResp::Ok { logs } => {
+                assert_eq!(
+                    logs.len(),
+                    1,
+                    "retry should surface the log once visible, got {}",
+                    logs.len()
+                );
+                assert!(
+                    matches!(logs[0].level, LogLevel::Info),
+                    "expected log level Info, got {:?}",
+                    logs[0].level
+                );
+                assert_eq!(logs[0].message, "test passed");
+            }
+            other => panic!("expected Ok with logs after retry, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_deploy_nil_no_logs_returns_empty() {
+        let deploy_id = test_deploy_id();
+
+        let observer =
+            MockNodeEventSource::new().with_wait_result(&deploy_id.to_string(), Some(false));
+
+        let write_client = MockWriteNode::new()
+            .with_head_block_index(10)
+            .with_deploy_response(Ok(deploy_id));
+
+        // No configured response -> the log-lookup read is always empty, as for
+        // a `Nil` test that logs nothing. The retry must exhaust and resolve to
+        // an empty log list (never a Timeout/500), preserving the no-logs
+        // semantic through the retry path.
+        let read_client = MockReadNode::new();
+
+        let service = make_service_with(write_client, read_client, observer);
+
+        let request = DeploySignedTestReq {
+            env: None,
+            test: test_signed_code(),
+        };
+
+        let resp = service
+            .deploy_test_contract(request)
+            .await
+            .expect("deploy_test_contract should succeed with no logs");
+
+        match resp {
+            DeploySignedTestResp::Ok { logs } => {
+                assert!(
+                    logs.is_empty(),
+                    "no-log deploy should yield an empty list, got: {logs:?}"
+                );
+            }
+            other => panic!("expected Ok with empty logs, got: {other:?}"),
         }
     }
 }
