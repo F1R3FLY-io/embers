@@ -7,9 +7,14 @@
 
 new rl(`rho:registry:lookup`),
     treeHashMapCh,
+    treeHashMapLookupCh,
+    treeHashMapInitCh,
     revVaultCh,
+    revVaultLookupCh,
     eitherCh,
+    eitherLookupCh,
     stackCh,
+    stackLookupCh,
     abort(`rho:execution:abort`),
     devNull(`rho:io:devNull`),
     deployData(`rho:deploy:data`),
@@ -21,27 +26,40 @@ new rl(`rho:registry:lookup`),
     getTransactionsHistory,
     getBalance
 in {
-    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-    for(treeHashMap <- treeHashMapCh) {
-        treeHashMap!("init", 3, *treeHashMapCh) |
+    // NOTE: each shared resource is looked up into its OWN channel and only the
+    // unwrapped resource is (re)sent to the channel that contracts peek (`<<-`).
+    // Sending the raw `rho:registry:lookup` result `(nonce, resource)` to the
+    // same channel that is later peeked races the peek — on f1r3node the bare
+    // peek pattern can match the `(nonce, resource)` tuple instead of the
+    // unwrapped resource, so the join never completes (transfers silently do
+    // not credit; balance queries return nothing). Keeping the lookup off the
+    // peeked channel avoids that ambiguity.
+    rl!(`rho:lang:treeHashMap`, *treeHashMapLookupCh) |
+    for(treeHashMap <- treeHashMapLookupCh) {
+        treeHashMap!("init", 3, *treeHashMapInitCh) |
 
-        for(@map <- treeHashMapCh) {
+        for(@map <- treeHashMapInitCh) {
             treeHashMapCh!(*treeHashMap, map)
         }
     } |
 
-    rl!(`rho:rchain:revVault`, *revVaultCh) |
-    for(@(_, revVault) <- revVaultCh) {
+    // f1r3node migrated the REV vault registry from the legacy
+    // `rho:rchain:revVault` to `rho:vault:system` (SystemVault). The legacy URN
+    // still resolves but is a SEPARATE, empty vault: transfers to it never touch
+    // the SystemVault balances that deploy pre-charge reads, so funded wallets
+    // stay broke. Use the SystemVault the node actually charges against.
+    rl!(`rho:vault:system`, *revVaultLookupCh) |
+    for(@(_, revVault) <- revVaultLookupCh) {
         revVaultCh!(revVault)
     } |
 
-    rl!(`rho:lang:either`, *eitherCh) |
-    for(@(_, either) <- eitherCh) {
+    rl!(`rho:lang:either`, *eitherLookupCh) |
+    for(@(_, either) <- eitherLookupCh) {
         eitherCh!(either)
     } |
 
-    rl!(`rho:lang:stack`, *stackCh) |
-    for(@(_, stack) <- stackCh) {
+    rl!(`rho:lang:stack`, *stackLookupCh) |
+    for(@(_, stack) <- stackLookupCh) {
         stackCh!(stack)
     } |
 

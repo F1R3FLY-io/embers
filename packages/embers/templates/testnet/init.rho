@@ -8,20 +8,28 @@
 new rl(`rho:registry:lookup`),
     devNull(`rho:io:devNull`),
     treeHashMapCh,
+    treeHashMapLookupCh,
+    treeHashMapInitCh,
     stackCh,
+    stackLookupCh,
     private
 in {
-    rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
-    for(treeHashMap <- treeHashMapCh) {
-        treeHashMap!("init", 3, *treeHashMapCh) |
+    // Look each shared resource up into its OWN channel and only forward the
+    // unwrapped resource onto the channel the log contracts peek (`<<-`). If the
+    // raw `(nonce, resource)` registry-lookup result were placed on the peeked
+    // channel, a bare `<<-` peek can bind that tuple instead of the resource and
+    // the join never fires — see the same fix in wallets/init.rho.
+    rl!(`rho:lang:treeHashMap`, *treeHashMapLookupCh) |
+    for(treeHashMap <- treeHashMapLookupCh) {
+        treeHashMap!("init", 3, *treeHashMapInitCh) |
 
-        for(@map <- treeHashMapCh) {
+        for(@map <- treeHashMapInitCh) {
             treeHashMapCh!(*treeHashMap, map)
         }
     } |
 
-    rl!(`rho:lang:stack`, *stackCh) |
-    for(@(_, stack) <- stackCh) {
+    rl!(`rho:lang:stack`, *stackLookupCh) |
+    for(@(_, stack) <- stackLookupCh) {
         stackCh!(stack)
     } |
 
