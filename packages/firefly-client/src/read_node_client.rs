@@ -14,13 +14,54 @@ pub struct ReadNodeClient {
     client: reqwest::Client,
 }
 
+/// Transport bounds for the read (explore-deploy) HTTP client.
+///
+/// reqwest's default client sets **no request timeout at all**, so `get_data`
+/// and `get_data_or_none` were entirely unbounded — and `get_data` is called
+/// directly by the periodic registry health check. reqwest's default
+/// `tcp_user_timeout` (30s) only fires when data goes *unacked*; a read node
+/// that accepts the connection and ACKs but then stalls at the HTTP layer would
+/// hang the call forever.
+#[derive(Clone, Copy, Debug)]
+pub struct ReadNodeConfig {
+    /// ~80x the observed healthy latency (0.24s) — generous for a heavy
+    /// exploratory term, and small enough that two full attempts still fit
+    /// inside the 45s cap used by `get_data_with_retry`.
+    pub request_timeout: Duration,
+    pub connect_timeout: Duration,
+    pub tcp_keepalive: Option<Duration>,
+}
+
+impl Default for ReadNodeConfig {
+    fn default() -> Self {
+        Self {
+            request_timeout: Duration::from_secs(20),
+            connect_timeout: Duration::from_secs(5),
+            tcp_keepalive: Some(Duration::from_secs(30)),
+        }
+    }
+}
+
 impl ReadNodeClient {
     pub fn new(url: String) -> Self {
+        Self::with_config(url, ReadNodeConfig::default())
+    }
+
+    /// # Panics
+    ///
+    /// Panics if the underlying HTTP client cannot be built, which can only
+    /// happen on a malformed TLS/proxy environment — an unrecoverable
+    /// misconfiguration at startup.
+    pub fn with_config(url: String, config: ReadNodeConfig) -> Self {
         tracing::info!("ReadNodeClient targeting: {url}");
-        Self {
-            url,
-            client: Default::default(),
-        }
+        let client = reqwest::Client::builder()
+            .connect_timeout(config.connect_timeout)
+            .timeout(config.request_timeout)
+            .tcp_keepalive(config.tcp_keepalive)
+            .build()
+            .expect("failed to build read-node HTTP client");
+
+        Self { url, client }
     }
 
     pub async fn get_data<T>(&self, rholang_code: String) -> Result<T, ReadNodeError>
@@ -640,5 +681,40 @@ mod tests {
             .get_data_or_none_with_retry::<String>("code".into(), 3, Duration::from_millis(10))
             .await;
         assert!(matches!(result, Err(ReadNodeError::Api(_, _))));
+    }
+
+    /// The read client had NO request timeout at all, so a read node that accepts
+    /// the connection and then stalls at the HTTP layer would hang `get_data`
+    /// forever — including the periodic registry health check, which calls it
+    /// directly. (reqwest's default `tcp_user_timeout` does not help: it only
+    /// fires when data goes *unacked*.) This test hangs on the old code.
+    #[tokio::test]
+    async fn test_get_data_times_out_when_server_stalls() {
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/api/explore-deploy"))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_json(string_expr_response("never arrives"))
+                    .set_delay(Duration::from_secs(30)),
+            )
+            .mount(&server)
+            .await;
+
+        let config = ReadNodeConfig {
+            request_timeout: Duration::from_millis(300),
+            ..ReadNodeConfig::default()
+        };
+        let client = ReadNodeClient::with_config(server.uri(), config);
+
+        let started = std::time::Instant::now();
+        let result: Result<String, _> = client.get_data("code".into()).await;
+
+        assert!(result.is_err(), "a stalled read must error, not hang");
+        assert!(
+            started.elapsed() < Duration::from_secs(5),
+            "must be bounded by request_timeout, took {:?}",
+            started.elapsed()
+        );
     }
 }

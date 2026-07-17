@@ -41,7 +41,7 @@ uuid                  = { version = "1.20", features = ["v7"] }
 zbase32               = { version = "0.1" }
 
 [dev-dependencies]
-tokio   = { version = "1.49", features = ["rt-multi-thread", "macros", "time", "test-util"] }
+tokio   = { version = "1.49", features = ["rt-multi-thread", "macros", "time", "test-util", "net"] }
 wiremock = { version = "0.6" }
 
 [lints.clippy]
