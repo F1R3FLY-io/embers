@@ -35,11 +35,9 @@ impl<'de> Deserialize<'de> for Graph {
     {
         let raw = String::deserialize(deserializer)?;
         // The Rholang tuplespace stores string content without unescaping
-        // escape sequences. Undo the escape_rho_string() level that was
-        // added when embedding the graphl string in Rholang source code.
-        // Order matters — reverse of escape_rho_string which does
-        // .replace('\\', "\\\\").replace('"', "\\\""):
-        let graphl = raw.replace("\\\"", "\"").replace("\\\\", "\\");
+        // escape sequences. Undo the escape_rho_string() level that was added
+        // when embedding the graphl string in Rholang source code.
+        let graphl = crate::blockchain::common::unescape_rho_string(&raw);
         models::Graph::new(graphl.clone()).map(Self).map_err(|e| {
             tracing::error!(
                 error = %e,
