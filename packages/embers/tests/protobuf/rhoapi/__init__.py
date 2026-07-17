@@ -29,18 +29,23 @@ __all__ = (
     "ENeq",
     "ENot",
     "EOr",
+    "EPathMap",
     "EPercentPercent",
     "EPlus",
     "EPlusPlus",
     "ESet",
     "ETuple",
     "EVar",
+    "EZipper",
     "Expr",
+    "GBigRational",
     "GDeployId",
     "GDeployerId",
+    "GFixedPoint",
     "GPrivate",
     "GSysAuthToken",
     "GUnforgeable",
+    "If",
     "KeyValuePair",
     "ListBindPatterns",
     "ListParWithRandom",
@@ -384,6 +389,20 @@ default_message_pool.register_message("rhoapi", "EOr", EOr)
 
 
 @dataclass(eq=False, repr=False)
+class EPathMap(betterproto2.Message):
+    ps: "list[Par]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+
+    locally_free: "bytes" = betterproto2.field(3, betterproto2.TYPE_BYTES)
+
+    connective_used: "bool" = betterproto2.field(4, betterproto2.TYPE_BOOL)
+
+    remainder: "Var | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True)
+
+
+default_message_pool.register_message("rhoapi", "EPathMap", EPathMap)
+
+
+@dataclass(eq=False, repr=False)
 class EPercentPercent(betterproto2.Message):
     """
     *
@@ -533,6 +552,14 @@ class Expr(betterproto2.Message):
         24, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
     )
 
+    e_pathmap_body: "EPathMap | None" = betterproto2.field(
+        32, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
+
+    e_zipper_body: "EZipper | None" = betterproto2.field(
+        33, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
+
     e_matches_body: "EMatches | None" = betterproto2.field(
         27, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
     )
@@ -560,8 +587,89 @@ class Expr(betterproto2.Message):
 
     e_mod_body: "EMod | None" = betterproto2.field(31, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
 
+    g_double: "int | None" = betterproto2.field(34, betterproto2.TYPE_FIXED64, optional=True, group="expr_instance")
+    """
+    Fields 32-33 reserved for future use
+
+    Extended numeric types (Rholang numeric types spec, 2025-11-13)
+    fixed64 (not protobuf double) to preserve bit-exact IEEE 754 semantics (-0.0 vs 0.0, NaN payloads)
+
+    IEEE 754 f64 stored as raw bits (covers f32 losslessly)
+    """
+
+    g_big_int: "bytes | None" = betterproto2.field(35, betterproto2.TYPE_BYTES, optional=True, group="expr_instance")
+    """
+    Arbitrary-precision signed integer (big-endian two's complement)
+    """
+
+    g_big_rat: "GBigRational | None" = betterproto2.field(
+        36, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
+    """
+    Exact rational number
+    """
+
+    g_fixed_point: "GFixedPoint | None" = betterproto2.field(
+        37, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
+    """
+    Fixed-point decimal
+    """
+
 
 default_message_pool.register_message("rhoapi", "Expr", Expr)
+
+
+@dataclass(eq=False, repr=False)
+class EZipper(betterproto2.Message):
+    """
+    *
+    Zipper for navigating and modifying PathMaps.
+    Zippers maintain a focus position within a PathMap structure,
+    allowing efficient navigation and modification operations.
+    """
+
+    pathmap: "EPathMap | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    """
+    The underlying PathMap being navigated
+    """
+
+    current_path: "list[bytes]" = betterproto2.field(2, betterproto2.TYPE_BYTES, repeated=True)
+    """
+    Current path position in the zipper (list of path segments as bytes)
+    Each segment is encoded as bytes representing a Par value
+    """
+
+    is_write_zipper: "bool" = betterproto2.field(3, betterproto2.TYPE_BOOL)
+    """
+    Whether this is a write zipper (true) or read zipper (false)
+    """
+
+    locally_free: "bytes" = betterproto2.field(4, betterproto2.TYPE_BYTES)
+    """
+    Metadata from the PathMap
+    """
+
+    connective_used: "bool" = betterproto2.field(5, betterproto2.TYPE_BOOL)
+
+
+default_message_pool.register_message("rhoapi", "EZipper", EZipper)
+
+
+@dataclass(eq=False, repr=False)
+class GBigRational(betterproto2.Message):
+    numerator: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
+    """
+    BigInt as big-endian two's complement
+    """
+
+    denominator: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
+    """
+    BigInt as big-endian two's complement, always > 0
+    """
+
+
+default_message_pool.register_message("rhoapi", "GBigRational", GBigRational)
 
 
 @dataclass(eq=False, repr=False)
@@ -578,6 +686,22 @@ class GDeployId(betterproto2.Message):
 
 
 default_message_pool.register_message("rhoapi", "GDeployId", GDeployId)
+
+
+@dataclass(eq=False, repr=False)
+class GFixedPoint(betterproto2.Message):
+    unscaled: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
+    """
+    BigInt as big-endian two's complement
+    """
+
+    scale: "int" = betterproto2.field(2, betterproto2.TYPE_UINT32)
+    """
+    Number of decimal digits: actual_value = unscaled / 10^scale
+    """
+
+
+default_message_pool.register_message("rhoapi", "GFixedPoint", GFixedPoint)
 
 
 @dataclass(eq=False, repr=False)
@@ -625,6 +749,30 @@ class GUnforgeable(betterproto2.Message):
 
 
 default_message_pool.register_message("rhoapi", "GUnforgeable", GUnforgeable)
+
+
+@dataclass(eq=False, repr=False)
+class If(betterproto2.Message):
+    """
+    First-class conditional. Reduction evaluates `condition`'s expression slot;
+    fires `if_true` when it reduces to GBool(true), `if_false` when it reduces
+    to GBool(false), and raises InterpreterError::IfConditionTypeError
+    otherwise. Side effects in `condition` (sends/news/receives) are inert
+    because the evaluator only walks par.exprs.
+    """
+
+    condition: "Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+
+    if_true: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+
+    if_false: "Par | None" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, optional=True)
+
+    locally_free: "bytes" = betterproto2.field(4, betterproto2.TYPE_BYTES)
+
+    connective_used: "bool" = betterproto2.field(5, betterproto2.TYPE_BOOL)
+
+
+default_message_pool.register_message("rhoapi", "If", If)
 
 
 @dataclass(eq=False, repr=False)
@@ -677,6 +825,15 @@ class MatchCase(betterproto2.Message):
 
     free_count: "int" = betterproto2.field(3, betterproto2.TYPE_INT32)
 
+    guard: "Par | None" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, optional=True)
+    """
+    Optional per-case `where`-clause guard. When non-empty, the case only
+    fires if the pattern matches AND the guard evaluates to GBool(true)
+    under the pattern's bindings. Anything else (false, non-bool, error)
+    falls through to the next case. An empty Par means no guard. See plan
+    §3.4 / §3.8.
+    """
+
 
 default_message_pool.register_message("rhoapi", "MatchCase", MatchCase)
 
@@ -692,14 +849,16 @@ class New(betterproto2.Message):
 
     bind_count: "int" = betterproto2.field(1, betterproto2.TYPE_SINT32)
     """
-    Includes any uris listed below. This makes it easier to substitute or walk a term.
+    Includes any uris listed below. This makes it easier to substitute or walk
+    a term.
     """
 
     p: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
 
     uri: "list[str]" = betterproto2.field(3, betterproto2.TYPE_STRING, repeated=True)
     """
-    For normalization, uri-referenced variables come at the end, and in lexicographical order.
+    For normalization, uri-referenced variables come at the end, and in
+    lexicographical order.
     """
 
     injections: "dict[str, Par]" = betterproto2.field(
@@ -742,6 +901,8 @@ class Par(betterproto2.Message):
     bundles: "list[Bundle]" = betterproto2.field(11, betterproto2.TYPE_MESSAGE, repeated=True)
 
     connectives: "list[Connective]" = betterproto2.field(8, betterproto2.TYPE_MESSAGE, repeated=True)
+
+    conditionals: "list[If]" = betterproto2.field(12, betterproto2.TYPE_MESSAGE, repeated=True)
 
     locally_free: "bytes" = betterproto2.field(9, betterproto2.TYPE_BYTES)
 
@@ -805,6 +966,14 @@ class Receive(betterproto2.Message):
 
     connective_used: "bool" = betterproto2.field(7, betterproto2.TYPE_BOOL)
 
+    condition: "Par | None" = betterproto2.field(8, betterproto2.TYPE_MESSAGE, optional=True)
+    """
+    Optional `where`-clause guard. When non-empty, the receive only commits
+    (consumes the matched messages) if every spatial pattern matches AND
+    the condition evaluates to GBool(true) under the bound variables. An
+    empty Par means no guard. See plan §3.3 / §3.5.
+    """
+
 
 default_message_pool.register_message("rhoapi", "Receive", Receive)
 
@@ -861,6 +1030,15 @@ class TaggedContinuation(betterproto2.Message):
     )
 
     scala_body_ref: "int | None" = betterproto2.field(2, betterproto2.TYPE_INT64, optional=True, group="tagged_cont")
+
+    guard: "Par | None" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, optional=True)
+    """
+    Optional `where`-clause guard, lifted from `Receive.condition` when the
+    continuation is registered with rspace. The matcher coordinator evaluates
+    it (via rho-pure-eval) against the *combined* bindings of all binds after
+    every spatial pattern has matched, so cross-channel guards see every
+    bound variable. Empty Par = no guard. See plan §7.12.
+    """
 
 
 default_message_pool.register_message("rhoapi", "TaggedContinuation", TaggedContinuation)
