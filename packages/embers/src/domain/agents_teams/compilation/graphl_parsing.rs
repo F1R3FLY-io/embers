@@ -164,6 +164,16 @@ enum NodeContext {
     TTIModel,
     #[serde(rename = "tts-model")]
     TTSModel,
+    /// A user-defined agent, referenced by id and version. The agent's Rholang
+    /// is fetched from agents storage at deploy time and spliced into the team.
+    /// `agent_name` is the label the author gave it; it names this agent's entry
+    /// when a downstream node joins several inputs into a map.
+    #[serde(rename = "agent", rename_all = "camelCase")]
+    Agent {
+        agent_id: String,
+        agent_version: String,
+        agent_name: String,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -183,10 +193,31 @@ pub struct Output<'a> {
 
 #[derive(Debug, Clone)]
 pub enum Node<'a> {
-    Compress { from: Vec<Vertex<'a>>, output: bool },
-    TextModel { from: Vertex<'a>, output: bool },
-    TTIModel { from: Vertex<'a>, output: bool },
-    TTSModel { from: Vertex<'a>, output: bool },
+    Compress {
+        from: Vec<Vertex<'a>>,
+        output: bool,
+    },
+    TextModel {
+        from: Vertex<'a>,
+        output: bool,
+    },
+    TTIModel {
+        from: Vertex<'a>,
+        output: bool,
+    },
+    TTSModel {
+        from: Vertex<'a>,
+        output: bool,
+    },
+    /// Like `Compress`, an agent may take several incoming edges: they are
+    /// joined and delivered as a map. A single edge is delivered as the value.
+    Agent {
+        agent_id: String,
+        agent_version: String,
+        agent_name: String,
+        from: Vec<Vertex<'a>>,
+        output: bool,
+    },
 }
 
 impl Node<'_> {
@@ -196,14 +227,43 @@ impl Node<'_> {
             Node::TextModel { output, .. } => *output,
             Node::TTIModel { output, .. } => *output,
             Node::TTSModel { output, .. } => *output,
+            Node::Agent { output, .. } => *output,
         }
     }
+}
+
+/// Identifies a specific version of a user-defined agent referenced by a team.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AgentRef {
+    pub id: String,
+    pub version: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Code<'a> {
     pub nodes: BTreeMap<Vertex<'a>, Node<'a>>,
     pub output: Option<Output<'a>>,
+}
+
+impl Code<'_> {
+    /// Every agent version this team references. Deduplicated, so an agent used
+    /// by two nodes is fetched once.
+    pub fn agent_refs(&self) -> BTreeSet<AgentRef> {
+        self.nodes
+            .values()
+            .filter_map(|node| match node {
+                Node::Agent {
+                    agent_id,
+                    agent_version,
+                    ..
+                } => Some(AgentRef {
+                    id: agent_id.clone(),
+                    version: agent_version.clone(),
+                }),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 fn resolve_context<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result<NodeContext> {
@@ -315,6 +375,24 @@ pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
                     let output = has_output(&flat, node)?;
                     partial.nodes.insert(node, Node::TTSModel { from, output });
                 }
+                NodeContext::Agent {
+                    agent_id,
+                    agent_version,
+                    agent_name,
+                } => {
+                    let from = resolve_froms(&flat, node)?.collect();
+                    let output = has_output(&flat, node)?;
+                    partial.nodes.insert(
+                        node,
+                        Node::Agent {
+                            agent_id,
+                            agent_version,
+                            agent_name,
+                            from,
+                            output,
+                        },
+                    );
+                }
             }
 
             anyhow::Ok(partial)
@@ -327,5 +405,68 @@ pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
             output,
         } => Ok(Code { nodes, output }),
         PartialCode { input: None, .. } => Err(anyhow!("input is missing")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::agents_teams::models::Graph;
+
+    /// The graphl an agent node produces, in the shape the editor emits: three
+    /// context-tagged vertices plus the edges wiring them together.
+    fn agent_team_graphl() -> String {
+        let agent_context = r#"{\"type\":\"agent\",\"agentId\":\"019f-abc\",\"agentName\":\"Summarize\",\"agentVersion\":\"019f-def\"}"#;
+        format!(
+            r#"0 * {{context "{{\"type\":\"input-node\"}}" for input1 in let input1 = < input1 > in < input1 > | {{context "{agent_context}" for model1 in let model1 = < model1 > in < model1 > | {{context "{{\"type\":\"output-node\"}}" for output1 in let output1 = < output1 > in < output1 > | 0}}}}}} * {{(let input1 = < input1 > in 0, let model1 = < model1 > in 0) * {{(let model1 = < model1 > in 0, let output1 = < output1 > in 0) * 0}}}}"#
+        )
+    }
+
+    #[test]
+    fn parses_an_agent_node_from_editor_graphl() {
+        let graph = Graph::new(agent_team_graphl()).expect("graphl should parse");
+        let code = parse(&graph).expect("an agent node should compile");
+
+        let agent = code
+            .nodes
+            .values()
+            .find_map(|node| match node {
+                Node::Agent {
+                    agent_id,
+                    agent_version,
+                    agent_name,
+                    from,
+                    output,
+                } => Some((agent_id, agent_version, agent_name, from.len(), *output)),
+                _ => None,
+            })
+            .expect("the graph should yield an agent node");
+
+        assert_eq!(agent.0, "019f-abc", "agent id should survive the context");
+        assert_eq!(agent.1, "019f-def", "agent version should survive");
+        assert_eq!(agent.2, "Summarize", "agent name should survive");
+        assert_eq!(agent.3, 1, "this agent has a single incoming edge");
+        assert!(agent.4, "the agent feeds the output node");
+    }
+
+    #[test]
+    fn collects_agent_references_for_resolution() {
+        let graph = Graph::new(agent_team_graphl()).expect("graphl should parse");
+        let code = parse(&graph).expect("an agent node should compile");
+
+        let refs = code.agent_refs();
+        assert_eq!(refs.len(), 1);
+        let agent_ref = refs.iter().next().expect("one reference");
+        assert_eq!(agent_ref.id, "019f-abc");
+        assert_eq!(agent_ref.version, "019f-def");
+    }
+
+    #[test]
+    fn a_graph_without_agents_references_none() {
+        let graphl = r#"0 * {context "{\"type\":\"input-node\"}" for input1 in let input1 = < input1 > in < input1 > | {context "{\"type\":\"text-model\"}" for model1 in let model1 = < model1 > in < model1 > | {context "{\"type\":\"output-node\"}" for output1 in let output1 = < output1 > in < output1 > | 0}}} * {(let input1 = < input1 > in 0, let model1 = < model1 > in 0) * {(let model1 = < model1 > in 0, let output1 = < output1 > in 0) * 0}}"#;
+        let graph = Graph::new(graphl.to_owned()).expect("graphl should parse");
+        let code = parse(&graph).expect("a built-in only graph should compile");
+
+        assert!(code.agent_refs().is_empty());
     }
 }

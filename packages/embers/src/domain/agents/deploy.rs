@@ -3,7 +3,7 @@ use std::time::Duration;
 use anyhow::Context;
 use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, Uri};
-use firefly_client::rendering::Render;
+use firefly_client::rendering::{Inline, Render};
 use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::agents::AgentsService;
@@ -17,6 +17,22 @@ struct UpdateLastDeploy {
     id: String,
     version: String,
     last_deploy: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Render)]
+#[template(path = "agents/deploy_agent.rho")]
+struct DeployAgentCode {
+    /// The agent's source, emitted raw rather than as a Rholang string literal.
+    code: Inline,
+    /// Public name the deployed agent answers on.
+    handle: String,
+}
+
+/// Name a standalone-deployed agent is reachable at. Derived from id and
+/// version so redeploying a version is idempotent and two versions of the same
+/// agent never collide.
+fn agent_handle(id: &str, version: &str) -> String {
+    format!("agent:{id}:{version}")
 }
 
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
@@ -48,7 +64,20 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
                     )
                     .await?
                     .context("agent not found")?;
-                let code = agent.code.context("agent has no code")?;
+                let source = agent.code.context("agent has no code")?;
+                anyhow::ensure!(
+                    !source.trim().is_empty(),
+                    "agent {id} version {version} has empty code",
+                );
+
+                // Bind the agent's entry contract and publish it: deployed
+                // verbatim, an agent written for a team is rejected outright
+                // because its `main` is a free name at the top level.
+                let code = DeployAgentCode {
+                    code: Inline::from(source),
+                    handle: agent_handle(&id, &version),
+                }
+                .render()?;
 
                 let system_code = UpdateLastDeploy {
                     env_uri: self.uri.clone(),
@@ -159,6 +188,121 @@ mod tests {
             1,
             "expected only the main contract to be deployed, but got {} deploys",
             deployed.len()
+        );
+    }
+}
+
+#[cfg(test)]
+mod deploy_wrapping_tests {
+    use serde_json::json;
+
+    use firefly_client::models::WalletAddress;
+
+    use super::*;
+    use crate::domain::agents::models::DeployReq;
+    use crate::domain::test_helpers::*;
+
+    const AGENT_SOURCE: &str = "contract main(@input, return) = { return!(input) }";
+
+    fn agent_json(code: serde_json::Value) -> serde_json::Value {
+        json!({
+            "id": "agent-id",
+            "version": "agent-version",
+            "created_at": 0,
+            "last_deploy": null,
+            "name": "Summarize",
+            "description": null,
+            "shard": null,
+            "logo": null,
+            "code": code,
+        })
+    }
+
+    fn service_returning(code: serde_json::Value) -> AgentsService<MockReadNode, MockWriteNode, MockNodeEventSource> {
+        AgentsService {
+            uri: test_uri(),
+            write_client: MockWriteNode::new().with_head_block_index(10),
+            read_client: MockReadNode::new().on_code_containing("\"get\"", agent_json(code)),
+            observer_node_events: MockNodeEventSource::new(),
+        }
+    }
+
+    fn agent_request() -> DeployReq {
+        DeployReq::Agent {
+            id: "agent-id".to_owned(),
+            version: "agent-version".to_owned(),
+            address: WalletAddress::from(test_public_key()),
+            phlo_limit: 50_000i64.try_into().expect("positive phlo limit"),
+        }
+    }
+
+    #[tokio::test]
+    async fn binds_the_entry_contract_so_a_team_agent_can_deploy() {
+        let service = service_returning(json!(AGENT_SOURCE));
+
+        let response = service
+            .prepare_deploy_contract(agent_request())
+            .await
+            .expect("deploying an agent written for a team should succeed");
+
+        let code = String::from_utf8_lossy(&response.contract.0).into_owned();
+
+        assert!(
+            code.contains("new main in"),
+            "`main` must be bound, otherwise the node rejects it as a free name:\n{code}"
+        );
+        assert!(
+            code.contains(AGENT_SOURCE),
+            "the agent's own source should be spliced in verbatim:\n{code}"
+        );
+        assert!(
+            code.contains(r#"contract @"agent:agent-id:agent-version""#),
+            "the deployed agent should be reachable at a handle:\n{code}"
+        );
+        assert!(
+            !code.contains(r#""contract main"#),
+            "the source must be raw, never a quoted Rholang string:\n{code}"
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_blank_agent_code() {
+        let service = service_returning(json!("   \n "));
+
+        let error = service
+            .prepare_deploy_contract(agent_request())
+            .await
+            .expect_err("an agent with blank code should not deploy");
+
+        assert!(
+            format!("{error:#}").contains("empty code"),
+            "unexpected error: {error:#}"
+        );
+    }
+
+    #[tokio::test]
+    async fn raw_code_deploys_are_left_alone() {
+        // The raw-code path is arbitrary user Rholang, not an agent, so it must
+        // not be wrapped.
+        let service = service_returning(json!(AGENT_SOURCE));
+        let raw = "new x in { x!(1) }".to_owned();
+
+        let response = service
+            .prepare_deploy_contract(DeployReq::Code {
+                code: raw.clone(),
+                phlo_limit: 50_000i64.try_into().expect("positive phlo limit"),
+            })
+            .await
+            .expect("raw code should deploy");
+
+        let code = String::from_utf8_lossy(&response.contract.0).into_owned();
+        assert!(
+            code.contains(&raw),
+            "raw code must be deployed verbatim, got:\n{code}"
+        );
+        assert!(
+            !code.contains("new main in"),
+            "the raw-code path must not be wrapped:\n{code}"
         );
     }
 }

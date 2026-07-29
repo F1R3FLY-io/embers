@@ -1,0 +1,19 @@
+{#-
+  Wraps an agent's source for a standalone deploy.
+
+  An agent written for a team is a bare `contract main(@input, return)`, whose
+  name is free at the top level — the normalizer rejects that outright. Binding
+  `main` with `new` makes it deployable, and the forwarder publishes it at a
+  handle derived from the agent's id and version, so a standalone deploy yields
+  something callable rather than an inert term.
+
+  Code that does not define `main` still deploys and runs exactly as before; it
+  simply leaves the forwarder unserved.
+-#}
+new main in {
+    {{ code }}
+    |
+    contract @{{ handle }}(@input, return) = {
+        main!(input, *return)
+    }
+}

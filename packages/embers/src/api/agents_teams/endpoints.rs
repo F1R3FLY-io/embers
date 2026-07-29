@@ -30,6 +30,7 @@ use crate::api::common::{
     SignedContract,
     Stringified,
 };
+use crate::domain::agents::AgentsService;
 use crate::domain::agents_teams::{AgentsTeamsService, models};
 
 #[derive(Debug, Clone)]
@@ -102,11 +103,12 @@ impl AgentsTeamsApi {
         &self,
         Json(body): Json<DeployAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents): Data<&AgentsService>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<DeployAgentsTeamResp>>> {
         PrepareResponse::from_call(
             body,
-            |body| agents_teams.prepare_deploy_contract(body.into()),
+            |body| agents_teams.prepare_deploy_contract(body.into(), agents),
             encoding_key,
         )
         .await
