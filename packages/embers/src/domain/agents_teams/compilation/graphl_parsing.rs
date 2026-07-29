@@ -461,6 +461,140 @@ mod tests {
         assert_eq!(agent_ref.version, "019f-def");
     }
 
+    // -------------------------------------------------------
+    // fan-out / fan-in: the red-team topology, end to end
+    // through the real graphl parser
+    // -------------------------------------------------------
+
+    /// Assembles graphl in the shape the editor emits: vertices nested inside
+    /// their contexts, then a right-nested tensor chain of anonymous edges.
+    fn graphl(nodes: &[(&str, String)], edges: &[(&str, &str)]) -> String {
+        let mut body = "0".to_owned();
+        for (name, json) in nodes.iter().rev() {
+            let escaped = json.replace('"', "\\\"");
+            body = format!(
+                "{{context \"{escaped}\" for {name} in let {name} = < {name} > in < {name} > | {body}}}"
+            );
+        }
+
+        let mut edge_chain = "0".to_owned();
+        for (from, to) in edges.iter().rev() {
+            edge_chain = format!(
+                "{{(let {from} = < {from} > in 0, let {to} = < {to} > in 0) * {edge_chain}}}"
+            );
+        }
+
+        format!("0 * {body} * {edge_chain}")
+    }
+
+    fn agent_context(name: &str) -> String {
+        format!(
+            r#"{{"type":"agent","agentId":"{name}-id","agentName":"{name}","agentVersion":"v1"}}"#
+        )
+    }
+
+    /// Input feeds every reasoning node; the hypothesis fans out to the three
+    /// critics and the refiner; the critics fan back into the refiner.
+    fn red_team_graphl() -> String {
+        graphl(
+            &[
+                ("aIn", r#"{"type":"input-node"}"#.to_owned()),
+                ("aHyp", agent_context("Hypothesize")),
+                ("aLog", agent_context("LogicCritic")),
+                ("aEvi", agent_context("EvidenceCritic")),
+                ("aFea", agent_context("FeasibilityCritic")),
+                ("aRef", agent_context("Refine")),
+                ("aCon", agent_context("Condense")),
+                ("aOut", r#"{"type":"output-node"}"#.to_owned()),
+            ],
+            &[
+                ("aIn", "aHyp"),
+                ("aIn", "aLog"),
+                ("aIn", "aEvi"),
+                ("aIn", "aFea"),
+                ("aIn", "aRef"),
+                ("aIn", "aCon"),
+                ("aHyp", "aLog"),
+                ("aHyp", "aEvi"),
+                ("aHyp", "aFea"),
+                ("aHyp", "aRef"),
+                ("aLog", "aRef"),
+                ("aEvi", "aRef"),
+                ("aFea", "aRef"),
+                ("aRef", "aCon"),
+                ("aCon", "aOut"),
+            ],
+        )
+    }
+
+    fn agent_arity(code: &Code<'_>, name: &str) -> usize {
+        code.nodes
+            .values()
+            .find_map(|node| match node {
+                Node::Agent {
+                    agent_name, from, ..
+                } if agent_name == name => Some(from.len()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("no agent node named {name}"))
+    }
+
+    #[test]
+    fn parses_fan_out_and_fan_in_arities() {
+        let graph = Graph::new(red_team_graphl()).expect("red-team graphl should parse");
+        let code = parse(&graph).expect("the red-team graph should compile");
+
+        assert_eq!(code.nodes.len(), 6, "six agent nodes, input and output aside");
+        assert_eq!(agent_arity(&code, "Hypothesize"), 1, "input only");
+        assert_eq!(agent_arity(&code, "LogicCritic"), 2, "input and hypothesis");
+        assert_eq!(agent_arity(&code, "EvidenceCritic"), 2);
+        assert_eq!(agent_arity(&code, "FeasibilityCritic"), 2);
+        assert_eq!(
+            agent_arity(&code, "Refine"),
+            5,
+            "input, hypothesis and all three critiques"
+        );
+        assert_eq!(agent_arity(&code, "Condense"), 2, "input and refinement");
+    }
+
+    #[test]
+    fn fan_out_reaches_every_target() {
+        let graph = Graph::new(red_team_graphl()).expect("red-team graphl should parse");
+        let code = parse(&graph).expect("the red-team graph should compile");
+
+        // The hypothesis vertex must appear as an input of all four of its
+        // targets; losing an edge here is exactly the failure a fan-out bug
+        // would produce.
+        let readers = code
+            .nodes
+            .values()
+            .filter(|node| match node {
+                Node::Agent { agent_name, from, .. } => {
+                    agent_name != "Hypothesize"
+                        && from.iter().any(|vertex| *vertex.as_ref() == "aHyp")
+                }
+                _ => false,
+            })
+            .count();
+        assert_eq!(
+            readers, 4,
+            "the hypothesis feeds three critics and the refiner"
+        );
+    }
+
+    #[test]
+    fn every_referenced_agent_version_is_collected_once() {
+        let graph = Graph::new(red_team_graphl()).expect("red-team graphl should parse");
+        let code = parse(&graph).expect("the red-team graph should compile");
+
+        let refs = code.agent_refs();
+        assert_eq!(refs.len(), 6, "six distinct agents, each fetched once");
+        assert!(
+            refs.iter().all(|agent_ref| agent_ref.version == "v1"),
+            "versions should survive the context round-trip: {refs:?}"
+        );
+    }
+
     #[test]
     fn a_graph_without_agents_references_none() {
         let graphl = r#"0 * {context "{\"type\":\"input-node\"}" for input1 in let input1 = < input1 > in < input1 > | {context "{\"type\":\"text-model\"}" for model1 in let model1 = < model1 > in < model1 > | {context "{\"type\":\"output-node\"}" for output1 in let output1 = < output1 > in < output1 > | 0}}} * {(let input1 = < input1 > in 0, let model1 = < model1 > in 0) * {(let model1 = < model1 > in 0, let output1 = < output1 > in 0) * 0}}"#;

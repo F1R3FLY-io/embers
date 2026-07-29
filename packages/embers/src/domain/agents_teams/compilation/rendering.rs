@@ -616,6 +616,208 @@ mod tests {
         );
     }
 
+    // -------------------------------------------------------
+    // red-team topology: broadcast to several sinks, then fan
+    // those back into one agent
+    // -------------------------------------------------------
+
+    /// Stub body for a named agent; never calls `rho:ai:gpt4`, so assertions
+    /// stay deterministic.
+    fn named_agent<'a>(name: &str, from: Vec<Vertex<'a>>) -> Node<'a> {
+        Node::Agent {
+            agent_id: format!("{name}-id"),
+            agent_version: "v1".to_owned(),
+            agent_name: name.to_owned(),
+            from,
+            output: true,
+        }
+    }
+
+    fn named_codes(names: &[&str]) -> AgentCodes {
+        names
+            .iter()
+            .map(|name| {
+                (
+                    AgentRef {
+                        id: format!("{name}-id"),
+                        version: "v1".to_owned(),
+                    },
+                    format!("contract main(@input, return) = {{ return!(\"{name}\") }}"),
+                )
+            })
+            .collect()
+    }
+
+    /// `Input → Hypothesize → {3 critics}`, then everything into `Refine`,
+    /// `Refine → Condense → Output`. `Input` additionally feeds the critics, the
+    /// refiner and the condenser, which is what makes their inputs Maps.
+    fn red_team_code<'a>(
+        input: Vertex<'a>,
+        hypothesize: Vertex<'a>,
+        logic: Vertex<'a>,
+        evidence: Vertex<'a>,
+        feasibility: Vertex<'a>,
+        refine: Vertex<'a>,
+        condense: Vertex<'a>,
+    ) -> Code<'a> {
+        Code {
+            nodes: BTreeMap::from([
+                (hypothesize, named_agent("Hypothesize", vec![input])),
+                (logic, named_agent("LogicCritic", vec![input, hypothesize])),
+                (
+                    evidence,
+                    named_agent("EvidenceCritic", vec![input, hypothesize]),
+                ),
+                (
+                    feasibility,
+                    named_agent("FeasibilityCritic", vec![input, hypothesize]),
+                ),
+                (
+                    refine,
+                    named_agent(
+                        "Refine",
+                        vec![input, hypothesize, logic, evidence, feasibility],
+                    ),
+                ),
+                (condense, named_agent("Condense", vec![input, refine])),
+            ]),
+            output: Some(GraphOutput { from: condense }),
+        }
+    }
+
+    fn render_red_team() -> String {
+        let code = red_team_code(
+            "aInput".into(),
+            "aHypothesize".into(),
+            "aLogic".into(),
+            "aEvidence".into(),
+            "aFeasibility".into(),
+            "aRefine".into(),
+            "aCondense".into(),
+        );
+        let codes = named_codes(&[
+            "Hypothesize",
+            "LogicCritic",
+            "EvidenceCritic",
+            "FeasibilityCritic",
+            "Refine",
+            "Condense",
+        ]);
+        render(code, deploy(), &codes).expect("the red-team graph should compile")
+    }
+
+    #[test]
+    fn the_refiner_joins_every_upstream_channel() {
+        let rendered = render_red_team();
+
+        // Four producers reach the refiner over channels (hypothesize plus the
+        // three critics); the fifth input rides the contract's `input`
+        // parameter and so must not occupy a join slot.
+        let refine_join = rendered
+            .split("new main, agentReturn in")
+            .find(|fragment| fragment.contains(r#""logicCritic""#))
+            .expect("the refiner's fragment should be rendered");
+        let separators = rendered.matches('&').count();
+        assert!(
+            separators >= 3,
+            "the refiner needs a four-way join, so at least three `&` separators:\n{rendered}"
+        );
+        assert!(
+            refine_join.contains(r#""hypothesize""#)
+                && refine_join.contains(r#""logicCritic""#)
+                && refine_join.contains(r#""evidenceCritic""#)
+                && refine_join.contains(r#""feasibilityCritic""#)
+                && refine_join.contains(r#""input""#),
+            "the refiner's map should carry all five inputs:\n{refine_join}"
+        );
+    }
+
+    #[test]
+    fn input_edges_do_not_occupy_join_slots() {
+        let rendered = render_red_team();
+
+        // `From::Input` renders as the bare `input` parameter. If it leaked into
+        // a join it would appear as `<- input`, which is not a channel.
+        assert!(
+            !rendered.contains("<- input\n") && !rendered.contains("<- input "),
+            "the input parameter must never be joined on as if it were a channel:\n{rendered}"
+        );
+        assert!(
+            rendered.contains(r#""input": input"#),
+            "the input parameter should appear in the maps as a plain value:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn every_reader_of_the_hypothesis_re_emits_it_so_the_broadcast_reaches_all_four() {
+        let rendered = render_red_team();
+
+        // The hypothesis is produced on one channel and read by four nodes: the
+        // three critics and the refiner. Each reader must put the value back, or
+        // whichever reads last finds the channel empty and the team stalls. The
+        // busiest channel in this team is therefore the hypothesis channel, and
+        // it must be re-emitted once per reader.
+        let mut re_emits: BTreeMap<&str, usize> = BTreeMap::new();
+        for line in rendered.lines() {
+            let trimmed = line.trim();
+            if let Some(channel) = trimmed.strip_suffix(" |").and_then(|rest| {
+                rest.strip_suffix(')')
+                    .and_then(|rest| rest.split_once("!("))
+                    .and_then(|(channel, value)| {
+                        (value == format!("{channel}Value")).then_some(channel)
+                    })
+            }) {
+                *re_emits.entry(channel).or_default() += 1;
+            }
+        }
+
+        let busiest = re_emits
+            .values()
+            .copied()
+            .max()
+            .unwrap_or_else(|| panic!("expected re-emitted channels:\n{rendered}"));
+        assert_eq!(
+            busiest, 4,
+            "the hypothesis has four readers, so its channel must be re-emitted \
+             exactly four times; counted {re_emits:?}:\n{rendered}"
+        );
+    }
+
+    #[test]
+    fn the_condenser_receives_the_prompt_and_the_refinement() {
+        let rendered = render_red_team();
+
+        let condense = rendered
+            .split("new main, agentReturn in")
+            .find(|fragment| fragment.contains(r#""refine""#))
+            .expect("the condenser's fragment should be rendered");
+        assert!(
+            condense.contains(r#""input": input"#) && condense.contains(r#""refine""#),
+            "the condenser's map should carry the prompt and the refinement:\n{condense}"
+        );
+    }
+
+    #[test]
+    fn no_vertex_ids_leak_into_any_map() {
+        let rendered = render_red_team();
+
+        for vertex in [
+            "aInput",
+            "aHypothesize",
+            "aLogic",
+            "aEvidence",
+            "aFeasibility",
+            "aRefine",
+            "aCondense",
+        ] {
+            assert!(
+                !rendered.contains(&format!("\"{vertex}\"")),
+                "vertex id {vertex} leaked into the rendered team; keys must be \
+                 producing-node labels:\n{rendered}"
+            );
+        }
+    }
+
     #[test]
     fn labels_are_lower_camel_cased() {
         assert_eq!(lower_camel_case("Summarize"), "summarize");
