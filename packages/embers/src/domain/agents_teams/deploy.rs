@@ -130,8 +130,16 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                         address.clone(),
                         id.clone(),
                         version.clone(),
-                        30,
-                        Duration::from_secs(1),
+                        // Ten at 500 ms, not thirty at a second. `get_data_with_retry`
+                        // caps a whole call at 45 s, and thirty retries backing off to
+                        // a 5 s ceiling sleep for well over two minutes -- so the
+                        // budget always expired first and every genuinely missing
+                        // agent reported "explore-deploy timed out" instead of saying
+                        // which agent was gone. This fits inside the ceiling, so the
+                        // real error is the one that surfaces. Matches the retry
+                        // shape used for reads elsewhere.
+                        10,
+                        Duration::from_millis(500),
                     )
                     .await?
                     .context("agents team not found")?;
@@ -205,44 +213,64 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
              the raw graph deploy path carries no wallet address to resolve agents against",
         )?;
 
-        let fetched = try_join_all(refs.into_iter().map(|agent_ref| async move {
-            // Reads that may trail a recent write go through the retrying
-            // variant: the observer lags the validator briefly after finalization.
-            let agent = agents
-                .get_with_retry(
-                    address.clone(),
-                    agent_ref.id.clone(),
-                    agent_ref.version.clone(),
-                    30,
-                    Duration::from_secs(1),
-                )
-                .await?
-                .with_context(|| {
+        let fetched = try_join_all(refs.into_iter().map(|agent_ref| {
+            // Resolved before the async block so the error can name the agent the
+            // way its author does. A bare uuid pair tells the reader nothing about
+            // which node in their team is the problem.
+            let name = code
+                .agent_name(&agent_ref)
+                .map_or_else(|| agent_ref.id.clone(), str::to_owned);
+            async move {
+                // Reads that may trail a recent write go through the retrying
+                // variant: the observer lags the validator briefly after finalization.
+                let agent = agents
+                    .get_with_retry(
+                        address.clone(),
+                        agent_ref.id.clone(),
+                        agent_ref.version.clone(),
+                        // Ten at 500 ms, not thirty at a second. `get_data_with_retry`
+                        // caps a whole call at 45 s, and thirty retries backing off to
+                        // a 5 s ceiling sleep for well over two minutes -- so the
+                        // budget always expired first and every genuinely missing
+                        // agent reported "explore-deploy timed out" instead of saying
+                        // which agent was gone. This fits inside the ceiling, so the
+                        // real error is the one that surfaces. Matches the retry
+                        // shape used for reads elsewhere.
+                        10,
+                        Duration::from_millis(500),
+                    )
+                    .await?
+                    .with_context(|| {
+                        format!(
+                            "the agent \"{}\" (id {}, version {}) that this team uses no longer \
+                         exists for wallet {}. Deleting an agent leaves every team using it \
+                         undeployable; replace that node in the team, or restore the agent.",
+                            name,
+                            agent_ref.id,
+                            agent_ref.version,
+                            AsRef::<String>::as_ref(address),
+                        )
+                    })?;
+
+                let source = agent.code.with_context(|| {
                     format!(
-                        "agent {} version {} referenced by this team was not found for wallet {}",
-                        agent_ref.id,
-                        agent_ref.version,
-                        AsRef::<String>::as_ref(address),
+                        "the agent \"{}\" (id {}, version {}) that this team uses has no code",
+                        name, agent_ref.id, agent_ref.version,
                     )
                 })?;
 
-            let source = agent.code.with_context(|| {
-                format!(
-                    "agent {} version {} referenced by this team has no code",
-                    agent_ref.id, agent_ref.version,
-                )
-            })?;
+                // Blank code would render a syntactically invalid contract, which
+                // fails on chain with an opaque parse error, so reject it here.
+                anyhow::ensure!(
+                    !source.trim().is_empty(),
+                    "the agent \"{}\" (id {}, version {}) that this team uses has empty code",
+                    name,
+                    agent_ref.id,
+                    agent_ref.version,
+                );
 
-            // Blank code would render a syntactically invalid contract, which
-            // fails on chain with an opaque parse error, so reject it here.
-            anyhow::ensure!(
-                !source.trim().is_empty(),
-                "agent {} version {} referenced by this team has empty code",
-                agent_ref.id,
-                agent_ref.version,
-            );
-
-            anyhow::Ok((agent_ref, source))
+                anyhow::Ok((agent_ref, source))
+            }
         }))
         .await?;
 
@@ -591,9 +619,22 @@ mod tests {
             .expect_err("a team referencing a missing agent should not deploy");
 
         let message = format!("{error:#}");
+        // Named the way its author knows it. The identifiers are kept for support,
+        // but on their own they tell the reader nothing about which node in their
+        // team is the problem.
         assert!(
-            message.contains("agent-id") && message.contains("was not found"),
-            "the error should name the missing agent, got: {message}"
+            message.contains("\"Summarize\""),
+            "the error should name the agent, got: {message}"
+        );
+        assert!(
+            message.contains("agent-id") && message.contains("agent-version"),
+            "the error should still carry the identifiers, got: {message}"
+        );
+        // And say what to do about it: deleting an agent is unrepairable by saving,
+        // unlike the dangling edges this resembles.
+        assert!(
+            message.contains("no longer exists") && message.contains("restore the agent"),
+            "the error should state the remedy, got: {message}"
         );
     }
 

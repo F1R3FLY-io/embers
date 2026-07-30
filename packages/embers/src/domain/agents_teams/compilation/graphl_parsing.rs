@@ -248,6 +248,26 @@ pub struct Code<'a> {
 impl Code<'_> {
     /// Every agent version this team references. Deduplicated, so an agent used
     /// by two nodes is fetched once.
+    /// The author-facing name of a referenced agent, when the graph records one.
+    ///
+    /// `AgentRef` stays pure identity -- it keys the resolved-code map, so folding a
+    /// name into it would split one agent into two entries if a graph ever carried
+    /// differing names for the same id. The name is looked up separately instead, so
+    /// an error can say "Refine" rather than a pair of uuids.
+    pub fn agent_name(&self, wanted: &AgentRef) -> Option<&str> {
+        self.nodes.values().find_map(|node| match node {
+            Node::Agent {
+                agent_id,
+                agent_version,
+                agent_name,
+                ..
+            } if *agent_id == wanted.id && *agent_version == wanted.version => {
+                Some(agent_name.as_str())
+            }
+            _ => None,
+        })
+    }
+
     pub fn agent_refs(&self) -> BTreeSet<AgentRef> {
         self.nodes
             .values()
@@ -396,6 +416,28 @@ fn has_output<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result<bool
     err(Debug),
     ret(Debug, level = "trace")
 )]
+/// Whether a graph names the given agent anywhere.
+///
+/// Deliberately does **not** go through `parse`. A team whose graph is semantically
+/// broken -- a dangling edge, say -- still uses whatever agents its contexts name,
+/// and a team that cannot be scanned must not silently drop out of a deletion
+/// warning: reporting "no teams affected" when a team is affected is precisely the
+/// silent failure this guards against. Collecting contexts succeeds on graphs that
+/// `parse` rejects, so the answer stays available.
+///
+/// Precise rather than a substring search: each context is deserialized, so an
+/// identifier appearing in some other field cannot masquerade as a reference.
+pub fn references_agent(graph: &Graph, agent_id: &str) -> anyhow::Result<bool> {
+    let flat = graph.try_visit(FlatGraph::default(), Visitor)?;
+
+    Ok(flat.contexts.values().any(|context| {
+        matches!(
+            serde_json::from_str::<NodeContext>(context),
+            Ok(NodeContext::Agent { agent_id: ref id, .. }) if id == agent_id
+        )
+    }))
+}
+
 pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
     record_trace!(graph);
 

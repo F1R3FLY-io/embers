@@ -59,8 +59,16 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
                         address,
                         id.clone(),
                         version.clone(),
-                        30,
-                        Duration::from_secs(1),
+                        // Ten at 500 ms, not thirty at a second. `get_data_with_retry`
+                        // caps a whole call at 45 s, and thirty retries backing off to
+                        // a 5 s ceiling sleep for well over two minutes -- so the
+                        // budget always expired first and every genuinely missing
+                        // agent reported "explore-deploy timed out" instead of saying
+                        // which agent was gone. This fits inside the ceiling, so the
+                        // real error is the one that surfaces. Matches the retry
+                        // shape used for reads elsewhere.
+                        10,
+                        Duration::from_millis(500),
                     )
                     .await?
                     .context("agent not found")?;
