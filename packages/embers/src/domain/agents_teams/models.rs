@@ -167,6 +167,34 @@ pub struct FireskyCredentials {
     pub pds_url: String,
     pub email: String,
     pub token: String,
+    /// See the blockchain-layer counterpart: optional because publishes recorded
+    /// before these were captured must remain decryptable.
+    pub handle: Option<String>,
+    pub did: Option<String>,
+}
+
+/// What is known about a team's publication, as far as the chain records it.
+#[derive(Debug, Clone)]
+pub struct PublishedState {
+    /// The handle the team was published under, when the publish recorded one.
+    pub handle: Option<String>,
+    pub did: Option<String>,
+    /// Whether the account still exists on the PDS it was published to.
+    ///
+    /// `None` when it could not be determined -- an unreachable PDS, or a publish
+    /// predating the handle being recorded. Distinguishing "absent" from "unknown"
+    /// matters: the first is a divergence to report, the second is not.
+    pub account_exists: Option<bool>,
+    /// The deployment that is published, which is not necessarily the newest.
+    pub uri: Uri,
+    pub published_version: String,
+    /// Whether the published deployment is still the team's most recent one.
+    ///
+    /// False means a mention runs an older build than the editor shows, because a
+    /// deploy mints a new uri while the published config record keeps naming the
+    /// old one. Nothing reported this, which is what makes "I re-deployed but
+    /// nothing changed" so hard to diagnose.
+    pub is_latest_deployment: bool,
 }
 
 #[derive(Debug, Clone)]

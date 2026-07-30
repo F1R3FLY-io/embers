@@ -563,20 +563,20 @@ mod tests {
 
     #[tokio::test]
     async fn resolves_code_for_a_referenced_agent() {
-        let read = MockReadNode::new().on_code_containing("\"get\"", agent_json(json!(AGENT_SOURCE)));
+        let read =
+            MockReadNode::new().on_code_containing("\"get\"", agent_json(json!(AGENT_SOURCE)));
         let agents = make_agents_service(read, MockWriteNode::new());
         let service = make_service(MockReadNode::new(), MockWriteNode::new());
 
         let codes = service
-            .resolve_agent_codes(
-                &agent_only_code(),
-                Some(&test_wallet_address()),
-                &agents,
-            )
+            .resolve_agent_codes(&agent_only_code(), Some(&test_wallet_address()), &agents)
             .await
             .expect("resolving a present agent should succeed");
 
-        assert_eq!(codes.get(&agent_ref()).map(String::as_str), Some(AGENT_SOURCE));
+        assert_eq!(
+            codes.get(&agent_ref()).map(String::as_str),
+            Some(AGENT_SOURCE)
+        );
     }
 
     #[tokio::test]
@@ -635,7 +635,8 @@ mod tests {
 
     #[tokio::test]
     async fn reads_a_repeated_agent_only_once() {
-        let read = MockReadNode::new().on_code_containing("\"get\"", agent_json(json!(AGENT_SOURCE)));
+        let read =
+            MockReadNode::new().on_code_containing("\"get\"", agent_json(json!(AGENT_SOURCE)));
         let agents = make_agents_service(read.clone(), MockWriteNode::new());
         let service = make_service(MockReadNode::new(), MockWriteNode::new());
 
@@ -648,7 +649,11 @@ mod tests {
             .await
             .expect("resolving a repeated agent should succeed");
 
-        assert_eq!(codes.len(), 1, "the same agent version should collapse to one entry");
+        assert_eq!(
+            codes.len(),
+            1,
+            "the same agent version should collapse to one entry"
+        );
         assert_eq!(
             read.calls().len(),
             1,

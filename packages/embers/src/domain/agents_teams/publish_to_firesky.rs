@@ -51,6 +51,10 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         request: PublishToFireskyReq,
     ) -> anyhow::Result<PublishToFireskyResp> {
         let handle = Handle::new(request.handle).map_err(|err| anyhow::anyhow!(err))?;
+        // Captured before `handle` and `did` are consumed below: these are what let
+        // a later read say *which* account a team was published under, and so
+        // whether that account still exists.
+        let handle_str = handle.as_str().to_owned();
 
         let agent_team = self
             .get(address, id, "latest".into())
@@ -86,6 +90,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .await?
             .data
             .did;
+
+        let did_str = did.as_str().to_owned();
 
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
         session.login(&request.email, request.password).await?;
@@ -177,6 +183,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             pds_url: request.pds_url.clone(),
             email: request.email.clone(),
             token: result.data.password.clone(),
+            handle: Some(handle_str.clone()),
+            did: Some(did_str.clone()),
         };
         let EncryptedMsg { ciphertext, nonce } =
             serialize_encrypted(payload, &self.aes_encryption_key)?;
@@ -187,6 +195,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 pds_url: request.pds_url,
                 email: request.email,
                 token: result.data.password,
+                handle: Some(handle_str),
+                did: Some(did_str),
             },
         );
 

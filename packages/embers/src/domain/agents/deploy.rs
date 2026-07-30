@@ -194,9 +194,8 @@ mod tests {
 
 #[cfg(test)]
 mod deploy_wrapping_tests {
-    use serde_json::json;
-
     use firefly_client::models::WalletAddress;
+    use serde_json::json;
 
     use super::*;
     use crate::domain::agents::models::DeployReq;
@@ -218,7 +217,9 @@ mod deploy_wrapping_tests {
         })
     }
 
-    fn service_returning(code: serde_json::Value) -> AgentsService<MockReadNode, MockWriteNode, MockNodeEventSource> {
+    fn service_returning(
+        code: serde_json::Value,
+    ) -> AgentsService<MockReadNode, MockWriteNode, MockNodeEventSource> {
         AgentsService {
             uri: test_uri(),
             write_client: MockWriteNode::new().with_head_block_index(10),

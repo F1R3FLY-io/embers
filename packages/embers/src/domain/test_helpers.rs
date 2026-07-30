@@ -174,7 +174,10 @@ impl ReadNode for MockReadNode {
         max_retries: u32,
         delay: Duration,
     ) -> Result<Option<T>, ReadNodeError> {
-        match self.get_data_with_retry(rholang_code, max_retries, delay).await {
+        match self
+            .get_data_with_retry(rholang_code, max_retries, delay)
+            .await
+        {
             Ok(data) => Ok(Some(data)),
             Err(ReadNodeError::ReturnValueMissing) => Ok(None),
             Err(err) => Err(err),

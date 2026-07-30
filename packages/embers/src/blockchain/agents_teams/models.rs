@@ -72,6 +72,21 @@ pub struct FireskyCredentials {
     pub pds_url: String,
     pub email: String,
     pub token: String,
+    /// The handle and DID the team was published under.
+    ///
+    /// Optional so that records written before these were recorded stay readable.
+    /// This payload is encrypted and stored on chain, which is append-only, so a
+    /// required field would make every earlier publish fail to decrypt and vanish
+    /// from `firesky_accounts` — taking the ability to run those teams with it.
+    ///
+    /// Without them a published team can be recognised but not described, so
+    /// nothing can check whether the account it names still exists. That is the gap
+    /// that let a wiped dev-env leave the interface claiming a team was published
+    /// when its account had been destroyed.
+    #[serde(default)]
+    pub handle: Option<String>,
+    #[serde(default)]
+    pub did: Option<String>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]

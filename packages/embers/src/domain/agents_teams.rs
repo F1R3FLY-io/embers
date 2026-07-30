@@ -30,6 +30,7 @@ mod list;
 mod list_versions;
 pub mod models;
 mod publish_to_firesky;
+mod published_state;
 mod run_agents_team;
 mod run_on_firesky;
 mod save;
@@ -133,6 +134,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                             pds_url: cred.pds_url,
                             email: cred.email,
                             token: cred.token,
+                            handle: cred.handle,
+                            did: cred.did,
                         },
                     ))
                 })

@@ -16,6 +16,7 @@ use crate::api::agents_teams::models::{
     DeploySignedRunOnFireskyReq,
     PublishToFireskyReq,
     PublishToFireskyResp,
+    PublishedState,
     RunReq,
     RunResp,
     SaveAgentsTeamReq,
@@ -243,6 +244,19 @@ impl AgentsTeamsApi {
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents.deploy_signed_delete(body.into()).await?;
         Ok(Json(deploy_id.into()))
+    }
+
+    /// Reports a team's publication as the chain records it, reconciled against
+    /// the PDS. Nothing previously compared the two, so a destroyed account left the
+    /// interface presenting a team as published with no way to notice.
+    #[oai(path = "/:address/:id/published", method = "get")]
+    async fn published_state(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Path(id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> MaybeNotFound<PublishedState> {
+        agents_teams.published_state(address.0, id).await.into()
     }
 
     #[oai(path = "/:address/:id/publish-to-firesky/prepare", method = "post")]

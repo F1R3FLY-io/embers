@@ -511,12 +511,22 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
-    def publish_to_firesky(self, wallet: Wallet, agent_id: str) -> UpdateResponce:
+    def publish_to_firesky(
+        self,
+        wallet: Wallet,
+        agent_id: str,
+        handle: str = "bar.test",
+        email: str = "bar@bar.com",
+        password: str = "hunter22",
+    ) -> UpdateResponce:
+        # Parameterised so a test can pick a handle nobody else has taken: the PDS
+        # rejects a duplicate outright, so a hardcoded one makes the test pass once
+        # and fail on every later run against the same dev network.
         prepare_request = {
             "pds_url": "http://localhost:2583",
-            "email": "bar@bar.com",
-            "handle": "bar.test",
-            "password": "hunter22",
+            "email": email,
+            "handle": handle,
+            "password": password,
         }
         resp = self._client.post(
             f"/ai-agents-teams/{wallet.address}/{agent_id}/publish-to-firesky/prepare",
@@ -540,6 +550,9 @@ class AgentsTeamsApi:
             second=resp_next,
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
+
+    def published_state(self, address: str, agent_id: str) -> Responce:
+        return self._client.get(f"/ai-agents-teams/{address}/{agent_id}/published")
 
     def run_on_firesky(self, wallet: Wallet, prompt: str, uri: str) -> UpdateResponce:
         prepare_request = {"prompt": prompt, "phlo_limit": "50000000", "agents_team": uri}

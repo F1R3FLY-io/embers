@@ -52,6 +52,26 @@ pub struct AgentsTeam {
     pub graph: Option<Stringified<models::Graph>>,
 }
 
+/// Whether a team is published to F1R3SKY, and whether the account it was
+/// published under is still there.
+///
+/// `account_exists` is deliberately three-valued. `Some(false)` is a real
+/// divergence — the chain records a publication whose account has been destroyed,
+/// which is what a wiped development PDS leaves behind. `None` means the question
+/// could not be answered, from an unreachable PDS or a publish recorded before
+/// handles were captured, and must not be presented as though the account were
+/// missing.
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::PublishedState))]
+pub struct PublishedState {
+    pub handle: Option<String>,
+    pub did: Option<String>,
+    pub account_exists: Option<bool>,
+    pub uri: Stringified<Uri>,
+    pub published_version: String,
+    pub is_latest_deployment: bool,
+}
+
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::CreateResp))]
 pub struct CreateAgentsTeamResp {
