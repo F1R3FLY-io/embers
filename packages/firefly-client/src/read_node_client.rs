@@ -22,11 +22,29 @@ pub struct ReadNodeClient {
 /// `tcp_user_timeout` (30s) only fires when data goes *unacked*; a read node
 /// that accepts the connection and ACKs but then stalls at the HTTP layer would
 /// hang the call forever.
+/// The outer bound on one logical read, retries included.
+///
+/// Must leave room for two full attempts at [`ReadNodeConfig::request_timeout`], or a
+/// slow-but-working read is cut off mid-flight and granted a retry it can never use.
+/// `read_budget_fits_two_attempts` holds this to it.
+pub const TOTAL_READ_BUDGET: Duration = Duration::from_secs(150);
+
 #[derive(Clone, Copy, Debug)]
 pub struct ReadNodeConfig {
-    /// ~80x the observed healthy latency (0.24s) — generous for a heavy
-    /// exploratory term, and small enough that two full attempts still fit
-    /// inside the 45s cap used by `get_data_with_retry`.
+    /// Bounds a single explore-deploy call.
+    ///
+    /// This was 20s, chosen as ~80x the 0.24s observed for a simple term on the
+    /// assumption that it was generous for a heavy one. It was not. Measured
+    /// against a local network of 13.7k blocks, `listVersions` for a team of seven
+    /// agents took **23.5s, 30.5s and 33.6s** on three consecutive runs — returning
+    /// 5 KB, so the cost is in evaluating the term, not in moving the result. Every
+    /// attempt died at 20s and the 45s retry cap ended the operation, which made
+    /// `/versions` and the whole publish state of that team permanently unreadable:
+    /// a slow-but-working node was indistinguishable from a broken one.
+    ///
+    /// 60s is twice the slowest measurement, and the retry cap below is set so that
+    /// two full attempts still fit. A node that has stopped answering entirely is
+    /// caught far sooner by `connect_timeout`.
     pub request_timeout: Duration,
     pub connect_timeout: Duration,
     pub tcp_keepalive: Option<Duration>,
@@ -35,7 +53,7 @@ pub struct ReadNodeConfig {
 impl Default for ReadNodeConfig {
     fn default() -> Self {
         Self {
-            request_timeout: Duration::from_secs(20),
+            request_timeout: Duration::from_secs(60),
             connect_timeout: Duration::from_secs(5),
             tcp_keepalive: Some(Duration::from_secs(30)),
         }
@@ -154,7 +172,12 @@ impl ReadNodeClient {
 
     /// Retry `get_data` up to `max_retries` times with exponential backoff and jitter.
     /// Only retries on `ReturnValueMissing` (empty explore-deploy result).
-    /// Enforces a 45-second total timeout to prevent unbounded hangs.
+    ///
+    /// Bounded overall so a node that never answers cannot hang the caller for ever.
+    /// The cap has to leave room for two full attempts at `request_timeout`, or a
+    /// slow-but-working read is cut off mid-flight and the retry it was granted is
+    /// one it can never use -- which is exactly what a 45s cap did once a single
+    /// read legitimately took 34s.
     pub async fn get_data_with_retry<T>(
         &self,
         rholang_code: String,
@@ -164,7 +187,7 @@ impl ReadNodeClient {
     where
         T: serde::de::DeserializeOwned,
     {
-        let total_timeout = Duration::from_secs(45);
+        let total_timeout = TOTAL_READ_BUDGET;
 
         let backoff = ExponentialBuilder::default()
             .with_min_delay(delay)
@@ -620,17 +643,25 @@ mod tests {
         );
     }
 
-    /// Timeout test: we can't easily test the 45-second timeout with a real
-    /// HTTP server, so instead we verify that the timeout duration is correct
-    /// by directly testing the Timeout error variant construction.
+    /// The retry cap has to outlast two whole attempts.
+    ///
+    /// Neither bound means much alone; the relationship between them is what broke.
+    /// A 20s request timeout under a 45s cap looked like "two attempts fit", and did
+    /// until a single legitimate read grew past 20s -- after which every attempt was
+    /// killed at the request timeout and the cap ended the operation, so a slow node
+    /// was indistinguishable from a dead one and `/versions` for a seven-agent team
+    /// became permanently unreadable. Pinning the relationship rather than either
+    /// number keeps the pair honest when one of them is next tuned.
     #[test]
-    fn test_timeout_error_has_correct_duration() {
-        let timeout = Duration::from_secs(45);
-        let err = ReadNodeError::Timeout(timeout);
-        match err {
-            ReadNodeError::Timeout(d) => assert_eq!(d, Duration::from_secs(45)),
-            other => panic!("expected Timeout, got {other:?}"),
-        }
+    fn read_budget_fits_two_attempts() {
+        let request_timeout = ReadNodeConfig::default().request_timeout;
+
+        assert!(
+            TOTAL_READ_BUDGET >= request_timeout * 2,
+            "a {}s cap cannot hold two {}s attempts",
+            TOTAL_READ_BUDGET.as_secs(),
+            request_timeout.as_secs(),
+        );
     }
 
     // -------------------------------------------------------

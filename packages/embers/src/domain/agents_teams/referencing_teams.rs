@@ -1,10 +1,22 @@
 use firefly_client::models::WalletAddress;
 use firefly_client::{NodeEventSource, ReadNode, WriteNode};
+use futures::StreamExt;
+use futures::stream::FuturesUnordered;
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::compilation::references_agent;
 use crate::domain::agents_teams::models::ReferencingTeam;
 use crate::domain::common::record_trace;
+
+/// How many reads to have in flight at once.
+///
+/// Every team is an independent read and the node answers them faster together than
+/// one after another: measured against the local network, two `listVersions` reads
+/// took 62s in sequence and 43s concurrently. The gain is real but sub-linear -- the
+/// node partially serialises -- so this is a small number rather than "all of them".
+/// Unbounded fan-out would turn a wallet holding fifty teams into fifty simultaneous
+/// explore-deploys and make the node slower for everyone, including this caller.
+const READ_CONCURRENCY: usize = 8;
 
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     /// Every team whose latest version uses the given agent.
@@ -39,22 +51,39 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
     ) -> anyhow::Result<Vec<ReferencingTeam>> {
         record_trace!(address, agent_id);
 
-        let teams = self.list(address.clone()).await?;
+        let listed = self.list(address.clone()).await?;
 
-        let mut referencing = Vec::new();
-        for header in teams.agents_teams {
-            let Some(team) = self
-                .get(address.clone(), header.id.clone(), "latest".to_owned())
-                .await?
-            else {
-                // Listed a moment ago and gone now: a concurrent delete, not a
-                // failure. Nothing references it any more either way.
-                continue;
-            };
+        // Read every team, then keep the ones that use the agent. Concurrent because
+        // the reads are independent and each costs tens of seconds against a busy
+        // node; sequentially, the wait grows with the number of teams the wallet
+        // holds and the confirmation dialog becomes unusable long before the list
+        // does.
+        let mut reads = FuturesUnordered::new();
+        let team_count = listed.agents_teams.len();
+        let mut headers = listed.agents_teams.into_iter();
+        let mut referencing = Vec::with_capacity(team_count);
 
-            let Some(graph) = team.graph else {
-                continue;
+        loop {
+            while reads.len() < READ_CONCURRENCY {
+                let Some(header) = headers.next() else { break };
+                let address = address.clone();
+                reads.push(async move {
+                    let team = self
+                        .get(address, header.id.clone(), "latest".to_owned())
+                        .await?;
+                    anyhow::Ok((header, team))
+                });
+            }
+
+            let Some(read) = reads.next().await else {
+                break;
             };
+            let (header, team) = read?;
+
+            // Listed a moment ago and gone now: a concurrent delete, not a failure.
+            // Nothing references it any more either way.
+            let Some(team) = team else { continue };
+            let Some(graph) = team.graph else { continue };
 
             // Scans contexts rather than going through `parse`, so a team whose
             // graph is semantically broken -- a dangling edge, say -- is still
@@ -66,18 +95,41 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 continue;
             }
 
-            // A published team keeps answering mentions from its deployed contract
-            // even after the team record is gone, so the caller has to be told which
-            // ones those are. Looked up per deployment rather than from this
-            // version's uri: publication is keyed by the uri current when it was
-            // published, which is usually an older deployment than the latest.
-            let publication = self
-                .publication_of(address.clone(), header.id.clone())
-                .await?;
+            referencing.push((header, team.name));
+        }
 
-            referencing.push(ReferencingTeam {
+        // A published team keeps answering mentions from its deployed contract even
+        // after the team record is gone, so the caller has to be told which ones
+        // those are. Looked up per deployment rather than from this version's uri:
+        // publication is keyed by the uri current when it was published, which is
+        // usually an older deployment than the latest.
+        //
+        // Only for the teams that actually reference the agent, and only after the
+        // scan above, so a wallet full of unrelated teams costs nothing here.
+        let mut publications = FuturesUnordered::new();
+        let mut result = Vec::with_capacity(referencing.len());
+        let mut pending = referencing.into_iter();
+
+        loop {
+            while publications.len() < READ_CONCURRENCY {
+                let Some((header, name)) = pending.next() else {
+                    break;
+                };
+                let address = address.clone();
+                publications.push(async move {
+                    let publication = self.publication_of(address, header.id.clone()).await?;
+                    anyhow::Ok((header, name, publication))
+                });
+            }
+
+            let Some(looked_up) = publications.next().await else {
+                break;
+            };
+            let (header, name, publication) = looked_up?;
+
+            result.push(ReferencingTeam {
                 id: header.id,
-                name: team.name,
+                name,
                 published: publication.is_some(),
                 // May be absent on a publication predating handles being recorded:
                 // still live, just not nameable. `published` carries the fact either
@@ -89,6 +141,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             });
         }
 
-        Ok(referencing)
+        // Completion order is arbitrary once the reads run concurrently, and the
+        // caller lists these to a user about to destroy them. Sorting by name keeps
+        // the same wallet producing the same dialog twice running.
+        result.sort_by(|left, right| left.name.cmp(&right.name));
+
+        Ok(result)
     }
 }

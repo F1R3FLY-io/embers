@@ -6,7 +6,7 @@ use atrium_api::com::atproto::repo;
 use atrium_api::types::Collection;
 use atrium_api::types::string::AtIdentifier;
 use atrium_xrpc_client::reqwest::ReqwestClient;
-use firefly_client::models::{Uri, WalletAddress};
+use firefly_client::models::WalletAddress;
 use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::agents_teams::AgentsTeamsService;
@@ -92,24 +92,5 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .await?;
 
         Ok(())
-    }
-
-    /// Unpublishes if the team is published, and says nothing if it is not.
-    ///
-    /// Used by cascading deletion, where "this team was never published" is an
-    /// ordinary case rather than something to fail on.
-    pub async fn unpublish_if_published(
-        &self,
-        address: WalletAddress,
-        id: String,
-        uri: Option<&Uri>,
-    ) -> anyhow::Result<bool> {
-        let published = uri.is_some_and(|uri| self.firesky_accounts.contains_key(uri));
-        if !published {
-            return Ok(false);
-        }
-
-        self.unpublish(address, id).await?;
-        Ok(true)
     }
 }

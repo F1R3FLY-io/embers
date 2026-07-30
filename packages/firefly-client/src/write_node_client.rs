@@ -63,10 +63,23 @@ pub struct WriteNodeConfig {
 impl Default for WriteNodeConfig {
     fn default() -> Self {
         Self {
-            // ~1500x the observed healthy latency (6.5ms) and ~2 block times, so
-            // it rides out a block-production stall without spurious failures,
-            // while still failing fast enough that a blip cannot become a wedge.
-            request_timeout: Duration::from_secs(10),
+            // ~3000x the observed healthy latency (6.5ms), and chosen from the
+            // slow path rather than the fast one. Steady state is 5-45ms, but the
+            // first call after a quiet period pays for re-establishing the channel
+            // on top of whatever the validator is already doing: measured against
+            // the local node, `/wallets/transfer/prepare` returned in 7.6s and 3.7s
+            // on those cold calls and in 5-45ms once warm. At 10s that cold path
+            // failed repeatedly -- eleven consecutive requests died at exactly
+            // 10.00s while the node was busy, and the same request succeeded
+            // moments later -- so the deadline was rejecting a healthy node rather
+            // than catching a wedged one. A wedge is still caught: 20s is well
+            // inside the ~60s the keep-alive needs to notice a dead peer, and an
+            // unreachable node is refused by `connect_timeout` in 5s.
+            //
+            // Kept *below* the 30s a typical HTTP client allows, so that a caller
+            // waiting on one of these sees this client's diagnostic rather than its
+            // own timeout with nothing to say about the cause.
+            request_timeout: Duration::from_secs(20),
             // Must stay < request_timeout so a reconnect inside a request cannot
             // consume the whole budget.
             connect_timeout: Duration::from_secs(5),

@@ -15,7 +15,15 @@ from Crypto.Hash import keccak
 
 from tests.key import SECP256k1
 
-DEFAULT_TIMEOUT = 30
+# Covers both the HTTP read and the wait for a deploy to be observed as finalised.
+#
+# Was 30s, which assumed a chain that finalises in seconds. Measured against the local
+# network under load, a run of four publishing tests had its later fixtures give up at
+# exactly 30.0s waiting for a transfer to finalise while the node was still working
+# through the deploys of the earlier ones -- a passing suite turned into a failing one
+# purely by the order it ran in. The wait costs nothing when the chain is quick, so the
+# only thing a tight bound buys is false failures.
+DEFAULT_TIMEOUT = 120
 
 FIRECAP_ID = bytes([0, 0, 0])
 FIRECAP_VERSION = bytes([0])
@@ -551,14 +559,24 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
+    # The reads behind these three are the slowest in the API and the default 30s is
+    # not enough for them. One `listVersions` for a seven-agent team measured 23.5s,
+    # 30.5s and 33.6s on three consecutive runs against a local network of 13.7k
+    # blocks, and `referencing` issues one per team plus one publication lookup each
+    # -- concurrently, but still bounded by the slowest. Timing out here would report
+    # a working endpoint as broken.
     def referencing_teams(self, address: str, agent_id: str) -> Responce:
-        return self._client.get(f"/ai-agents-teams/{address}/referencing/{agent_id}")
+        return self._client.get(
+            f"/ai-agents-teams/{address}/referencing/{agent_id}", timeout=300
+        )
 
     def unpublish(self, address: str, agent_id: str) -> Responce:
-        return self._client.post(f"/ai-agents-teams/{address}/{agent_id}/unpublish")
+        return self._client.post(
+            f"/ai-agents-teams/{address}/{agent_id}/unpublish", timeout=300
+        )
 
     def published_state(self, address: str, agent_id: str) -> Responce:
-        return self._client.get(f"/ai-agents-teams/{address}/{agent_id}/published")
+        return self._client.get(f"/ai-agents-teams/{address}/{agent_id}/published", timeout=300)
 
     def run_on_firesky(self, wallet: Wallet, prompt: str, uri: str) -> UpdateResponce:
         prepare_request = {"prompt": prompt, "phlo_limit": "50000000", "agents_team": uri}

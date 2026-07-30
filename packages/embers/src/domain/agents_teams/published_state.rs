@@ -127,7 +127,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                     .map(|uri| (version.last_deploy, version.version, uri))
             })
             .collect();
-        deployed.sort_by(|left, right| right.0.cmp(&left.0));
+        deployed.sort_by_key(|(last_deploy, _, _)| std::cmp::Reverse(*last_deploy));
 
         let newest_deployed_uri = deployed.first().map(|(_, _, uri)| uri.clone());
 
@@ -171,7 +171,7 @@ async fn config_record_present(pds_url: &str, repo: String) -> Option<bool> {
         return None;
     };
 
-    let client = AtpServiceClient::new(ReqwestClient::new(pds_url.to_owned()));
+    let client = AtpServiceClient::new(ReqwestClient::new(pds_url));
 
     match client
         .service
@@ -209,7 +209,7 @@ async fn resolves(pds_url: &str, handle: &str) -> Option<bool> {
         return None;
     };
 
-    let client = AtpServiceClient::new(ReqwestClient::new(pds_url.to_owned()));
+    let client = AtpServiceClient::new(ReqwestClient::new(pds_url));
 
     match client
         .service

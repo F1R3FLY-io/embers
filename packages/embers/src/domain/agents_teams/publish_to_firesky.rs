@@ -32,6 +32,51 @@ use crate::domain::common::{
     upload_blob_from_url,
 };
 
+/// An app-password name this account is not already using.
+///
+/// Names are unique per account, so a second `Embers` password is refused -- which
+/// made publishing to an account that had been published to before fail at the last
+/// step, after the config record had already been written. Numbering from the names
+/// actually present keeps every publication holding its own credential, so revoking
+/// one never silently disarms another.
+///
+/// Bounded rather than open-ended: an account carrying a hundred Embers passwords is
+/// a symptom, not a case to accommodate, and atproto caps app passwords anyway.
+async fn free_app_password_name<S>(agent: &Agent<S>) -> anyhow::Result<String>
+where
+    S: atrium_api::agent::SessionManager + Send + Sync,
+{
+    const BASE: &str = "Embers";
+    const LIMIT: usize = 100;
+
+    let taken: std::collections::HashSet<String> = agent
+        .api
+        .com
+        .atproto
+        .server
+        .list_app_passwords()
+        .await?
+        .data
+        .passwords
+        .into_iter()
+        .map(|password| password.data.name)
+        .collect();
+
+    if !taken.contains(BASE) {
+        return Ok(BASE.to_owned());
+    }
+
+    (2..=LIMIT)
+        .map(|n| format!("{BASE} {n}"))
+        .find(|name| !taken.contains(name))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "this account already holds {LIMIT} Embers app passwords; revoke the \
+                 ones no longer in use before publishing again"
+            )
+        })
+}
+
 pub(super) static SELF_RKEY: LazyLock<RecordKey> =
     LazyLock::new(|| RecordKey::new("self".into()).unwrap());
 
@@ -69,7 +114,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         let http_client = ReqwestClient::new(request.pds_url.clone());
         let client = AtpServiceClient::new(http_client.clone());
 
-        let did = client
+        let created = client
             .service
             .com
             .atproto
@@ -78,7 +123,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 server::create_account::InputData {
                     did: None,
                     email: request.email.clone().into(),
-                    handle,
+                    handle: handle.clone(),
                     invite_code: request.invite_code,
                     password: request.password.clone().into(),
                     plc_op: None,
@@ -88,14 +133,56 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 }
                 .into(),
             )
-            .await?
-            .data
-            .did;
-
-        let did_str = did.as_str().to_owned();
+            .await;
 
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
-        session.login(&request.email, request.password).await?;
+
+        // Publishing to a handle that already exists is the ordinary way to publish
+        // again after unpublishing. Unpublishing deliberately keeps the account and
+        // the handle, so that it is reversible rather than a slower deletion -- but
+        // creating unconditionally made that promise false: the second publish died
+        // on the handle the first one had taken, and the only way back was to pick a
+        // different handle, which is precisely what was being preserved.
+        //
+        // Signing in is what tells the two cases apart. Credentials that work belong
+        // to the caller; credentials that do not mean the handle is somebody else's,
+        // which is a real conflict and is reported as one.
+        let did = match created {
+            Ok(account) => {
+                session.login(&request.email, &request.password).await?;
+                account.data.did
+            }
+            Err(create_error) => {
+                let existing = session
+                    .login(&request.email, &request.password)
+                    .await
+                    .map_err(|login_error| {
+                        anyhow::anyhow!(
+                            "could not create an account for this handle ({create_error}), \
+                             and could not sign in to an existing one either \
+                             ({login_error}) — the handle may belong to someone else, or \
+                             the password may differ from the one it was created with"
+                        )
+                    })?;
+
+                // The identifier signed in with is the email, so the account reached
+                // is not necessarily the one that carries the requested handle.
+                // Publishing to it anyway would put the team on an account the user
+                // did not name, under a handle they did not ask for.
+                if existing.data.handle != handle {
+                    return Err(anyhow::anyhow!(
+                        "these credentials belong to @{}, not @{}; publish under that \
+                         handle, or use the credentials of the account you meant",
+                        existing.data.handle.as_str(),
+                        handle.as_str(),
+                    ));
+                }
+
+                existing.data.did.clone()
+            }
+        };
+
+        let did_str = did.as_str().to_owned();
         let agent = Agent::new(session);
         let agent_repo = AtIdentifier::Did(did);
 
@@ -144,21 +231,27 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 .await?;
         }
 
+        // `put` rather than `create`: the record is a singleton at rkey `self`, and
+        // creating it fails outright when one is already there. That made publishing
+        // twice impossible -- both after unpublishing and after a re-deploy, where
+        // the point of publishing again is precisely to replace the uri this record
+        // holds with the newer one.
         agent
             .api
             .com
             .atproto
             .repo
-            .create_record(
-                repo::create_record::InputData {
+            .put_record(
+                repo::put_record::InputData {
                     collection: AgentsTeamConfig::nsid(),
                     record: AgentsTeamConfig {
                         uri: uri.clone().into(),
                     }
                     .try_into_unknown()?,
                     repo: agent_repo,
-                    rkey: Some(SELF_RKEY.clone()),
+                    rkey: SELF_RKEY.clone(),
                     swap_commit: None,
+                    swap_record: None,
                     validate: None,
                 }
                 .into(),
@@ -172,7 +265,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .server
             .create_app_password(
                 server::create_app_password::InputData {
-                    name: "Embers".into(),
+                    name: free_app_password_name(&agent).await?,
                     privileged: Some(false),
                 }
                 .into(),
