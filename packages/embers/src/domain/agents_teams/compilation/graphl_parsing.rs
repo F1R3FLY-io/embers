@@ -277,11 +277,76 @@ fn resolve_context<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result
 
     let context = match (contexts.next(), contexts.next()) {
         (Some(context), None) => context,
-        (None, _) => return Err(anyhow!("node {node} is missing context")),
+        (None, _) => return Err(missing_context_error(flat, node)),
         (Some(_), Some(_)) => return Err(anyhow!("node {node} has multiple contexts")),
     };
 
     serde_json::from_str(context).with_context(|| format!("node {node} has invalid context"))
+}
+
+/// Explains a vertex that edges refer to but nothing defines.
+///
+/// The bare identifier alone is close to useless to the person who has to act on it:
+/// it names an internal id, in a process they are not looking at, for a node that by
+/// definition has no label. Naming the neighbours the broken edges lead to, and
+/// stating the remedy, is what makes the message actionable — the graph is repaired
+/// simply by opening it in the editor and saving, because the editor drops edges
+/// whose endpoints it cannot resolve.
+///
+/// See `docs/post-mortems/AGENT_TEAM_EDITOR_GRAPH_CORRUPTION.md` in embers-frontend.
+fn missing_context_error(flat: &FlatGraph<'_>, node: Vertex<'_>) -> anyhow::Error {
+    let names = flat.bindings_reverse.get(&node);
+
+    // Every edge with this vertex at either end, described by the *other* end, which
+    // — unlike this one — usually does have a context to name it by.
+    let mut neighbours: Vec<String> = flat
+        .edges
+        .iter()
+        .filter_map(|(from, to)| {
+            let names = names?;
+            match (names.contains(from), names.contains(to)) {
+                (true, false) => Some(format!("-> {}", describe_vertex(flat, *to))),
+                (false, true) => Some(format!("{} ->", describe_vertex(flat, *from))),
+                _ => None,
+            }
+        })
+        .collect();
+    neighbours.sort();
+    neighbours.dedup();
+
+    if neighbours.is_empty() {
+        return anyhow!(
+            "node {node} is missing context: the graph refers to it but never defines it"
+        );
+    }
+
+    anyhow!(
+        "node {node} is missing context: {} edge(s) refer to it but the graph never \
+         defines it ({}). This is what a node deleted without its edges leaves behind. \
+         Open the team in the editor and save it — that drops the stale connections and \
+         produces a graph that deploys.",
+        neighbours.len(),
+        neighbours.join(", "),
+    )
+}
+
+/// A vertex named the way its author would recognise it: an agent's own name where
+/// there is one, else the node kind, else the raw identifier.
+fn describe_vertex(flat: &FlatGraph<'_>, name: Name<'_>) -> String {
+    let Some(context) = flat.contexts.get(&name) else {
+        return name.to_string();
+    };
+
+    match serde_json::from_str::<NodeContext>(context) {
+        Ok(NodeContext::Agent { agent_name, .. }) => agent_name,
+        Ok(NodeContext::Input) => "Input".to_owned(),
+        Ok(NodeContext::Output) => "Output".to_owned(),
+        Ok(NodeContext::Compress) => "Compress".to_owned(),
+        Ok(NodeContext::TextModel) => "Text model".to_owned(),
+        Ok(NodeContext::TTIModel) => "TTI model".to_owned(),
+        Ok(NodeContext::TTSModel) => "TTS model".to_owned(),
+        Err(_) => name.to_string(),
+    }
 }
 
 fn resolve_froms<'a>(
@@ -544,7 +609,11 @@ mod tests {
         let graph = Graph::new(red_team_graphl()).expect("red-team graphl should parse");
         let code = parse(&graph).expect("the red-team graph should compile");
 
-        assert_eq!(code.nodes.len(), 6, "six agent nodes, input and output aside");
+        assert_eq!(
+            code.nodes.len(),
+            6,
+            "six agent nodes, input and output aside"
+        );
         assert_eq!(agent_arity(&code, "Hypothesize"), 1, "input only");
         assert_eq!(agent_arity(&code, "LogicCritic"), 2, "input and hypothesis");
         assert_eq!(agent_arity(&code, "EvidenceCritic"), 2);
@@ -569,7 +638,9 @@ mod tests {
             .nodes
             .values()
             .filter(|node| match node {
-                Node::Agent { agent_name, from, .. } => {
+                Node::Agent {
+                    agent_name, from, ..
+                } => {
                     agent_name != "Hypothesize"
                         && from.iter().any(|vertex| *vertex.as_ref() == "aHyp")
                 }
@@ -602,5 +673,39 @@ mod tests {
         let code = parse(&graph).expect("a built-in only graph should compile");
 
         assert!(code.agent_refs().is_empty());
+    }
+
+    #[test]
+    fn a_dangling_edge_is_reported_with_the_neighbours_it_connects() {
+        // What a node deleted without its edges leaves behind. The identifier alone
+        // tells the author nothing -- the node has no context, so it has no label --
+        // so the message has to describe the edges by their *other* end.
+        let graphl = graphl(
+            &[
+                ("aIn", r#"{"type":"input-node"}"#.to_owned()),
+                ("aCon", agent_context("Condense")),
+                ("aOut", r#"{"type":"output-node"}"#.to_owned()),
+            ],
+            &[("aIn", "aCon"), ("aCon", "aGhost"), ("aGhost", "aOut")],
+        );
+
+        let graph = Graph::new(graphl).expect("graphl should parse");
+        let error = parse(&graph).expect_err("a dangling edge must not compile");
+        let message = format!("{error:#}");
+
+        assert!(message.contains("is missing context"), "{message}");
+        // The neighbours, named as the author knows them rather than by id.
+        assert!(message.contains("Condense ->"), "{message}");
+        assert!(message.contains("-> Output"), "{message}");
+        // And the remedy, since the editor repairs this on load-and-save.
+        assert!(message.contains("save"), "{message}");
+    }
+
+    #[test]
+    fn a_well_formed_graph_reports_nothing() {
+        // Guards the diagnostic against firing on healthy input.
+        let graph = Graph::new(red_team_graphl()).expect("graphl should parse");
+
+        assert!(parse(&graph).is_ok());
     }
 }
