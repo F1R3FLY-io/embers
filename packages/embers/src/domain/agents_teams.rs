@@ -31,9 +31,11 @@ mod list_versions;
 pub mod models;
 mod publish_to_firesky;
 mod published_state;
+mod referencing_teams;
 mod run_agents_team;
 mod run_on_firesky;
 mod save;
+mod unpublish;
 
 #[derive(Clone)]
 pub struct AgentsTeamsService<

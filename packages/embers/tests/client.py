@@ -551,6 +551,12 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
+    def referencing_teams(self, address: str, agent_id: str) -> Responce:
+        return self._client.get(f"/ai-agents-teams/{address}/referencing/{agent_id}")
+
+    def unpublish(self, address: str, agent_id: str) -> Responce:
+        return self._client.post(f"/ai-agents-teams/{address}/{agent_id}/unpublish")
+
     def published_state(self, address: str, agent_id: str) -> Responce:
         return self._client.get(f"/ai-agents-teams/{address}/{agent_id}/published")
 

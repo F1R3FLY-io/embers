@@ -32,7 +32,8 @@ use crate::domain::common::{
     upload_blob_from_url,
 };
 
-static SELF_RKEY: LazyLock<RecordKey> = LazyLock::new(|| RecordKey::new("self".into()).unwrap());
+pub(super) static SELF_RKEY: LazyLock<RecordKey> =
+    LazyLock::new(|| RecordKey::new("self".into()).unwrap());
 
 #[derive(Debug, Clone, Render)]
 #[template(path = "agents_teams/save_firesky_token.rho")]
@@ -237,7 +238,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct AgentsTeamConfig {
+pub(super) struct AgentsTeamConfig {
     uri: String,
 }
 

@@ -173,6 +173,25 @@ pub struct FireskyCredentials {
     pub did: Option<String>,
 }
 
+/// A team whose latest version uses a given agent.
+///
+/// Deleting that agent would leave the team undeployable with no way to repair it,
+/// so deletion names these before proceeding.
+#[derive(Debug, Clone)]
+pub struct ReferencingTeam {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    /// Whether any deployment of this team is published. A published team keeps
+    /// answering mentions from its deployed contract even after its record is
+    /// deleted, so deletion has to say so.
+    pub published: bool,
+    /// The handle it was published under, when the publication recorded one.
+    /// `None` with `published` true means an older publication whose handle was
+    /// never captured -- still live, just not nameable.
+    pub published_handle: Option<String>,
+}
+
 /// What is known about a team's publication, as far as the chain records it.
 #[derive(Debug, Clone)]
 pub struct PublishedState {
@@ -188,6 +207,18 @@ pub struct PublishedState {
     /// The deployment that is published, which is not necessarily the newest.
     pub uri: Uri,
     pub published_version: String,
+    /// Whether the publication is currently in force -- that is, whether the
+    /// account still carries the `com.f1r3sky.agentsteam.config` record that makes
+    /// f1r3sky treat the handle as a team. Mentions fire only while it is present.
+    ///
+    /// Distinct from `account_exists` because unpublishing removes the record and
+    /// keeps the account. The chain-side credential cannot be removed at all -- the
+    /// env stores tokens in a push-only stack -- so a publication is permanent
+    /// history and this is the part that actually varies.
+    ///
+    /// `None` when it could not be determined, for the same reasons as
+    /// `account_exists`.
+    pub active: Option<bool>,
     /// Whether the published deployment is still the team's most recent one.
     ///
     /// False means a mention runs an older build than the editor shows, because a

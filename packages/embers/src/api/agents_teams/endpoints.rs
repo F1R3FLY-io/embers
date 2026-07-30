@@ -17,6 +17,7 @@ use crate::api::agents_teams::models::{
     PublishToFireskyReq,
     PublishToFireskyResp,
     PublishedState,
+    ReferencingTeam,
     RunReq,
     RunResp,
     SaveAgentsTeamReq,
@@ -244,6 +245,33 @@ impl AgentsTeamsApi {
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents.deploy_signed_delete(body.into()).await?;
         Ok(Json(deploy_id.into()))
+    }
+
+    /// Every team whose latest version uses the given agent, so deleting that agent
+    /// can name what it would break before doing it. See `referencing_teams`.
+    #[oai(path = "/:address/referencing/:agent_id", method = "get")]
+    async fn referencing_teams(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Path(agent_id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> poem::Result<Json<Vec<ReferencingTeam>>> {
+        let teams = agents_teams.referencing_teams(address.0, agent_id).await?;
+        Ok(Json(teams.into_iter().map(Into::into).collect()))
+    }
+
+    /// Stops a published team answering mentions, by removing the record that marks
+    /// its account as a team. The account and handle are kept, so it is reversible
+    /// by publishing again.
+    #[oai(path = "/:address/:id/unpublish", method = "post")]
+    async fn unpublish(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Path(id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> poem::Result<()> {
+        agents_teams.unpublish(address.0, id).await?;
+        Ok(())
     }
 
     /// Reports a team's publication as the chain records it, reconciled against

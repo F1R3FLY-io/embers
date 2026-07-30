@@ -52,6 +52,17 @@ pub struct AgentsTeam {
     pub graph: Option<Stringified<models::Graph>>,
 }
 
+/// A team whose latest version uses a given agent, and would break if it were deleted.
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::ReferencingTeam))]
+pub struct ReferencingTeam {
+    pub id: String,
+    pub name: String,
+    pub version: String,
+    pub published: bool,
+    pub published_handle: Option<String>,
+}
+
 /// Whether a team is published to F1R3SKY, and whether the account it was
 /// published under is still there.
 ///
@@ -67,6 +78,7 @@ pub struct PublishedState {
     pub handle: Option<String>,
     pub did: Option<String>,
     pub account_exists: Option<bool>,
+    pub active: Option<bool>,
     pub uri: Stringified<Uri>,
     pub published_version: String,
     pub is_latest_deployment: bool,

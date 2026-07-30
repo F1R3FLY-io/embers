@@ -1,12 +1,14 @@
 use anyhow::anyhow;
 use atrium_api::client::AtpServiceClient;
-use atrium_api::types::string::Handle;
+use atrium_api::types::Collection;
+use atrium_api::types::string::{AtIdentifier, Handle};
 use atrium_xrpc_client::reqwest::ReqwestClient;
-use firefly_client::models::WalletAddress;
+use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::agents_teams::AgentsTeamsService;
-use crate::domain::agents_teams::models::PublishedState;
+use crate::domain::agents_teams::models::{FireskyCredentials, PublishedState};
+use crate::domain::agents_teams::publish_to_firesky::{AgentsTeamConfig, SELF_RKEY};
 use crate::domain::common::record_trace;
 
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
@@ -43,13 +45,79 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
     ) -> anyhow::Result<Option<PublishedState>> {
         record_trace!(address, id);
 
+        let Some(publication) = self.publication_of(address, id).await? else {
+            return Ok(None);
+        };
+        let Publication {
+            credentials,
+            is_latest_deployment,
+            uri,
+            version,
+        } = publication;
+
+        let account_exists = match credentials.handle.as_deref() {
+            // Nothing to check against: this publish predates handles being recorded.
+            None => None,
+            Some(handle) => resolves(&credentials.pds_url, handle).await,
+        };
+
+        // Whether the publication is actually in force. The chain-side credential is
+        // permanent -- the env stores tokens in a push-only stack with no removal --
+        // so "was published once" and "is published now" are different questions, and
+        // only this one governs whether a mention fires.
+        let active = match (account_exists, repo_identifier(&credentials)) {
+            // No account, so no record on it either. Answering `Some(false)` here
+            // rather than re-asking spares a request that cannot succeed.
+            (Some(false), _) => Some(false),
+            (_, Some(repo)) => config_record_present(&credentials.pds_url, repo).await,
+            (_, None) => None,
+        };
+
+        Ok(Some(PublishedState {
+            account_exists,
+            active,
+            did: credentials.did,
+            handle: credentials.handle,
+            // A published deployment that is no longer the newest means mentions run
+            // an older build of the team than the editor shows. Silent today, and
+            // the cause of "I re-deployed but nothing changed".
+            is_latest_deployment,
+            published_version: version,
+            uri,
+        }))
+    }
+}
+
+/// Which deployment of a team is published, if any.
+pub(super) struct Publication {
+    pub credentials: FireskyCredentials,
+    pub is_latest_deployment: bool,
+    pub uri: Uri,
+    pub version: String,
+}
+
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
+    /// Finds the published deployment of a team, without touching the PDS.
+    ///
+    /// Separate from `published_state` because two callers want different things:
+    /// the state endpoint reconciles against the PDS, while a deletion warning only
+    /// needs to name the handle and must not pay two network round-trips per team.
+    ///
+    /// Keyed by deployment uri rather than team id, because each deploy mints a
+    /// fresh uri while the account keeps naming whichever was current when it was
+    /// published -- so the published deployment is frequently not the newest.
+    pub(super) async fn publication_of(
+        &self,
+        address: WalletAddress,
+        id: String,
+    ) -> anyhow::Result<Option<Publication>> {
         let versions = self
             .list_versions(address, id)
             .await?
             .ok_or_else(|| anyhow!("agents team not found"))?;
 
-        // Newest deploy first, so the first published deployment found is the most
-        // recent one and the newest deployed uri is the head of the list.
+        // Newest deploy first, so the newest deployed uri heads the list and the
+        // first published entry found is the most recent published one.
         let mut deployed: Vec<_> = versions
             .agents_teams
             .into_iter()
@@ -76,23 +144,58 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .map(|entry| entry.clone())
             .ok_or_else(|| anyhow!("publication vanished while being read"))?;
 
-        let account_exists = match credentials.handle.as_deref() {
-            // Nothing to check against: this publish predates handles being recorded.
-            None => None,
-            Some(handle) => resolves(&credentials.pds_url, handle).await,
-        };
-
-        Ok(Some(PublishedState {
-            account_exists,
-            did: credentials.did,
-            handle: credentials.handle,
-            // A published deployment that is no longer the newest means mentions run
-            // an older build of the team than the editor shows. Silent today, and
-            // the cause of "I re-deployed but nothing changed".
+        Ok(Some(Publication {
+            credentials,
             is_latest_deployment: newest_deployed_uri.as_ref() == Some(&uri),
-            published_version: version,
             uri,
+            version,
         }))
+    }
+}
+
+/// The account identifier to address the repo by, preferring the DID because a
+/// handle can be reassigned to a different account.
+fn repo_identifier(credentials: &FireskyCredentials) -> Option<String> {
+    credentials
+        .did
+        .clone()
+        .or_else(|| credentials.handle.clone())
+}
+
+/// Whether the account still carries the record that marks it as an agent team.
+///
+/// `None` on any transport failure, for the same reason as `resolves`: an
+/// unreachable PDS is not evidence that the record is gone.
+async fn config_record_present(pds_url: &str, repo: String) -> Option<bool> {
+    let Ok(repo) = repo.parse::<AtIdentifier>() else {
+        return None;
+    };
+
+    let client = AtpServiceClient::new(ReqwestClient::new(pds_url.to_owned()));
+
+    match client
+        .service
+        .com
+        .atproto
+        .repo
+        .get_record(
+            atrium_api::com::atproto::repo::get_record::ParametersData {
+                cid: None,
+                collection: AgentsTeamConfig::nsid(),
+                repo,
+                rkey: SELF_RKEY.clone(),
+            }
+            .into(),
+        )
+        .await
+    {
+        Ok(_) => Some(true),
+        // The PDS answered and does not have the record: the team was unpublished.
+        Err(atrium_api::xrpc::Error::XrpcResponse(_)) => Some(false),
+        Err(err) => {
+            tracing::info!("could not read the agents-team config record from {pds_url}: {err}");
+            None
+        }
     }
 }
 
