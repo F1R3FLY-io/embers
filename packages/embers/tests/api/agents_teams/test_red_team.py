@@ -50,8 +50,7 @@ REFINE = (
 )
 
 CONDENSE = (
-    'contract main(@input, return) = { return!("C{" ++ input.get("input") ++ "|" '
-    '++ input.get("refine") ++ "}") }'
+    'contract main(@input, return) = { return!("C{" ++ input.get("input") ++ "|" ++ input.get("refine") ++ "}") }'
 )
 
 AGENTS = {
@@ -107,17 +106,11 @@ def _graphl(contexts: list[tuple[str, str]], edges: list[tuple[str, str]]) -> st
     contexts, then a right-nested tensor chain of anonymous edges."""
     body = "0"
     for name, json in reversed(contexts):
-        body = (
-            f'{{context "{_escape(json)}" for {name} in '
-            f"let {name} = < {name} > in < {name} > | {body}}}"
-        )
+        body = f'{{context "{_escape(json)}" for {name} in let {name} = < {name} > in < {name} > | {body}}}'
 
     chain = "0"
     for source, target in reversed(edges):
-        chain = (
-            f"{{(let {source} = < {source} > in 0, "
-            f"let {target} = < {target} > in 0) * {chain}}}"
-        )
+        chain = f"{{(let {source} = < {source} > in 0, let {target} = < {target} > in 0) * {chain}}}"
 
     return f"0 * {body} * {chain}"
 
@@ -141,8 +134,7 @@ def _red_team_graphl(agents: dict[str, tuple[str, str]]) -> str:
         contexts.append(
             (
                 vertex,
-                f'{{"type":"agent","agentId":"{agent_id}",'
-                f'"agentName":"{name}","agentVersion":"{version}"}}',
+                f'{{"type":"agent","agentId":"{agent_id}","agentName":"{name}","agentVersion":"{version}"}}',
             )
         )
     contexts.append(("aOut", '{"type":"output-node"}'))
@@ -170,7 +162,6 @@ def test_broadcast_and_join_produce_every_input(client: ApiClient, funded_wallet
     client.agents_teams.deploy(
         funded_wallet,
         agents_team=team,
-        phlo_limit=50_000_000,
         deploy=insert_signed_deploy(registry_key, datetime.now(UTC), funded_wallet, version=0),
     ).wait_for_sync()
 
@@ -180,7 +171,6 @@ def test_broadcast_and_join_produce_every_input(client: ApiClient, funded_wallet
     resp = client.agents_teams.run(
         funded_wallet,
         PROMPT,
-        phlo_limit=50_000_000,
         agents_team=uri,
     )
 
@@ -205,10 +195,7 @@ def test_raw_graph_deploy_cannot_resolve_agent_nodes(client: ApiClient, funded_w
         json={
             "type": "Graph",
             "graph": graph,
-            "phlo_limit": 50_000_000,
-            "deploy": insert_signed_deploy(
-                SECP256k1.generate(), datetime.now(UTC), funded_wallet, version=0
-            ),
+            "deploy": insert_signed_deploy(SECP256k1.generate(), datetime.now(UTC), funded_wallet, version=0),
         },
     )
 

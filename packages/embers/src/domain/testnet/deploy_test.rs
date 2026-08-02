@@ -87,7 +87,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetService<R, W, N> {
 
         let result = self
             .observer_node_events
-            .wait_for_deploy(&deploy_id, Duration::from_mins(1))
+            .wait_for_deploy(&deploy_id, self.deploy_finalization_timeout)
             .await;
 
         match result {
@@ -149,6 +149,7 @@ mod tests {
             write_client,
             read_client,
             observer_node_events: observer,
+            deploy_finalization_timeout: Duration::from_secs(5),
         }
     }
 

@@ -7,8 +7,9 @@ use chrono::{DateTime, Utc};
 use prost::Message as _;
 use secp256k1::{Message, PublicKey, Secp256k1, SecretKey};
 
-use crate::models::rhoapi;
+use crate::models::casper::DeployDataProto;
 use crate::models::rhoapi::expr::ExprInstance;
+use crate::models::{SignedCode, rhoapi};
 
 pub trait FromExpr: Sized {
     fn from(val: ExprInstance) -> anyhow::Result<Self>;
@@ -154,6 +155,36 @@ pub fn insert_signed_signature(
         .to_vec()
 }
 
+/// Signs the exact protobuf bytes returned by a prepare endpoint.
+///
+/// Keeping the prepared bytes and signature together allows callers to persist
+/// a deploy in an outbox and safely resubmit the identical deploy after a crash.
+pub fn sign_prepared_contract(contract: Vec<u8>, key: &SecretKey) -> anyhow::Result<SignedCode> {
+    let prepared = DeployDataProto::decode(contract.as_slice())?;
+    anyhow::ensure!(
+        prepared.sig.is_empty(),
+        "prepared deploy already contains a signature"
+    );
+    anyhow::ensure!(
+        prepared.deployer.is_empty(),
+        "prepared deploy already contains a deployer"
+    );
+    anyhow::ensure!(
+        prepared.sig_algorithm.is_empty(),
+        "prepared deploy already contains a signature algorithm"
+    );
+
+    let digest = Blake2b::<U32>::new().chain_update(&contract).finalize();
+    let secp = Secp256k1::new();
+    let signature = secp.sign_ecdsa(Message::from_digest(digest.into()), key);
+    Ok(SignedCode {
+        contract,
+        sig: signature.serialize_der().to_vec(),
+        sig_algorithm: "secp256k1".to_owned(),
+        deployer: key.public_key(&secp).serialize_uncompressed().to_vec(),
+    })
+}
+
 #[test]
 fn test_insert_signed_signature() {
     use std::str::FromStr;
@@ -172,4 +203,26 @@ fn test_insert_signed_signature() {
         hex::encode(sig),
         "3044022038044777f2faccfc503363ce70d5701ae64969ca98e64049f92d8477fdea0c1402200843c073c6f0121f580f38bb2940f16cef54fc24ea325ebc00230fa6e3117549"
     );
+}
+
+#[test]
+fn prepared_contract_signing_is_stable_and_rejects_signed_input() {
+    let key = SecretKey::from_byte_array([7u8; 32]).expect("valid key");
+    let prepared = DeployDataProto {
+        term: "new Nil".to_owned(),
+        timestamp: 42,
+        shard_id: "root".to_owned(),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let first = sign_prepared_contract(prepared.clone(), &key).expect("signing should succeed");
+    let second = sign_prepared_contract(prepared, &key).expect("signing should be deterministic");
+    assert_eq!(first.contract, second.contract);
+    assert_eq!(first.sig, second.sig);
+    assert_eq!(first.deployer, second.deployer);
+
+    let mut already_signed =
+        DeployDataProto::decode(first.contract.as_slice()).expect("prepared protobuf");
+    already_signed.sig = vec![1].into();
+    assert!(sign_prepared_contract(already_signed.encode_to_vec(), &key).is_err());
 }

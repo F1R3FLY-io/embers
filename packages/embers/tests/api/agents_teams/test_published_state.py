@@ -24,7 +24,6 @@ def _deploy(client: ApiClient, wallet: Wallet, team: AgentsTeam) -> None:
     client.agents_teams.deploy(
         wallet,
         agents_team=team,
-        phlo_limit=5_000_000,
         deploy=insert_signed_deploy(SECP256k1.generate(), datetime.now(UTC), wallet, version=0),
     ).wait_for_sync()
 
@@ -37,9 +36,7 @@ def _unique_handle(wallet: Wallet) -> str:
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 @pytest.mark.parametrize("agents_team", [ECHO_TEAM], indirect=True)
-def test_an_unpublished_team_reports_nothing(
-    client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam
-):
+def test_an_unpublished_team_reports_nothing(client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam):
     # 404 rather than a body saying "not published": absence is the natural encoding,
     # and it keeps the caller from mistaking an empty record for a real one.
     _deploy(client, funded_wallet, agents_team)
@@ -83,9 +80,7 @@ def test_a_published_team_reports_the_handle_and_that_the_account_exists(
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 @pytest.mark.parametrize("agents_team", [ECHO_TEAM], indirect=True)
-def test_re_deploying_marks_the_publication_stale(
-    client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam
-):
+def test_re_deploying_marks_the_publication_stale(client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam):
     """A deploy mints a new registry uri, but the published config record keeps
     naming the old one -- so mentions keep running the older build. That was silent,
     and is the mechanism behind "I re-deployed and nothing changed"."""

@@ -53,7 +53,7 @@ pub struct ReadNodeConfig {
 impl Default for ReadNodeConfig {
     fn default() -> Self {
         Self {
-            request_timeout: Duration::from_secs(60),
+            request_timeout: Duration::from_mins(1),
             connect_timeout: Duration::from_secs(5),
             tcp_keepalive: Some(Duration::from_secs(30)),
         }
@@ -90,17 +90,14 @@ impl ReadNodeClient {
         let code_prefix: String = rholang_code.chars().take(200).collect();
         let mut response_json = self.explore_deploy(rholang_code).await?;
 
-        let data_value = match response_json.pointer_mut("/expr/0").map(Value::take) {
-            Some(v) => v,
-            None => {
-                tracing::warn!(
-                    response = %response_json,
-                    code_len,
-                    code_prefix = %code_prefix,
-                    "explore-deploy returned no data at /expr/0"
-                );
-                return Err(ReadNodeError::ReturnValueMissing);
-            }
+        let Some(data_value) = response_json.pointer_mut("/expr/0").map(Value::take) else {
+            tracing::warn!(
+                response = %response_json,
+                code_len,
+                code_prefix = %code_prefix,
+                "explore-deploy returned no data at /expr/0"
+            );
+            return Err(ReadNodeError::ReturnValueMissing);
         };
 
         let intermediate: ReadNodeExpr = serde_json::from_value(data_value.clone())
@@ -257,18 +254,19 @@ impl ReadNodeClient {
         if let Some(block) = response.get("block") {
             tracing::info!(
                 target: "f1r3fly.rholang.diag",
-                block_number = block.get("blockNumber").and_then(|v| v.as_u64()),
-                block_hash = block.get("blockHash").and_then(|v| v.as_str()),
-                deploy_count = block.get("deployCount").and_then(|v| v.as_u64()),
-                post_state = block.get("postStateHash").and_then(|v| v.as_str()),
+                block_number = block.get("blockNumber").and_then(serde_json::Value::as_u64),
+                block_hash = block.get("blockHash").and_then(serde_json::Value::as_str),
+                deploy_count = block.get("deployCount").and_then(serde_json::Value::as_u64),
+                post_state = block.get("postStateHash").and_then(serde_json::Value::as_str),
                 "explore_deploy: response block info"
             );
         }
 
         // Warn on empty expr, debug-log otherwise
-        match response.pointer("/expr/0") {
-            Some(_) => tracing::trace!(response = %response, "explore_deploy response (has data)"),
-            None => tracing::warn!(response = %response, "explore_deploy response (empty expr)"),
+        if response.pointer("/expr/0").is_some() {
+            tracing::trace!(response = %response, "explore_deploy response (has data)");
+        } else {
+            tracing::warn!(response = %response, "explore_deploy response (empty expr)");
         }
 
         Ok(response)
@@ -637,7 +635,7 @@ mod tests {
         assert!(
             matches!(
                 result,
-                Err(ReadNodeError::ReturnValueMissing) | Err(ReadNodeError::Timeout(_))
+                Err(ReadNodeError::ReturnValueMissing | ReadNodeError::Timeout(_))
             ),
             "expected ReturnValueMissing or Timeout, got {result:?}"
         );

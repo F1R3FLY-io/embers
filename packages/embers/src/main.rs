@@ -19,7 +19,8 @@ use crate::api::testnet::TestnetApi;
 use crate::api::wallets::WalletsApi;
 use crate::configuration::collect_config;
 use crate::domain::agents::AgentsService;
-use crate::domain::agents_teams::AgentsTeamsService;
+use crate::domain::agents_teams::continuation_store::F1r3driveContinuationStore;
+use crate::domain::agents_teams::{AgentsTeamsRuntimeConfig, AgentsTeamsService};
 use crate::domain::oslfs::OslfsService;
 use crate::domain::testnet::TestnetService;
 use crate::domain::wallets::WalletsService;
@@ -32,6 +33,14 @@ mod domain;
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let config = collect_config().context("failed to read configuration")?;
+    let deploy_finalization_timeout = config.finalization.deploy_timeout();
+    let continuation_store = F1r3driveContinuationStore::open(
+        &config.continuation_store.mount_path,
+        config.continuation_store.encryption_key,
+        config.continuation_store.capability_key,
+        config.continuation_store.max_object_bytes,
+    )
+    .context("failed to open the F1r3drive Agent Teams continuation store")?;
 
     let env_filter = tracing_subscriber::EnvFilter::try_new(config.log_level)
         .context("failed to init log filter")?;
@@ -73,7 +82,11 @@ async fn main() -> anyhow::Result<()> {
                     validator_node_events.clone(),
                     &config.mainnet.service_key,
                     &config.mainnet.agents_teams_env_key,
-                    config.aes_encryption_key.into(),
+                    AgentsTeamsRuntimeConfig {
+                        aes_encryption_key: config.aes_encryption_key.into(),
+                        continuation_store: continuation_store.clone(),
+                        deploy_finalization_timeout,
+                    },
                 )
                 .await?;
 
@@ -104,15 +117,14 @@ async fn main() -> anyhow::Result<()> {
                     "mainnet init deploys submitted, waiting for finalization"
                 );
 
-                let init_timeout = Duration::from_secs(60);
-                let agents_waiter =
-                    validator_node_events.wait_for_deploy(&agents_deploy_id, init_timeout);
-                let agents_teams_waiter =
-                    validator_node_events.wait_for_deploy(&agents_teams_deploy_id, init_timeout);
-                let oslfs_waiter =
-                    validator_node_events.wait_for_deploy(&oslfs_deploy_id, init_timeout);
-                let wallets_waiter =
-                    validator_node_events.wait_for_deploy(&wallets_deploy_id, init_timeout);
+                let agents_waiter = validator_node_events
+                    .wait_for_deploy(&agents_deploy_id, deploy_finalization_timeout);
+                let agents_teams_waiter = validator_node_events
+                    .wait_for_deploy(&agents_teams_deploy_id, deploy_finalization_timeout);
+                let oslfs_waiter = validator_node_events
+                    .wait_for_deploy(&oslfs_deploy_id, deploy_finalization_timeout);
+                let wallets_waiter = validator_node_events
+                    .wait_for_deploy(&wallets_deploy_id, deploy_finalization_timeout);
 
                 // Wait for all init deploys to finalize
                 let (a, at, o, w) = tokio::join!(
@@ -129,7 +141,9 @@ async fn main() -> anyhow::Result<()> {
                 ] {
                     match result {
                         Some(true) => anyhow::bail!("{name} init deploy errored on chain"),
-                        None => anyhow::bail!("{name} init deploy not finalized within 60s"),
+                        None => anyhow::bail!(
+                            "{name} init deploy not finalized within {deploy_finalization_timeout:?}"
+                        ),
                         Some(false) => tracing::info!("{name} init deploy finalized successfully"),
                     }
                 }
@@ -158,17 +172,20 @@ async fn main() -> anyhow::Result<()> {
                     testnet_observer_node_events.clone(),
                     config.testnet.service_key,
                     &config.testnet.env_key,
+                    deploy_finalization_timeout,
                 )
                 .await?;
 
                 tracing::info!(deploy_id = %testnet_deploy_id, "testnet init deploy submitted");
 
                 let testnet_waiter = testnet_observer_node_events
-                    .wait_for_deploy(&testnet_deploy_id, Duration::from_secs(60));
+                    .wait_for_deploy(&testnet_deploy_id, deploy_finalization_timeout);
 
                 match testnet_waiter.await {
                     Some(true) => anyhow::bail!("testnet init deploy errored on chain"),
-                    None => anyhow::bail!("testnet init deploy not finalized within 60s"),
+                    None => anyhow::bail!(
+                        "testnet init deploy not finalized within {deploy_finalization_timeout:?}"
+                    ),
                     Some(false) => tracing::info!("testnet init deploy finalized successfully"),
                 }
 
@@ -193,13 +210,13 @@ async fn main() -> anyhow::Result<()> {
             ("wallets".into(), wallets_service.uri.clone()),
         ];
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(60));
+            let mut interval = tokio::time::interval(Duration::from_mins(1));
             loop {
                 interval.tick().await;
 
                 // Control probe: check a well-known system URI
                 let system_probe_code =
-                    r#"new ret, rl(`rho:registry:lookup`) in { rl!(`rho:lang:treeHashMap`, *ret) }"#
+                    r"new ret, rl(`rho:registry:lookup`) in { rl!(`rho:lang:treeHashMap`, *ret) }"
                         .to_string();
                 match health_read_client
                     .get_data::<serde_json::Value>(system_probe_code)
@@ -219,7 +236,7 @@ async fn main() -> anyhow::Result<()> {
                 for (name, uri) in &env_uris {
                     let uri_str: &str = uri.as_ref();
                     let code = format!(
-                        r#"new ret, rl(`rho:registry:lookup`) in {{ rl!(`{uri_str}`, *ret) }}"#,
+                        r"new ret, rl(`rho:registry:lookup`) in {{ rl!(`{uri_str}`, *ret) }}",
                     );
                     match health_read_client.get_data::<serde_json::Value>(code).await {
                         Ok(serde_json::Value::Null) => tracing::warn!(
@@ -244,6 +261,16 @@ async fn main() -> anyhow::Result<()> {
             }
         });
         tracing::info!("periodic registry health check started (every 60s)");
+    }
+
+    {
+        let recovery_service = agents_teams_service.clone();
+        let poll_interval = Duration::from_millis(config.continuation_store.recovery_poll_millis);
+        tokio::spawn(recovery_service.run_recovery_loop(poll_interval));
+        tracing::info!(
+            ?poll_interval,
+            "Agent Teams durable recovery scheduler started"
+        );
     }
 
     let secret = Alphanumeric.sample_string(&mut rand::rng(), 20);
@@ -305,7 +332,7 @@ async fn verify_env_readable(
     env_uri: &Uri,
 ) -> anyhow::Result<()> {
     let uri_str: &str = env_uri.as_ref();
-    let code = format!(r#"new ret, rl(`rho:registry:lookup`) in {{ rl!(`{uri_str}`, *ret) }}"#,);
+    let code = format!(r"new ret, rl(`rho:registry:lookup`) in {{ rl!(`{uri_str}`, *ret) }}",);
     let result: Result<serde_json::Value, _> = read_client
         .get_data_with_retry(code, 10, Duration::from_millis(500))
         .await;

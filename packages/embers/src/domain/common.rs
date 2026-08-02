@@ -24,11 +24,19 @@ macro_rules! record_trace {
 
 pub(crate) use record_trace;
 
+/// Current UTC time at the precision shared by the JSON API and Rholang.
+/// Prepare tokens hash their typed response before JSON serialization, while
+/// Rholang stores rendered `DateTime` values as epoch seconds. Truncating here
+/// makes both round trips preserve the exact signed value.
+pub fn utc_now_protocol() -> DateTime<Utc> {
+    DateTime::<Utc>::from_timestamp_secs(Utc::now().timestamp())
+        .expect("the current UTC timestamp is representable in seconds")
+}
+
 #[bon::builder]
 pub fn prepare_for_signing(
     code: String,
     valid_after_block_number: u64,
-    phlo_limit: Option<PositiveNonZero<i64>>,
     timestamp: Option<DateTime<Utc>>,
 ) -> PreparedContract {
     let timestamp = timestamp
@@ -37,8 +45,6 @@ pub fn prepare_for_signing(
     let contract = DeployDataProto {
         term: code,
         timestamp,
-        phlo_price: 1,
-        phlo_limit: phlo_limit.map_or(5_000_000, |v| v.0),
         valid_after_block_number: valid_after_block_number as _,
         shard_id: "root".into(),
         ..Default::default()
@@ -138,7 +144,6 @@ pub struct RegistryDeploy {
 #[cfg(test)]
 mod tests {
     use aes_gcm::Aes256Gcm;
-    use aes_gcm::aead::KeyInit;
 
     use super::*;
 
@@ -147,7 +152,7 @@ mod tests {
     // -------------------------------------------------------
 
     #[test]
-    fn test_prepare_for_signing_default_phlo_limit() {
+    fn test_prepare_for_signing_uses_cost_accounted_deploy_shape() {
         let contract = prepare_for_signing()
             .code("new Nil".into())
             .valid_after_block_number(0)
@@ -155,24 +160,9 @@ mod tests {
 
         let proto = DeployDataProto::decode(contract.0.as_slice())
             .expect("should decode as DeployDataProto");
-        assert_eq!(proto.phlo_limit, 5_000_000);
         assert_eq!(proto.term, "new Nil");
         assert_eq!(proto.shard_id, "root");
-        assert_eq!(proto.phlo_price, 1);
-    }
-
-    #[test]
-    fn test_prepare_for_signing_custom_phlo_limit() {
-        let contract = prepare_for_signing()
-            .code("code".into())
-            .valid_after_block_number(10)
-            .phlo_limit(PositiveNonZero(1_000_000))
-            .call();
-
-        let proto = DeployDataProto::decode(contract.0.as_slice())
-            .expect("should decode as DeployDataProto");
-        assert_eq!(proto.phlo_limit, 1_000_000);
-        assert_eq!(proto.valid_after_block_number, 10);
+        assert_eq!(proto.valid_after_block_number, 0);
     }
 
     #[test]
@@ -203,12 +193,22 @@ mod tests {
         assert_eq!(proto.shard_id, "root");
     }
 
+    #[test]
+    fn api_timestamp_round_trips_at_wire_precision() {
+        let value = utc_now_protocol();
+        assert_eq!(
+            DateTime::<Utc>::from_timestamp_millis(value.timestamp_millis()),
+            Some(value)
+        );
+        assert_eq!(value.timestamp_subsec_nanos(), 0);
+    }
+
     // -------------------------------------------------------
     // encrypt/decrypt round-trip tests
     // -------------------------------------------------------
 
     fn test_aes_key() -> Key<Aes256Gcm> {
-        *Key::<Aes256Gcm>::from_slice(&[42u8; 32])
+        [42u8; 32].into()
     }
 
     #[test]
@@ -241,9 +241,9 @@ mod tests {
 
     #[test]
     fn test_decrypt_wrong_key_fails() {
-        let key1 = *Key::<Aes256Gcm>::from_slice(&[1u8; 32]);
-        let key2 = *Key::<Aes256Gcm>::from_slice(&[2u8; 32]);
-        let encrypted = serialize_encrypted(&"secret", &key1).expect("should encrypt");
+        let key1 = [1u8; 32].into();
+        let key2 = [2u8; 32].into();
+        let encrypted = serialize_encrypted("secret", &key1).expect("should encrypt");
         let result = deserialize_decrypted::<String>(encrypted, &key2);
         assert!(result.is_err(), "decryption with wrong key should fail");
     }

@@ -39,7 +39,6 @@ def _deploy(client: ApiClient, wallet: Wallet, team: AgentsTeam) -> None:
     client.agents_teams.deploy(
         wallet,
         agents_team=team,
-        phlo_limit=5_000_000,
         deploy=insert_signed_deploy(SECP256k1.generate(), datetime.now(UTC), wallet, version=0),
     ).wait_for_sync()
 
@@ -112,9 +111,7 @@ def test_unpublishing_stops_the_mentions_and_keeps_the_account(
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 @pytest.mark.parametrize("agents_team", [ECHO_TEAM], indirect=True)
-def test_the_deployment_survives_unpublishing(
-    client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam
-):
+def test_the_deployment_survives_unpublishing(client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam):
     """Unpublishing stops the mention path, not the contract.
 
     The deployed team is still there at its registry uri and still callable by anyone
@@ -153,9 +150,7 @@ def test_unpublishing_a_team_that_was_never_published_fails(
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 @pytest.mark.parametrize("agents_team", [ECHO_TEAM], indirect=True)
-def test_republishing_after_unpublishing_works(
-    client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam
-):
+def test_republishing_after_unpublishing_works(client: ApiClient, funded_wallet: Wallet, agents_team: AgentsTeam):
     """The reason the account is kept.
 
     Unpublishing has to be reversible, or it is just a slower deletion. Publishing

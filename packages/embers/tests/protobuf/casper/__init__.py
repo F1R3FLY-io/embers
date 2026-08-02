@@ -7,6 +7,7 @@ __all__ = (
     "ApprovedBlockCandidateProto",
     "ApprovedBlockProto",
     "ApprovedBlockRequestProto",
+    "AtomKind",
     "BlockApprovalProto",
     "BlockEventInfo",
     "BlockHashMessageProto",
@@ -23,6 +24,7 @@ __all__ = (
     "BondStatusQuery",
     "CloseBlockSystemDeployDataProto",
     "CommEventProto",
+    "CompoundSigner",
     "ConsumeEventProto",
     "ContinuationAtNameQuery",
     "ContinuationsWithBlockInfo",
@@ -61,6 +63,8 @@ __all__ = (
     "ProposeQuery",
     "ProposeResultQuery",
     "RChainStateProto",
+    "RedeemSystemDeployDataProto",
+    "RedemptionAuthorizationProto",
     "RejectedDeployInfo",
     "RejectedDeployProto",
     "ReportCommProto",
@@ -68,6 +72,13 @@ __all__ = (
     "ReportProduceProto",
     "ReportProto",
     "ReportQuery",
+    "SigAtom",
+    "SigBang",
+    "SigCompound",
+    "SigLolly",
+    "SigPair",
+    "SigPlus",
+    "SigThreshold",
     "Signature",
     "SingleReport",
     "SlashSystemDeployDataProto",
@@ -97,6 +108,25 @@ _COMPILER_VERSION = "0.9.0"
 betterproto2.check_compiler_version(_COMPILER_VERSION)
 
 
+class AtomKind(betterproto2.Enum):
+    """
+    Distinguishes the two atomic signature axes of the cost-accounted
+    rho-calculus (`publications/cost-accounting/cost-accounted-rho.tex`
+    §App-A, eqs. eq:app-sig-ground / eq:app-sig-hash):
+      GROUND (`g`)  — a ground signature key `g ∈ G`; Σ⟦g⟧ = quote(H_g).
+      QUOTE  (`#P`) — a cryptographic process-hash `#P`; Σ⟦#P⟧ = quote(H(𝒫⟦P⟧)).
+    Both reflect to a quoted name on the wire, so the SIGNATURE-CHANNEL
+    derivation is identical for equal `pk` bytes; the axis is carried only
+    so the runtime `Sig` value round-trips faithfully. GROUND = 0 is the
+    proto3 default, so any legacy `SigAtom` decoded without this field is a
+    ground atom — preserving backward compatibility.
+    """
+
+    GROUND = 0
+
+    QUOTE = 1
+
+
 class DeployFinalizationStateProto(betterproto2.Enum):
     DEPLOY_STATE_UNSPECIFIED = 0
 
@@ -115,22 +145,32 @@ class ApprovedBlockCandidateProto(betterproto2.Message):
     ---------- Signing Protocol ---------
     """
 
-    block: "BlockMessageProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    block: "BlockMessageProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     required_sigs: "int" = betterproto2.field(2, betterproto2.TYPE_INT32)
 
 
-default_message_pool.register_message("casper", "ApprovedBlockCandidateProto", ApprovedBlockCandidateProto)
+default_message_pool.register_message(
+    "casper", "ApprovedBlockCandidateProto", ApprovedBlockCandidateProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class ApprovedBlockProto(betterproto2.Message):
-    candidate: "ApprovedBlockCandidateProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    candidate: "ApprovedBlockCandidateProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    sigs: "list[Signature]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    sigs: "list[Signature]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
-default_message_pool.register_message("casper", "ApprovedBlockProto", ApprovedBlockProto)
+default_message_pool.register_message(
+    "casper", "ApprovedBlockProto", ApprovedBlockProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -140,24 +180,36 @@ class ApprovedBlockRequestProto(betterproto2.Message):
     trim_state: "bool" = betterproto2.field(2, betterproto2.TYPE_BOOL)
 
 
-default_message_pool.register_message("casper", "ApprovedBlockRequestProto", ApprovedBlockRequestProto)
+default_message_pool.register_message(
+    "casper", "ApprovedBlockRequestProto", ApprovedBlockRequestProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class BlockApprovalProto(betterproto2.Message):
-    candidate: "ApprovedBlockCandidateProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    candidate: "ApprovedBlockCandidateProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    sig: "Signature | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    sig: "Signature | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
-default_message_pool.register_message("casper", "BlockApprovalProto", BlockApprovalProto)
+default_message_pool.register_message(
+    "casper", "BlockApprovalProto", BlockApprovalProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class BlockEventInfo(betterproto2.Message):
-    block_info: "LightBlockInfo | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    block_info: "LightBlockInfo | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    deploys: "list[DeployInfoWithEventData]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    deploys: "list[DeployInfoWithEventData]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     system_deploys: "list[SystemDeployInfoWithEventData]" = betterproto2.field(
         3, betterproto2.TYPE_MESSAGE, repeated=True
@@ -176,7 +228,9 @@ class BlockHashMessageProto(betterproto2.Message):
     block_creator: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("casper", "BlockHashMessageProto", BlockHashMessageProto)
+default_message_pool.register_message(
+    "casper", "BlockHashMessageProto", BlockHashMessageProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -185,9 +239,13 @@ class BlockInfo(betterproto2.Message):
     For node clients, see BlockMessage for actual Casper protocol Block representation
     """
 
-    block_info: "LightBlockInfo | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    block_info: "LightBlockInfo | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    deploys: "list[DeployInfo]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    deploys: "list[DeployInfo]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
 default_message_pool.register_message("casper", "BlockInfo", BlockInfo)
@@ -206,11 +264,17 @@ class BlockMessageProto(betterproto2.Message):
     obtained by hashing the information in the header
     """
 
-    header: "HeaderProto | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    header: "HeaderProto | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    body: "BodyProto | None" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, optional=True)
+    body: "BodyProto | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    justifications: "list[JustificationProto]" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, repeated=True)
+    justifications: "list[JustificationProto]" = betterproto2.field(
+        4, betterproto2.TYPE_MESSAGE, repeated=True
+    )
     """
     map of all validators to latest blocks based on current view
     """
@@ -250,13 +314,19 @@ default_message_pool.register_message("casper", "BlockMessageProto", BlockMessag
 class BlockMetadataInternal(betterproto2.Message):
     block_hash: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
-    parents: "list[bytes]" = betterproto2.field(2, betterproto2.TYPE_BYTES, repeated=True)
+    parents: "list[bytes]" = betterproto2.field(
+        2, betterproto2.TYPE_BYTES, repeated=True
+    )
 
     sender: "bytes" = betterproto2.field(3, betterproto2.TYPE_BYTES)
 
-    justifications: "list[JustificationProto]" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, repeated=True)
+    justifications: "list[JustificationProto]" = betterproto2.field(
+        4, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    bonds: "list[BondProto]" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, repeated=True)
+    bonds: "list[BondProto]" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     block_num: "int" = betterproto2.field(6, betterproto2.TYPE_INT64)
 
@@ -283,7 +353,9 @@ class BlockMetadataInternal(betterproto2.Message):
     """
 
 
-default_message_pool.register_message("casper", "BlockMetadataInternal", BlockMetadataInternal)
+default_message_pool.register_message(
+    "casper", "BlockMetadataInternal", BlockMetadataInternal
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -317,20 +389,30 @@ class BlocksQueryByHeight(betterproto2.Message):
     end_block_number: "int" = betterproto2.field(2, betterproto2.TYPE_INT64)
 
 
-default_message_pool.register_message("casper", "BlocksQueryByHeight", BlocksQueryByHeight)
+default_message_pool.register_message(
+    "casper", "BlocksQueryByHeight", BlocksQueryByHeight
+)
 
 
 @dataclass(eq=False, repr=False)
 class BodyProto(betterproto2.Message):
-    state: "RChainStateProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    state: "RChainStateProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    deploys: "list[ProcessedDeployProto]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    deploys: "list[ProcessedDeployProto]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    system_deploys: "list[ProcessedSystemDeployProto]" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, repeated=True)
+    system_deploys: "list[ProcessedSystemDeployProto]" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     extra_bytes: "bytes" = betterproto2.field(4, betterproto2.TYPE_BYTES)
 
-    rejected_deploys: "list[RejectedDeployProto]" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, repeated=True)
+    rejected_deploys: "list[RejectedDeployProto]" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
 default_message_pool.register_message("casper", "BodyProto", BodyProto)
@@ -369,24 +451,61 @@ class CloseBlockSystemDeployDataProto(betterproto2.Message):
     pass
 
 
-default_message_pool.register_message("casper", "CloseBlockSystemDeployDataProto", CloseBlockSystemDeployDataProto)
+default_message_pool.register_message(
+    "casper", "CloseBlockSystemDeployDataProto", CloseBlockSystemDeployDataProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class CommEventProto(betterproto2.Message):
-    consume: "ConsumeEventProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    consume: "ConsumeEventProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    produces: "list[ProduceEventProto]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    produces: "list[ProduceEventProto]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    peeks: "list[PeekProto]" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, repeated=True)
+    peeks: "list[PeekProto]" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
 default_message_pool.register_message("casper", "CommEventProto", CommEventProto)
 
 
 @dataclass(eq=False, repr=False)
+class CompoundSigner(betterproto2.Message):
+    """
+    One cosigner in a multi-signature deploy. Sorted ascending by `pk` bytes
+    in `DeployDataProto.cosigners` (decoder enforces). Each cosigner signs
+    the same canonical message hash as the primary deployer.
+    """
+
+    pk: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
+    """
+    cosigner public key
+    """
+
+    sig: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
+    """
+    cosigner signature of (hash(term) + timestamp) using private key
+    """
+
+    sig_algorithm: "str" = betterproto2.field(3, betterproto2.TYPE_STRING)
+    """
+    name of the algorithm used to sign (e.g., "secp256k1", "ed25519")
+    """
+
+
+default_message_pool.register_message("casper", "CompoundSigner", CompoundSigner)
+
+
+@dataclass(eq=False, repr=False)
 class ConsumeEventProto(betterproto2.Message):
-    channels_hashes: "list[bytes]" = betterproto2.field(1, betterproto2.TYPE_BYTES, repeated=True)
+    channels_hashes: "list[bytes]" = betterproto2.field(
+        1, betterproto2.TYPE_BYTES, repeated=True
+    )
 
     hash: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
 
@@ -400,10 +519,14 @@ default_message_pool.register_message("casper", "ConsumeEventProto", ConsumeEven
 class ContinuationAtNameQuery(betterproto2.Message):
     depth: "int" = betterproto2.field(1, betterproto2.TYPE_INT32)
 
-    names: "list[_rhoapi__.Par]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    names: "list[_rhoapi__.Par]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
-default_message_pool.register_message("casper", "ContinuationAtNameQuery", ContinuationAtNameQuery)
+default_message_pool.register_message(
+    "casper", "ContinuationAtNameQuery", ContinuationAtNameQuery
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -412,29 +535,39 @@ class ContinuationsWithBlockInfo(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, repeated=True
     )
 
-    block: "LightBlockInfo | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    block: "LightBlockInfo | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
-default_message_pool.register_message("casper", "ContinuationsWithBlockInfo", ContinuationsWithBlockInfo)
+default_message_pool.register_message(
+    "casper", "ContinuationsWithBlockInfo", ContinuationsWithBlockInfo
+)
 
 
 @dataclass(eq=False, repr=False)
 class DataAtNameByBlockQuery(betterproto2.Message):
-    par: "_rhoapi__.Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    par: "_rhoapi__.Par | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     block_hash: "str" = betterproto2.field(2, betterproto2.TYPE_STRING)
 
     use_pre_state_hash: "bool" = betterproto2.field(3, betterproto2.TYPE_BOOL)
 
 
-default_message_pool.register_message("casper", "DataAtNameByBlockQuery", DataAtNameByBlockQuery)
+default_message_pool.register_message(
+    "casper", "DataAtNameByBlockQuery", DataAtNameByBlockQuery
+)
 
 
 @dataclass(eq=False, repr=False)
 class DataAtNameQuery(betterproto2.Message):
     depth: "int" = betterproto2.field(1, betterproto2.TYPE_INT32)
 
-    name: "_rhoapi__.Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    name: "_rhoapi__.Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("casper", "DataAtNameQuery", DataAtNameQuery)
@@ -442,9 +575,13 @@ default_message_pool.register_message("casper", "DataAtNameQuery", DataAtNameQue
 
 @dataclass(eq=False, repr=False)
 class DataWithBlockInfo(betterproto2.Message):
-    post_block_data: "list[_rhoapi__.Par]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    post_block_data: "list[_rhoapi__.Par]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    block: "LightBlockInfo | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    block: "LightBlockInfo | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("casper", "DataWithBlockInfo", DataWithBlockInfo)
@@ -454,9 +591,21 @@ default_message_pool.register_message("casper", "DataWithBlockInfo", DataWithBlo
 class DeployDataProto(betterproto2.Message):
     """
     *
-    Note: deploys are uniquely keyed by `user`, `timestamp`.
+    Note: deploys are uniquely keyed by (`deployer`, `timestamp`).
 
-    **TODO**: details of signatures and payment. See RHOL-781
+    Multi-signature support is provided via the `cosigners` field, realizing the
+    compound-signature operational semantics of the cost-accounted rho-calculus
+    paper (`publications/cost-accounting/cost-accounted-rho.tex`, §3.2 Rules 2-5).
+    When `cosigners` is empty, the deploy is a legacy single-signer deploy: fields
+    1/4/5 hold the only signer. When `cosigners` is non-empty, the primary signer
+    occupies index 0 (fields 1/4/5) and additional cosigners occupy `cosigners`
+    (field 14) entries with their own (pk, sig, sig_algorithm). The wire decoder
+    enforces canonical `pk.bytes` ascending sort, no duplicate signers, and that
+    every signer's signature verifies against the canonical message hash.
+
+    D3 (DR-9): there is NO per-deploy phlo escrow/price and NO per-signer
+    phlo_share. A deploy's cost is the per-COMM token count, funded by the
+    per-signature supply pool Σ⟦s⟧ and gated at block assembly (Def 19, §7.6).
     """
 
     deployer: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
@@ -484,16 +633,6 @@ class DeployDataProto(betterproto2.Message):
     name of the algorithm used to sign
     """
 
-    phlo_price: "int" = betterproto2.field(7, betterproto2.TYPE_INT64)
-    """
-    phlo price
-    """
-
-    phlo_limit: "int" = betterproto2.field(8, betterproto2.TYPE_INT64)
-    """
-    phlo limit for the deployment
-    """
-
     valid_after_block_number: "int" = betterproto2.field(10, betterproto2.TYPE_INT64)
 
     shard_id: "str" = betterproto2.field(11, betterproto2.TYPE_STRING)
@@ -511,6 +650,36 @@ class DeployDataProto(betterproto2.Message):
     optional millisecond timestamp after which deploy is invalid (0 = no expiration)
     """
 
+    cosigners: "list[CompoundSigner]" = betterproto2.field(
+        14, betterproto2.TYPE_MESSAGE, repeated=True
+    )
+    """
+    additional cosigners (empty = legacy single-sig)
+    """
+
+    cosigner_threshold: "int" = betterproto2.field(16, betterproto2.TYPE_INT32)
+    """
+    Phase 2: M-of-N threshold quorum size.
+      0  → N-of-N (Phase 1 semantics): every signer must verify.
+      k>0 → M-of-N: at least `k` of `cosigners.len() + 1` signers must
+            present a valid signature. Placeholder signers (sig.is_empty())
+            are allowed and do not count toward quorum.
+    Constraint at decode: 0 ≤ cosigner_threshold ≤ cosigners.len() + 1.
+    """
+
+    sig_algebra: "SigCompound | None" = betterproto2.field(
+        17, betterproto2.TYPE_MESSAGE, optional=True
+    )
+    """
+    Phase 3: LL-rich signature algebra. When present, OVERRIDES
+    `cosigners[]` and `cosigner_threshold` — the deploy is validated
+    against the algebraic expression instead of the flat list. Atomic
+    leaves (SigAtom) carry the per-signer (pk, sig, sig_algorithm) tuples,
+    and the algebra describes their combination.
+    See `rholang/src/rust/interpreter/accounting/mod.rs::Sig` for the
+    operational semantics.
+    """
+
 
 default_message_pool.register_message("casper", "DeployDataProto", DeployDataProto)
 
@@ -518,19 +687,25 @@ default_message_pool.register_message("casper", "DeployDataProto", DeployDataPro
 @dataclass(eq=False, repr=False)
 class DeployFinalizationStatusInfo(betterproto2.Message):
     state: "DeployFinalizationStateProto" = betterproto2.field(
-        1, betterproto2.TYPE_ENUM, default_factory=lambda: DeployFinalizationStateProto(0)
+        1,
+        betterproto2.TYPE_ENUM,
+        default_factory=lambda: DeployFinalizationStateProto(0),
     )
 
     rejection_count: "int" = betterproto2.field(2, betterproto2.TYPE_UINT32)
 
-    latest_block_hash: "bytes | None" = betterproto2.field(3, betterproto2.TYPE_BYTES, optional=True)
+    latest_block_hash: "bytes | None" = betterproto2.field(
+        3, betterproto2.TYPE_BYTES, optional=True
+    )
     """
     Present when the sig has been included in at least one block.
     Absent (no field set) when the deploy is unknown to this node.
     """
 
 
-default_message_pool.register_message("casper", "DeployFinalizationStatusInfo", DeployFinalizationStatusInfo)
+default_message_pool.register_message(
+    "casper", "DeployFinalizationStatusInfo", DeployFinalizationStatusInfo
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -538,7 +713,9 @@ class DeployFinalizationStatusQuery(betterproto2.Message):
     deploy_sig: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("casper", "DeployFinalizationStatusQuery", DeployFinalizationStatusQuery)
+default_message_pool.register_message(
+    "casper", "DeployFinalizationStatusQuery", DeployFinalizationStatusQuery
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -553,10 +730,6 @@ class DeployInfo(betterproto2.Message):
 
     sig_algorithm: "str" = betterproto2.field(5, betterproto2.TYPE_STRING)
 
-    phlo_price: "int" = betterproto2.field(7, betterproto2.TYPE_INT64)
-
-    phlo_limit: "int" = betterproto2.field(8, betterproto2.TYPE_INT64)
-
     valid_after_block_number: "int" = betterproto2.field(9, betterproto2.TYPE_INT64)
 
     cost: "int" = betterproto2.field(10, betterproto2.TYPE_UINT64)
@@ -565,7 +738,9 @@ class DeployInfo(betterproto2.Message):
 
     system_deploy_error: "str" = betterproto2.field(12, betterproto2.TYPE_STRING)
 
-    transfers: "list[TransferInfo]" = betterproto2.field(13, betterproto2.TYPE_MESSAGE, repeated=True)
+    transfers: "list[TransferInfo]" = betterproto2.field(
+        13, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     transfers_available: "bool" = betterproto2.field(14, betterproto2.TYPE_BOOL)
     """
@@ -578,12 +753,18 @@ default_message_pool.register_message("casper", "DeployInfo", DeployInfo)
 
 @dataclass(eq=False, repr=False)
 class DeployInfoWithEventData(betterproto2.Message):
-    deploy_info: "DeployInfo | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    deploy_info: "DeployInfo | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    report: "list[SingleReport]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    report: "list[SingleReport]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
-default_message_pool.register_message("casper", "DeployInfoWithEventData", DeployInfoWithEventData)
+default_message_pool.register_message(
+    "casper", "DeployInfoWithEventData", DeployInfoWithEventData
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -620,7 +801,9 @@ class ExploratoryDeployQuery(betterproto2.Message):
     use_pre_state_hash: "bool" = betterproto2.field(3, betterproto2.TYPE_BOOL)
 
 
-default_message_pool.register_message("casper", "ExploratoryDeployQuery", ExploratoryDeployQuery)
+default_message_pool.register_message(
+    "casper", "ExploratoryDeployQuery", ExploratoryDeployQuery
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -636,7 +819,9 @@ class ForkChoiceTipRequestProto(betterproto2.Message):
     pass
 
 
-default_message_pool.register_message("casper", "ForkChoiceTipRequestProto", ForkChoiceTipRequestProto)
+default_message_pool.register_message(
+    "casper", "ForkChoiceTipRequestProto", ForkChoiceTipRequestProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -652,12 +837,16 @@ class HasBlockRequestProto(betterproto2.Message):
     hash: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("casper", "HasBlockRequestProto", HasBlockRequestProto)
+default_message_pool.register_message(
+    "casper", "HasBlockRequestProto", HasBlockRequestProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class HeaderProto(betterproto2.Message):
-    parents_hash_list: "list[bytes]" = betterproto2.field(1, betterproto2.TYPE_BYTES, repeated=True)
+    parents_hash_list: "list[bytes]" = betterproto2.field(
+        1, betterproto2.TYPE_BYTES, repeated=True
+    )
     """
     list of parent block hashes
     """
@@ -697,7 +886,9 @@ class JustificationProto(betterproto2.Message):
     latest_block_hash: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("casper", "JustificationProto", JustificationProto)
+default_message_pool.register_message(
+    "casper", "JustificationProto", JustificationProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -705,7 +896,9 @@ class LastFinalizedBlockQuery(betterproto2.Message):
     pass
 
 
-default_message_pool.register_message("casper", "LastFinalizedBlockQuery", LastFinalizedBlockQuery)
+default_message_pool.register_message(
+    "casper", "LastFinalizedBlockQuery", LastFinalizedBlockQuery
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -736,7 +929,9 @@ class LightBlockInfo(betterproto2.Message):
 
     header_extra_bytes: "bytes" = betterproto2.field(10, betterproto2.TYPE_BYTES)
 
-    parents_hash_list: "list[str]" = betterproto2.field(11, betterproto2.TYPE_STRING, repeated=True)
+    parents_hash_list: "list[str]" = betterproto2.field(
+        11, betterproto2.TYPE_STRING, repeated=True
+    )
 
     block_number: "int" = betterproto2.field(12, betterproto2.TYPE_INT64)
     """
@@ -749,7 +944,9 @@ class LightBlockInfo(betterproto2.Message):
 
     body_extra_bytes: "bytes" = betterproto2.field(15, betterproto2.TYPE_BYTES)
 
-    bonds: "list[BondInfo]" = betterproto2.field(16, betterproto2.TYPE_MESSAGE, repeated=True)
+    bonds: "list[BondInfo]" = betterproto2.field(
+        16, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     block_size: "str" = betterproto2.field(17, betterproto2.TYPE_STRING)
     """
@@ -760,9 +957,13 @@ class LightBlockInfo(betterproto2.Message):
 
     fault_tolerance: "float" = betterproto2.field(19, betterproto2.TYPE_FLOAT)
 
-    justifications: "list[JustificationInfo]" = betterproto2.field(20, betterproto2.TYPE_MESSAGE, repeated=True)
+    justifications: "list[JustificationInfo]" = betterproto2.field(
+        20, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    rejected_deploys: "list[RejectedDeployInfo]" = betterproto2.field(21, betterproto2.TYPE_MESSAGE, repeated=True)
+    rejected_deploys: "list[RejectedDeployInfo]" = betterproto2.field(
+        21, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     is_finalized: "bool" = betterproto2.field(22, betterproto2.TYPE_BOOL)
 
@@ -775,7 +976,9 @@ class MachineVerifyQuery(betterproto2.Message):
     pass
 
 
-default_message_pool.register_message("casper", "MachineVerifyQuery", MachineVerifyQuery)
+default_message_pool.register_message(
+    "casper", "MachineVerifyQuery", MachineVerifyQuery
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -789,7 +992,9 @@ class MergeableEntryRequestProto(betterproto2.Message):
     block_hash: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("casper", "MergeableEntryRequestProto", MergeableEntryRequestProto)
+default_message_pool.register_message(
+    "casper", "MergeableEntryRequestProto", MergeableEntryRequestProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -803,7 +1008,9 @@ class MergeableEntryResponseProto(betterproto2.Message):
     """
 
 
-default_message_pool.register_message("casper", "MergeableEntryResponseProto", MergeableEntryResponseProto)
+default_message_pool.register_message(
+    "casper", "MergeableEntryResponseProto", MergeableEntryResponseProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -813,7 +1020,9 @@ class NoApprovedBlockAvailableProto(betterproto2.Message):
     node_identifier: "str" = betterproto2.field(2, betterproto2.TYPE_STRING)
 
 
-default_message_pool.register_message("casper", "NoApprovedBlockAvailableProto", NoApprovedBlockAvailableProto)
+default_message_pool.register_message(
+    "casper", "NoApprovedBlockAvailableProto", NoApprovedBlockAvailableProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -869,7 +1078,9 @@ class PrintUnmatchedSendsQuery(betterproto2.Message):
     print_unmatched_sends: "bool" = betterproto2.field(1, betterproto2.TYPE_BOOL)
 
 
-default_message_pool.register_message("casper", "PrintUnmatchedSendsQuery", PrintUnmatchedSendsQuery)
+default_message_pool.register_message(
+    "casper", "PrintUnmatchedSendsQuery", PrintUnmatchedSendsQuery
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -890,16 +1101,24 @@ class PrivateNamePreviewQuery(betterproto2.Message):
     """
 
 
-default_message_pool.register_message("casper", "PrivateNamePreviewQuery", PrivateNamePreviewQuery)
+default_message_pool.register_message(
+    "casper", "PrivateNamePreviewQuery", PrivateNamePreviewQuery
+)
 
 
 @dataclass(eq=False, repr=False)
 class ProcessedDeployProto(betterproto2.Message):
-    deploy: "DeployDataProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    deploy: "DeployDataProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    cost: "_rhoapi__.PCost | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    cost: "_rhoapi__.PCost | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    deploy_log: "list[EventProto]" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, repeated=True)
+    deploy_log: "list[EventProto]" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, repeated=True
+    )
     """
     the new terms and comm. rule reductions from this deploy
     """
@@ -912,19 +1131,27 @@ class ProcessedDeployProto(betterproto2.Message):
     system_deploy_error: "str" = betterproto2.field(6, betterproto2.TYPE_STRING)
 
 
-default_message_pool.register_message("casper", "ProcessedDeployProto", ProcessedDeployProto)
+default_message_pool.register_message(
+    "casper", "ProcessedDeployProto", ProcessedDeployProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class ProcessedSystemDeployProto(betterproto2.Message):
-    system_deploy: "SystemDeployDataProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    system_deploy: "SystemDeployDataProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    deploy_log: "list[EventProto]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    deploy_log: "list[EventProto]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     error_msg: "str" = betterproto2.field(3, betterproto2.TYPE_STRING)
 
 
-default_message_pool.register_message("casper", "ProcessedSystemDeployProto", ProcessedSystemDeployProto)
+default_message_pool.register_message(
+    "casper", "ProcessedSystemDeployProto", ProcessedSystemDeployProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -939,7 +1166,9 @@ class ProduceEventProto(betterproto2.Message):
 
     is_deterministic: "bool" = betterproto2.field(5, betterproto2.TYPE_BOOL)
 
-    output_value: "list[bytes]" = betterproto2.field(6, betterproto2.TYPE_BYTES, repeated=True)
+    output_value: "list[bytes]" = betterproto2.field(
+        6, betterproto2.TYPE_BYTES, repeated=True
+    )
 
     failed: "bool" = betterproto2.field(7, betterproto2.TYPE_BOOL)
 
@@ -960,7 +1189,9 @@ class ProposeResultQuery(betterproto2.Message):
     pass
 
 
-default_message_pool.register_message("casper", "ProposeResultQuery", ProposeResultQuery)
+default_message_pool.register_message(
+    "casper", "ProposeResultQuery", ProposeResultQuery
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -975,7 +1206,9 @@ class RChainStateProto(betterproto2.Message):
     hash of the tuplespace contents after new deploys
     """
 
-    bonds: "list[BondProto]" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, repeated=True)
+    bonds: "list[BondProto]" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, repeated=True
+    )
     """
     Internals of what will be the "blessed" PoS contract
     (which will be part of the tuplespace in the real implementation).
@@ -988,11 +1221,67 @@ default_message_pool.register_message("casper", "RChainStateProto", RChainStateP
 
 
 @dataclass(eq=False, repr=False)
+class RedeemSystemDeployDataProto(betterproto2.Message):
+    validator_pk: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
+
+    outcome_tag: "str" = betterproto2.field(2, betterproto2.TYPE_STRING)
+    """
+    Outcome tag: "Vindicated" | "Guilty" | "Burned".
+    """
+
+    penalty: "int" = betterproto2.field(3, betterproto2.TYPE_INT64)
+    """
+    Penalty for the Guilty outcome (0 for Vindicated / Burned).
+    """
+
+    pos_multi_sig_public_keys: "list[str]" = betterproto2.field(
+        4, betterproto2.TYPE_STRING, repeated=True
+    )
+    """
+    The genesis-configured PoS-multisig authority keyset (hex-encoded), the
+    quorum threshold, and the cosigner authorizations over the redemption
+    digest — all replay inputs to the multisig-quorum verification.
+    """
+
+    pos_multi_sig_quorum: "int" = betterproto2.field(5, betterproto2.TYPE_UINT32)
+
+    authorizations: "list[RedemptionAuthorizationProto]" = betterproto2.field(
+        6, betterproto2.TYPE_MESSAGE, repeated=True
+    )
+
+
+default_message_pool.register_message(
+    "casper", "RedeemSystemDeployDataProto", RedeemSystemDeployDataProto
+)
+
+
+@dataclass(eq=False, repr=False)
+class RedemptionAuthorizationProto(betterproto2.Message):
+    """
+    Cost-Accounted Rho Stage-C validator redemption (DR-7/DR-12). Carries the
+    FULL redemption-authorization material so a block's redeem deploy round-trips
+    and replay can re-run the DR-12 PoS-multisig-quorum platform obligation
+    (RedeemDeploy::verify_multisig_quorum) byte-identically to play.
+    """
+
+    public_key: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
+
+    signature: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
+
+
+default_message_pool.register_message(
+    "casper", "RedemptionAuthorizationProto", RedemptionAuthorizationProto
+)
+
+
+@dataclass(eq=False, repr=False)
 class RejectedDeployInfo(betterproto2.Message):
     sig: "str" = betterproto2.field(1, betterproto2.TYPE_STRING)
 
 
-default_message_pool.register_message("casper", "RejectedDeployInfo", RejectedDeployInfo)
+default_message_pool.register_message(
+    "casper", "RejectedDeployInfo", RejectedDeployInfo
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1000,14 +1289,20 @@ class RejectedDeployProto(betterproto2.Message):
     sig: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("casper", "RejectedDeployProto", RejectedDeployProto)
+default_message_pool.register_message(
+    "casper", "RejectedDeployProto", RejectedDeployProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class ReportCommProto(betterproto2.Message):
-    consume: "ReportConsumeProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    consume: "ReportConsumeProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    produces: "list[ReportProduceProto]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    produces: "list[ReportProduceProto]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
 default_message_pool.register_message("casper", "ReportCommProto", ReportCommProto)
@@ -1015,28 +1310,42 @@ default_message_pool.register_message("casper", "ReportCommProto", ReportCommPro
 
 @dataclass(eq=False, repr=False)
 class ReportConsumeProto(betterproto2.Message):
-    channels: "list[_rhoapi__.Par]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    channels: "list[_rhoapi__.Par]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    patterns: "list[_rhoapi__.BindPattern]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    patterns: "list[_rhoapi__.BindPattern]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    peeks: "list[PeekProto]" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, repeated=True)
+    peeks: "list[PeekProto]" = betterproto2.field(
+        4, betterproto2.TYPE_MESSAGE, repeated=True
+    )
     """
     disable because can not work and it is not important actually
      TaggedContinuation continuation=3;
     """
 
 
-default_message_pool.register_message("casper", "ReportConsumeProto", ReportConsumeProto)
+default_message_pool.register_message(
+    "casper", "ReportConsumeProto", ReportConsumeProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class ReportProduceProto(betterproto2.Message):
-    channel: "_rhoapi__.Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    channel: "_rhoapi__.Par | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    data: "_rhoapi__.ListParWithRandom | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    data: "_rhoapi__.ListParWithRandom | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
-default_message_pool.register_message("casper", "ReportProduceProto", ReportProduceProto)
+default_message_pool.register_message(
+    "casper", "ReportProduceProto", ReportProduceProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1056,7 +1365,9 @@ class ReportProto(betterproto2.Message):
         2, betterproto2.TYPE_MESSAGE, optional=True, group="report"
     )
 
-    comm: "ReportCommProto | None" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, optional=True, group="report")
+    comm: "ReportCommProto | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, optional=True, group="report"
+    )
 
 
 default_message_pool.register_message("casper", "ReportProto", ReportProto)
@@ -1073,6 +1384,151 @@ default_message_pool.register_message("casper", "ReportQuery", ReportQuery)
 
 
 @dataclass(eq=False, repr=False)
+class SigAtom(betterproto2.Message):
+    pk: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
+
+    sig: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
+
+    sig_algorithm: "str" = betterproto2.field(3, betterproto2.TYPE_STRING)
+
+    atom_kind: "AtomKind" = betterproto2.field(
+        5, betterproto2.TYPE_ENUM, default_factory=lambda: AtomKind(0)
+    )
+
+
+default_message_pool.register_message("casper", "SigAtom", SigAtom)
+
+
+@dataclass(eq=False, repr=False)
+class SigBang(betterproto2.Message):
+    inner: "SigCompound | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+    uses_bound: "int" = betterproto2.field(2, betterproto2.TYPE_INT64)
+    """
+    uses_bound = 0 means unbounded (LL-canonical); uses_bound > 0 means
+    bounded replication (Phase 3 §3.5 capability registry).
+    """
+
+    capability_handle: "bytes" = betterproto2.field(3, betterproto2.TYPE_BYTES)
+    """
+    capability_handle: optional registry pointer to a pre-registered
+    replicable signature (Phase 3 §3.5 rho:system:capabilities).
+    """
+
+
+default_message_pool.register_message("casper", "SigBang", SigBang)
+
+
+@dataclass(eq=False, repr=False)
+class SigCompound(betterproto2.Message):
+    """
+    Phase 2 / Phase 3 LL-rich signature algebra wire encoding.
+
+    `SigCompound` is a recursive algebraic shape mirroring the runtime
+    `Sig` enum (`rholang/src/rust/interpreter/accounting/mod.rs`). When
+    present on a `DeployDataProto` (future field expansion — Phase 2/3 RFC),
+    the verifier validates the deploy against the `Sig` expression instead
+    of the flat `cosigners[]` list.
+
+    At Phase 1 (current), `Sig::And` is the only compound shape used and
+    the flat cosigners[] field encodes a left-associated And tree. The
+    `SigCompound` message is introduced here to give downstream Phase 2/3
+    wire-format extensions a forward-compatible scaffold:
+
+      - Phase 2 (M-of-N quorum): set `threshold` field to encode a
+        `Sig::Threshold` envelope; populate `members[]` with the candidate
+        signers and `threshold_min` with the required quorum size.
+      - Phase 3 (LL-rich): set `plus` / `with_` / `bang` / `whynot` /
+        `lolly` to encode the corresponding LL connectives. Branch witness
+        for `Plus` is carried via `plus_branch` (0 = left, 1 = right).
+
+    Oneofs:
+        - connective:
+    """
+
+    atom: "SigAtom | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::Ground / Sig::Quote leaf (atom_kind selects axis)
+    """
+
+    tensor: "SigPair | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::And / Sig::Tensor (multiplicative ⊗)
+    """
+
+    plus: "SigPlus | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::Plus  (additive ⊕ with branch witness)
+    """
+
+    with_: "SigPair | None" = betterproto2.field(
+        4, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::With  (additive & — LL "with")
+    """
+
+    bang: "SigBang | None" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::Bang  (exponential !)
+    """
+
+    whynot: "SigCompound | None" = betterproto2.field(
+        6, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::WhyNot (exponential ?)
+    """
+
+    lolly: "SigLolly | None" = betterproto2.field(
+        7, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::Lolly  (linear implication ⊸)
+    """
+
+    threshold: "SigThreshold | None" = betterproto2.field(
+        8, betterproto2.TYPE_MESSAGE, optional=True, group="connective"
+    )
+    """
+    Sig::Threshold (M-of-N quorum)
+    """
+
+
+default_message_pool.register_message("casper", "SigCompound", SigCompound)
+
+
+@dataclass(eq=False, repr=False)
+class SigLolly(betterproto2.Message):
+    from_: "SigCompound | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+    to: "SigCompound | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+    capability_handle: "bytes" = betterproto2.field(3, betterproto2.TYPE_BYTES)
+    """
+    capability_handle: pointer into rho:system:capabilities registry
+    that holds the transformer process for this σ_from ⊸ σ_to delegation.
+    """
+
+
+default_message_pool.register_message("casper", "SigLolly", SigLolly)
+
+
+@dataclass(eq=False, repr=False)
 class Signature(betterproto2.Message):
     public_key: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
@@ -1085,8 +1541,61 @@ default_message_pool.register_message("casper", "Signature", Signature)
 
 
 @dataclass(eq=False, repr=False)
+class SigPair(betterproto2.Message):
+    left: "SigCompound | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+    right: "SigCompound | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+
+default_message_pool.register_message("casper", "SigPair", SigPair)
+
+
+@dataclass(eq=False, repr=False)
+class SigPlus(betterproto2.Message):
+    left: "SigCompound | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+    right: "SigCompound | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
+
+    chosen_branch: "int" = betterproto2.field(3, betterproto2.TYPE_INT32)
+    """
+    0 = left, 1 = right (signer's choice)
+    """
+
+
+default_message_pool.register_message("casper", "SigPlus", SigPlus)
+
+
+@dataclass(eq=False, repr=False)
+class SigThreshold(betterproto2.Message):
+    threshold: "int" = betterproto2.field(1, betterproto2.TYPE_INT32)
+    """
+    required quorum size k
+    """
+
+    members: "list[SigCompound]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
+    """
+    candidate signers (n total; k-of-n)
+    """
+
+
+default_message_pool.register_message("casper", "SigThreshold", SigThreshold)
+
+
+@dataclass(eq=False, repr=False)
 class SingleReport(betterproto2.Message):
-    events: "list[ReportProto]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    events: "list[ReportProto]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
 default_message_pool.register_message("casper", "SingleReport", SingleReport)
@@ -1098,13 +1607,19 @@ class SlashSystemDeployDataProto(betterproto2.Message):
 
     issuer_public_key: "bytes" = betterproto2.field(2, betterproto2.TYPE_BYTES)
 
+    target_activation_epoch: "int" = betterproto2.field(3, betterproto2.TYPE_INT64)
 
-default_message_pool.register_message("casper", "SlashSystemDeployDataProto", SlashSystemDeployDataProto)
+
+default_message_pool.register_message(
+    "casper", "SlashSystemDeployDataProto", SlashSystemDeployDataProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class Status(betterproto2.Message):
-    version: "VersionInfo | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    version: "VersionInfo | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     address: "str" = betterproto2.field(2, betterproto2.TYPE_STRING)
 
@@ -1118,7 +1633,9 @@ class Status(betterproto2.Message):
 
     min_phlo_price: "int" = betterproto2.field(7, betterproto2.TYPE_INT64)
 
-    peer_list: "list[PeerInfo]" = betterproto2.field(8, betterproto2.TYPE_MESSAGE, repeated=True)
+    peer_list: "list[PeerInfo]" = betterproto2.field(
+        8, betterproto2.TYPE_MESSAGE, repeated=True
+    )
     """
     Detailed peer list
     """
@@ -1161,28 +1678,42 @@ default_message_pool.register_message("casper", "StoreItemProto", StoreItemProto
 
 @dataclass(eq=False, repr=False)
 class StoreItemsMessageProto(betterproto2.Message):
-    start_path: "list[StoreNodeKeyProto]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    start_path: "list[StoreNodeKeyProto]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    last_path: "list[StoreNodeKeyProto]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    last_path: "list[StoreNodeKeyProto]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    history_items: "list[StoreItemProto]" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, repeated=True)
+    history_items: "list[StoreItemProto]" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    data_items: "list[StoreItemProto]" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, repeated=True)
+    data_items: "list[StoreItemProto]" = betterproto2.field(
+        4, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
-default_message_pool.register_message("casper", "StoreItemsMessageProto", StoreItemsMessageProto)
+default_message_pool.register_message(
+    "casper", "StoreItemsMessageProto", StoreItemsMessageProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class StoreItemsMessageRequestProto(betterproto2.Message):
-    start_path: "list[StoreNodeKeyProto]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    start_path: "list[StoreNodeKeyProto]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     skip: "int" = betterproto2.field(2, betterproto2.TYPE_INT32)
 
     take: "int" = betterproto2.field(3, betterproto2.TYPE_INT32)
 
 
-default_message_pool.register_message("casper", "StoreItemsMessageRequestProto", StoreItemsMessageRequestProto)
+default_message_pool.register_message(
+    "casper", "StoreItemsMessageRequestProto", StoreItemsMessageRequestProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1212,22 +1743,36 @@ class SystemDeployDataProto(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="systemDeploy"
     )
 
-    close_block_system_deploy: "CloseBlockSystemDeployDataProto | None" = betterproto2.field(
-        2, betterproto2.TYPE_MESSAGE, optional=True, group="systemDeploy"
+    close_block_system_deploy: "CloseBlockSystemDeployDataProto | None" = (
+        betterproto2.field(
+            2, betterproto2.TYPE_MESSAGE, optional=True, group="systemDeploy"
+        )
+    )
+
+    redeem_system_deploy: "RedeemSystemDeployDataProto | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, optional=True, group="systemDeploy"
     )
 
 
-default_message_pool.register_message("casper", "SystemDeployDataProto", SystemDeployDataProto)
+default_message_pool.register_message(
+    "casper", "SystemDeployDataProto", SystemDeployDataProto
+)
 
 
 @dataclass(eq=False, repr=False)
 class SystemDeployInfoWithEventData(betterproto2.Message):
-    system_deploy: "SystemDeployDataProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    system_deploy: "SystemDeployDataProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    report: "list[SingleReport]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    report: "list[SingleReport]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
-default_message_pool.register_message("casper", "SystemDeployInfoWithEventData", SystemDeployInfoWithEventData)
+default_message_pool.register_message(
+    "casper", "SystemDeployInfoWithEventData", SystemDeployInfoWithEventData
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1263,14 +1808,18 @@ default_message_pool.register_message("casper", "TransferInfo", TransferInfo)
 
 @dataclass(eq=False, repr=False)
 class UnapprovedBlockProto(betterproto2.Message):
-    candidate: "ApprovedBlockCandidateProto | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    candidate: "ApprovedBlockCandidateProto | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     timestamp: "int" = betterproto2.field(2, betterproto2.TYPE_INT64)
 
     duration: "int" = betterproto2.field(3, betterproto2.TYPE_INT64)
 
 
-default_message_pool.register_message("casper", "UnapprovedBlockProto", UnapprovedBlockProto)
+default_message_pool.register_message(
+    "casper", "UnapprovedBlockProto", UnapprovedBlockProto
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1282,7 +1831,9 @@ class UpdateNotification(betterproto2.Message):
     payload: "str" = betterproto2.field(3, betterproto2.TYPE_STRING)
 
 
-default_message_pool.register_message("casper", "UpdateNotification", UpdateNotification)
+default_message_pool.register_message(
+    "casper", "UpdateNotification", UpdateNotification
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1290,7 +1841,9 @@ class UpdateNotificationResponse(betterproto2.Message):
     pass
 
 
-default_message_pool.register_message("casper", "UpdateNotificationResponse", UpdateNotificationResponse)
+default_message_pool.register_message(
+    "casper", "UpdateNotificationResponse", UpdateNotificationResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1317,12 +1870,18 @@ default_message_pool.register_message("casper", "VisualizeDagQuery", VisualizeDa
 
 @dataclass(eq=False, repr=False)
 class WaitingContinuationInfo(betterproto2.Message):
-    post_block_patterns: "list[_rhoapi__.BindPattern]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    post_block_patterns: "list[_rhoapi__.BindPattern]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    post_block_continuation: "_rhoapi__.Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    post_block_continuation: "_rhoapi__.Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
-default_message_pool.register_message("casper", "WaitingContinuationInfo", WaitingContinuationInfo)
+default_message_pool.register_message(
+    "casper", "WaitingContinuationInfo", WaitingContinuationInfo
+)
 
 
 from .. import rhoapi as _rhoapi__

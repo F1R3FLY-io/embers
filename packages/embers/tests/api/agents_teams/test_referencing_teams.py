@@ -12,29 +12,26 @@ here reaches a model.
 
 import json
 import re
+from datetime import UTC, datetime
 
 import pytest
 
 from tests.client import AgentsTeam, ApiClient, Wallet
+from tests.conftest import insert_signed_deploy
+from tests.key import SECP256k1
 
-ECHO_AGENT = 'contract main(@input, return) = { return!(input) }'
+ECHO_AGENT = "contract main(@input, return) = { return!(input) }"
 
 
 def _graphl(contexts: list[tuple[str, str]], edges: list[tuple[str, str]]) -> str:
     body = "0"
     for name, ctx in reversed(contexts):
         escaped = ctx.replace('"', '\\"')
-        body = (
-            f'{{context "{escaped}" for {name} in '
-            f"let {name} = < {name} > in < {name} > | {body}}}"
-        )
+        body = f'{{context "{escaped}" for {name} in let {name} = < {name} > in < {name} > | {body}}}'
 
     chain = "0"
     for source, target in reversed(edges):
-        chain = (
-            f"{{(let {source} = < {source} > in 0, "
-            f"let {target} = < {target} > in 0) * {chain}}}"
-        )
+        chain = f"{{(let {source} = < {source} > in 0, let {target} = < {target} > in 0) * {chain}}}"
 
     return f"0 * {body} * {chain}"
 
@@ -91,9 +88,7 @@ def test_every_team_using_the_agent_is_named(client: ApiClient, funded_wallet: W
     other_id, other_version = _create_agent(client, funded_wallet, "Other")
 
     first = _create_team(client, funded_wallet, "first", _team_using(used_id, "Used", used_version))
-    second = _create_team(
-        client, funded_wallet, "second", _team_using(used_id, "Used", used_version)
-    )
+    second = _create_team(client, funded_wallet, "second", _team_using(used_id, "Used", used_version))
     _create_team(client, funded_wallet, "third", _team_using(other_id, "Other", other_version))
 
     resp = client.agents_teams.referencing_teams(funded_wallet.address, used_id)
@@ -105,9 +100,7 @@ def test_every_team_using_the_agent_is_named(client: ApiClient, funded_wallet: W
 
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
-def test_a_reference_only_in_an_older_version_is_not_reported(
-    client: ApiClient, funded_wallet: Wallet
-):
+def test_a_reference_only_in_an_older_version_is_not_reported(client: ApiClient, funded_wallet: Wallet):
     """Only the latest version counts.
 
     A team whose current version no longer uses the agent is not broken going
@@ -116,13 +109,9 @@ def test_a_reference_only_in_an_older_version_is_not_reported(
     used_id, used_version = _create_agent(client, funded_wallet, "Dropped")
     other_id, other_version = _create_agent(client, funded_wallet, "Kept")
 
-    team = _create_team(
-        client, funded_wallet, "moved-on", _team_using(used_id, "Dropped", used_version)
-    )
+    team = _create_team(client, funded_wallet, "moved-on", _team_using(used_id, "Dropped", used_version))
 
-    assert {t["id"] for t in client.agents_teams.referencing_teams(
-        funded_wallet.address, used_id
-    ).json} == {team.id}
+    assert {t["id"] for t in client.agents_teams.referencing_teams(funded_wallet.address, used_id).json} == {team.id}
 
     # Save a newer version that uses the other agent instead.
     client.agents_teams.save(
@@ -150,16 +139,9 @@ def test_a_wallet_with_no_teams_reports_nothing(client: ApiClient, funded_wallet
 
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
-def test_the_deploy_error_names_the_agent_not_only_its_id(
-    client: ApiClient, funded_wallet: Wallet
-):
+def test_the_deploy_error_names_the_agent_not_only_its_id(client: ApiClient, funded_wallet: Wallet):
     """The other half of the same problem: when a team is already broken, the failure
     has to say which node to look at."""
-    from datetime import UTC, datetime
-
-    from tests.conftest import insert_signed_deploy
-    from tests.key import SECP256k1
-
     # A graph naming an agent that was never created.
     graph = _team_using("no-such-agent", "Vanished", "no-such-version")
     team = _create_team(client, funded_wallet, "broken", graph)
@@ -176,10 +158,7 @@ def test_the_deploy_error_names_the_agent_not_only_its_id(
             "id": team.id,
             "version": team.version,
             "address": funded_wallet.address,
-            "phlo_limit": 5_000_000,
-            "deploy": insert_signed_deploy(
-                SECP256k1.generate(), datetime.now(UTC), funded_wallet, version=0
-            ),
+            "deploy": insert_signed_deploy(SECP256k1.generate(), datetime.now(UTC), funded_wallet, version=0),
         },
     )
 

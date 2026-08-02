@@ -5,7 +5,6 @@ use structural_convert::StructuralConvert;
 
 use crate::api::common::{PreparedContract, SignedContract, Stringified};
 use crate::domain::agents::models;
-use crate::domain::common::PositiveNonZero;
 
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(from(models::Agents))]
@@ -78,13 +77,11 @@ pub struct DeployAgent {
     id: String,
     version: String,
     address: Stringified<WalletAddress>,
-    phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 
 #[derive(Debug, Clone, Hash, Object)]
 pub struct DeployCode {
     code: String,
-    phlo_limit: Stringified<PositiveNonZero<i64>>,
 }
 
 #[derive(Debug, Clone, Hash, Union)]
@@ -101,12 +98,8 @@ impl From<DeployAgentReq> for models::DeployReq {
                 id: deploy.id,
                 version: deploy.version,
                 address: deploy.address.0,
-                phlo_limit: deploy.phlo_limit.0,
             },
-            DeployAgentReq::Code(deploy) => Self::Code {
-                code: deploy.code,
-                phlo_limit: deploy.phlo_limit.0,
-            },
+            DeployAgentReq::Code(deploy) => Self::Code { code: deploy.code },
         }
     }
 }

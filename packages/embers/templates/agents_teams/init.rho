@@ -11,12 +11,27 @@ new rl(`rho:registry:lookup`),
     abort(`rho:execution:abort`),
     deployData(`rho:deploy:data`),
     treeHashMapCh,
+    runsCh,
+    serviceDeployDataCh,
+    serviceDeployerAddressCh,
+    serviceAddressCh,
     agentsTeamsDeploysMapCh,
     tokensCh,
     listOpsCh,
     stackCh,
-    visit
+    visit,
+    registerRun,
+    all,
+    any
 in {
+    deployData!(*serviceDeployDataCh) |
+    for(_, @serviceDeployerId, _ <- serviceDeployDataCh) {
+        revAddress!("fromDeployerId", serviceDeployerId, *serviceDeployerAddressCh)
+    } |
+    for(@serviceAddress <- serviceDeployerAddressCh) {
+        serviceAddressCh!(serviceAddress)
+    } |
+
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
     for(treeHashMap <- treeHashMapCh) {
         treeHashMap!("init", 3, *treeHashMapCh) |
@@ -25,6 +40,8 @@ in {
             treeHashMapCh!(*treeHashMap, map)
         }
     } |
+
+    runsCh!({}) |
 
     rl!(`rho:lang:listOps`, *listOpsCh) |
     for(@(_, listOps) <- listOpsCh) {
@@ -35,6 +52,45 @@ in {
     for(@(_, stack) <- stackCh) {
         @stack!("init", *tokensCh) |
         stackCh!(stack)
+    } |
+
+    contract all(@values, ret) = {
+        match values {
+            [] => ret!(true)
+            [head ...tail] => {
+                if (head) { all!(tail, *ret) } else { ret!(false) }
+            }
+        }
+    } |
+
+    contract any(@values, ret) = {
+        match values {
+            [] => ret!(false)
+            [head ...tail] => {
+                if (head) { ret!(true) } else { any!(tail, *ret) }
+            }
+        }
+    } |
+
+    contract registerRun(@run_id, @new_run, verifyExisting, acknowledged) = {
+        for(@runs <- runsCh) {
+            if (runs.contains(run_id)) {
+                new verifiedCh in {
+                    verifyExisting!(runs.get(run_id), *verifiedCh) |
+                    for(@verified <- verifiedCh) {
+                        runsCh!(runs) |
+                        if (verified) {
+                            acknowledged!(true)
+                        } else {
+                            abort!("run identity conflict")
+                        }
+                    }
+                }
+            } else {
+                runsCh!(runs.set(run_id, new_run)) |
+                acknowledged!(true)
+            }
+        }
     } |
 
     contract visit(@"agentsTeams", @address, f, notFound) = {
@@ -63,7 +119,7 @@ in {
         }
     } |
 
-    contract agentsTeams(@"create", @id, @version, @created_at, @name, @description, @shard, @logo, @graph) = {
+    contract agentsTeams(@"create", @id, @version, @created_at, @name, @description, @shard, @logo, @graph, @definition) = {
         new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
             deployData!(*deployDataCh) |
 
@@ -105,6 +161,7 @@ in {
                                     "shard": shard,
                                     "logo": logo,
                                     "graph": graph,
+                                    "definition": definition,
                                 }, *devNull) |
                             treeHashMap!("set", agentsTeamVersions, "latest",
                                 {
@@ -117,6 +174,7 @@ in {
                                     "shard": shard,
                                     "logo": logo,
                                     "graph": graph,
+                                    "definition": definition,
                                 }, *devNull)
                         }
                     }
@@ -139,7 +197,7 @@ in {
                         new agentsTeamLastVersionCh in {
                             treeHashMap!("get", agentsTeamVersions, "latest", *agentsTeamLastVersionCh) |
                             for(@agentsTeamLastVersion <- agentsTeamLastVersionCh) {
-                                ret!(agentsTeamLastVersion.delete("graph").set("id", id))
+                                ret!(agentsTeamLastVersion.delete("graph").delete("definition").set("id", id))
                             }
                         }
                     } |
@@ -163,7 +221,7 @@ in {
 
             for(@agentsTeamVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh) {
                 contract toAgentsTeamHeader(@(version, agentsTeam), ret) = {
-                    ret!(agentsTeam.delete("graph").union({"id": id, "version": version}))
+                    ret!(agentsTeam.delete("graph").delete("definition").union({"id": id, "version": version}))
                 } |
 
                 treeHashMap!("toMap", agentsTeamVersions, *agentsTeamVersionsMapCh) |
@@ -192,7 +250,375 @@ in {
         }
     } |
 
-    contract agentsTeams(@"save", @id, @version, @created_at, @name, @description, @shard, @logo, @graph) = {
+    contract agentsTeams(@"beginRun", @run_id, @agents_team, @created_at, acknowledged) = {
+        new deployDataCh, deployerAddressCh, verifyExisting in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh) {
+                contract verifyExisting(@run, ret) = {
+                    all!([
+                        run.get("owner") == address,
+                        run.get("agents_team") == agents_team,
+                        run.get("created_at") == created_at
+                    ], *ret)
+                } |
+                registerRun!(run_id, {
+                        "owner": address,
+                        "run_id": run_id,
+                        "agents_team": agents_team,
+                        "created_at": created_at,
+                        "definition_hash": Nil,
+                        "revision": 0,
+                        "status": "running",
+                        "continuation_content_hash": Nil,
+                        "continuation_capability_hash": Nil,
+                        "command_id": Nil,
+                        "command_content_hash": Nil,
+                        "command_capability_hash": Nil,
+                        "command_actor": Nil,
+                        "command_class": Nil,
+                        "command_wait_id": Nil,
+                        "approval_authority_grants": [],
+                        "wait_ids": [],
+                        "due_at": Nil,
+                        "output_content_hash": Nil,
+                        "output_capability_hash": Nil,
+                        "events": [{"sequence": 0, "type": "runStarted"}]
+                    }, *verifyExisting, *acknowledged)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"beginDurableRun", @run_id, @agents_team, @created_at,
+                         @definition_hash, @request_content_hash, @request_capability_hash,
+                         @continuation_content_hash, @continuation_capability_hash, acknowledged) = {
+        new deployDataCh, deployerAddressCh, verifyExisting in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh) {
+                contract verifyExisting(@run, ret) = {
+                    all!([
+                        run.get("owner") == address,
+                        run.get("agents_team") == agents_team,
+                        run.get("created_at") == created_at,
+                        run.get("definition_hash") == definition_hash,
+                        run.get("request_content_hash") == request_content_hash,
+                        run.get("request_capability_hash") == request_capability_hash,
+                        run.get("continuation_content_hash") == continuation_content_hash,
+                        run.get("continuation_capability_hash") == continuation_capability_hash
+                    ], *ret)
+                } |
+                registerRun!(run_id, {
+                        "owner": address,
+                        "run_id": run_id,
+                        "agents_team": agents_team,
+                        "created_at": created_at,
+                        "definition_hash": definition_hash,
+                        "request_content_hash": request_content_hash,
+                        "request_capability_hash": request_capability_hash,
+                        "revision": 0,
+                        "status": "running",
+                        "continuation_content_hash": continuation_content_hash,
+                        "continuation_capability_hash": continuation_capability_hash,
+                        "command_id": Nil,
+                        "command_content_hash": Nil,
+                        "command_capability_hash": Nil,
+                        "command_actor": Nil,
+                        "command_class": Nil,
+                        "command_wait_id": Nil,
+                        "approval_authority_grants": [],
+                        "wait_ids": [],
+                        "due_at": Nil,
+                        "output_content_hash": Nil,
+                        "output_capability_hash": Nil,
+                        "events": [{"sequence": 0, "type": "runStarted"}]
+                    }, *verifyExisting, *acknowledged)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"claimCommand", @run_id, @expected_revision, @command_id,
+                         @command_class, @command_wait_id,
+                         @command_content_hash, @command_capability_hash, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @runs <- runsCh; @serviceAddress <<- serviceAddressCh) {
+                if (runs.contains(run_id)) {
+                    new runCh in {
+                        runCh!(runs.get(run_id)) |
+                        for(@run <- runCh) {
+                    new idempotentCh in {
+                        all!([
+                            run.get("command_id") == command_id,
+                            run.get("command_class") == command_class,
+                            run.get("command_wait_id") == command_wait_id,
+                            run.get("command_content_hash") == command_content_hash,
+                            run.get("command_capability_hash") == command_capability_hash
+                        ], *idempotentCh) |
+                        for(@idempotent <- idempotentCh) {
+                            if (idempotent) {
+                                runsCh!(runs) |
+                                acknowledged!(true)
+                            } else if (run.get("revision") == expected_revision) {
+                                new ownerOrServiceCh, authorizedCh in {
+                                    any!([
+                                        run.get("owner") == address,
+                                        address == serviceAddress
+                                    ], *ownerOrServiceCh) |
+                                    for(@ownerOrService <- ownerOrServiceCh) {
+                                        if (ownerOrService) {
+                                            authorizedCh!(true)
+                                        } else {
+                                            new approvalClassCh in {
+                                                any!([
+                                                    command_class == "approve",
+                                                    command_class == "reject"
+                                                ], *approvalClassCh) |
+                                                for(@approvalClass <- approvalClassCh) {
+                                                    if (approvalClass) {
+                                                        all!([
+                                                            run.get("wait_ids").contains(command_wait_id),
+                                                            run.get("approval_authority_grants").contains(command_wait_id ++ "|" ++ address)
+                                                        ], *authorizedCh)
+                                                    } else {
+                                                        authorizedCh!(false)
+                                                    }
+                                                }
+                                            }
+                                        } |
+                                        for(@authorized <- authorizedCh) {
+                                            if (authorized) {
+                                                runsCh!(runs.set(run_id,
+                                                    run.set("status", "resuming")
+                                                       .set("command_id", command_id)
+                                                       .set("command_content_hash", command_content_hash)
+                                                       .set("command_capability_hash", command_capability_hash)
+                                                       .set("command_actor", address)
+                                                       .set("command_class", command_class)
+                                                       .set("command_wait_id", command_wait_id)
+                                                       .set("events", run.get("events") ++ [{
+                                                           "sequence": run.get("events").length(),
+                                                           "type": "commandClaimed"
+                                                       }])
+                                                )) |
+                                                acknowledged!(true)
+                                            } else {
+                                                abort!("command actor is unauthorized")
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                abort!("command revision is stale")
+                            }
+                        }
+                    }
+                        }
+                    }
+                } else {
+                    abort!("run capability not found")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"advanceRun", @run_id, @expected_revision, @status,
+                         @definition_hash, @continuation_content_hash,
+                         @continuation_capability_hash, @wait_ids, @due_at,
+                         @approval_authority_grants, @output_content_hash,
+                         @output_capability_hash, @event_type, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @serviceAddress <<- serviceAddressCh) {
+                if (address == serviceAddress) {
+                    for(@runs <- runsCh) {
+                        if (runs.contains(run_id)) {
+                            new runCh in {
+                                runCh!(runs.get(run_id)) |
+                                for(@run <- runCh) {
+                            if (run.get("revision") == expected_revision) {
+                                runsCh!(runs.set(run_id,
+                                    run.set("revision", expected_revision + 1)
+                                       .set("status", status)
+                                       .set("definition_hash", definition_hash)
+                                       .set("continuation_content_hash", continuation_content_hash)
+                                       .set("continuation_capability_hash", continuation_capability_hash)
+                                       .set("wait_ids", wait_ids)
+                                       .set("due_at", due_at)
+                                       .set("approval_authority_grants", approval_authority_grants)
+                                       .set("output_content_hash", output_content_hash)
+                                       .set("output_capability_hash", output_capability_hash)
+                                       .set("command_id", Nil)
+                                       .set("command_content_hash", Nil)
+                                       .set("command_capability_hash", Nil)
+                                       .set("command_actor", Nil)
+                                       .set("command_class", Nil)
+                                       .set("command_wait_id", Nil)
+                                       .set("events", run.get("events") ++ [{
+                                           "sequence": run.get("events").length(),
+                                           "type": event_type
+                                       }])
+                                )) |
+                                acknowledged!(true)
+                            } else {
+                                new idempotentCh in {
+                                    all!([
+                                        run.get("revision") == expected_revision + 1,
+                                        run.get("status") == status,
+                                        run.get("definition_hash") == definition_hash,
+                                        run.get("continuation_content_hash") == continuation_content_hash,
+                                        run.get("continuation_capability_hash") == continuation_capability_hash,
+                                        run.get("wait_ids") == wait_ids,
+                                        run.get("due_at") == due_at,
+                                        run.get("approval_authority_grants") == approval_authority_grants,
+                                        run.get("output_content_hash") == output_content_hash,
+                                        run.get("output_capability_hash") == output_capability_hash
+                                    ], *idempotentCh) |
+                                    for(@idempotent <- idempotentCh) {
+                                        if (idempotent) {
+                                            runsCh!(runs) |
+                                            acknowledged!(true)
+                                        } else {
+                                            abort!("run revision conflict")
+                                        }
+                                    }
+                                }
+                            }
+                                }
+                            }
+                        } else {
+                            abort!("run capability not found")
+                        }
+                    }
+                } else {
+                    abort!("run advancement requires the Embers service")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"clearCommand", @run_id, @expected_revision, @command_id, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @serviceAddress <<- serviceAddressCh) {
+                if (address == serviceAddress) {
+                    for(@runs <- runsCh) {
+                        if (runs.contains(run_id)) {
+                            new runCh in {
+                                runCh!(runs.get(run_id)) |
+                                for(@run <- runCh) {
+                            new identityCh in {
+                                all!([
+                                    run.get("revision") == expected_revision,
+                                    run.get("command_id") == command_id
+                                ], *identityCh) |
+                                for(@identityMatches <- identityCh) {
+                                    if (identityMatches) {
+                                        runsCh!(runs.set(run_id,
+                                            run.set("status", "suspended")
+                                               .set("command_id", Nil)
+                                               .set("command_content_hash", Nil)
+                                               .set("command_capability_hash", Nil)
+                                               .set("command_actor", Nil)
+                                               .set("command_class", Nil)
+                                               .set("command_wait_id", Nil)
+                                               .set("events", run.get("events") ++ [{
+                                                   "sequence": run.get("events").length(),
+                                                   "type": "commandRejected"
+                                               }])
+                                        )) |
+                                        acknowledged!(true)
+                                    } else if (run.get("command_id") == Nil) {
+                                        runsCh!(runs) |
+                                        acknowledged!(true)
+                                    } else {
+                                        abort!("command clear identity conflict")
+                                    }
+                                }
+                            }
+                                }
+                            }
+                        } else {
+                            abort!("run capability not found")
+                        }
+                    }
+                } else {
+                    abort!("command clearing requires the Embers service")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"finishRun", @run_id, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @runs <- runsCh) {
+                if (runs.contains(run_id)) {
+                    new runCh in {
+                        runCh!(runs.get(run_id)) |
+                        for(@run <- runCh) {
+                    if (run.get("owner") == address) {
+                        runsCh!(runs.set(run_id,
+                            run.set("status", "returned")
+                               .set("events", run.get("events") ++ [{
+                                   "sequence": run.get("events").length(),
+                                   "type": "runReturned"
+                               }])
+                        )) |
+                        acknowledged!(true)
+                    } else {
+                        abort!("run capability owner mismatch")
+                    }
+                        }
+                    }
+                } else {
+                    abort!("run capability not found")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"getRun", @run_id, ret) = {
+        for(@runs <<- runsCh) {
+            if (runs.contains(run_id)) {
+                ret!(runs.get(run_id).delete("owner"))
+            } else {
+                ret!(Nil)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"listRuns", ret) = {
+        for(@runs <<- runsCh; listOps <<- listOpsCh) {
+            new scrubRun in {
+                contract scrubRun(@(_, run), result) = {
+                    result!(run.delete("owner"))
+                } |
+                match runs.toList() {
+                    [] => ret!([])
+                    run_entries => listOps!("parMap", run_entries, *scrubRun, *ret)
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"save", @id, @version, @created_at, @name, @description, @shard, @logo, @graph, @definition) = {
         new deployDataCh, deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
             deployData!(*deployDataCh) |
 
@@ -218,6 +644,7 @@ in {
                             "shard": shard,
                             "logo": logo,
                             "graph": graph,
+                            "definition": definition,
                         }, *devNull) |
                     treeHashMap!("set", agentsTeamVersions, "latest",
                         {
@@ -230,6 +657,7 @@ in {
                             "shard": shard,
                             "logo": logo,
                             "graph": graph,
+                            "definition": definition,
                         }, *devNull)
                 }
             } |

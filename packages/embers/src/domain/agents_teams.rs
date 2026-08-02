@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::Duration;
 
 use aes_gcm::{Aes256Gcm, Key};
 use anyhow::{Context, anyhow};
@@ -21,21 +22,33 @@ use crate::blockchain;
 use crate::domain::agents_teams::models::FireskyCredentials;
 use crate::domain::common::deserialize_decrypted;
 
+/// On-chain registry schema version. Increment whenever the private persistent
+/// state or public contract semantics change so an existing environment key is
+/// upgraded atomically by `insertSigned` on the next bootstrap.
+const AGENTS_TEAMS_ENV_VERSION: i64 = 1;
+
 mod compilation;
+pub mod continuation_store;
 mod create;
 mod delete;
 mod deploy;
 mod get;
+mod get_run;
 mod list;
 mod list_versions;
 pub mod models;
+mod orchestration;
 mod publish_to_firesky;
 mod published_state;
+mod recovery;
 mod referencing_teams;
 mod run_agents_team;
+mod run_commands;
 mod run_on_firesky;
+pub mod runtime;
 mod save;
 mod unpublish;
+pub mod workflow;
 
 #[derive(Clone)]
 pub struct AgentsTeamsService<
@@ -47,8 +60,18 @@ pub struct AgentsTeamsService<
     pub write_client: W,
     pub read_client: R,
     pub observer_node_events: N,
+    pub service_key: SecretKey,
     pub aes_encryption_key: Key<Aes256Gcm>,
+    pub continuation_store: continuation_store::F1r3driveContinuationStore,
+    pub deploy_finalization_timeout: Duration,
+    pub run_locks: Arc<DashMap<String, Arc<tokio::sync::Mutex<()>>>>,
     pub firesky_accounts: Arc<DashMap<Uri, FireskyCredentials>>,
+}
+
+pub struct AgentsTeamsRuntimeConfig {
+    pub aes_encryption_key: Key<Aes256Gcm>,
+    pub continuation_store: continuation_store::F1r3driveContinuationStore,
+    pub deploy_finalization_timeout: Duration,
 }
 
 #[allow(unused)]
@@ -77,14 +100,19 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         observer_node_events: N,
         deployer_key: &SecretKey,
         env_key: &SecretKey,
-        aes_encryption_key: Key<Aes256Gcm>,
+        runtime_config: AgentsTeamsRuntimeConfig,
     ) -> anyhow::Result<(Self, DeployId)> {
+        let AgentsTeamsRuntimeConfig {
+            aes_encryption_key,
+            continuation_store,
+            deploy_finalization_timeout,
+        } = runtime_config;
         let secp = Secp256k1::new();
         let env_public_key = PublicKey::from_secret_key(&secp, env_key);
         let deployer_public_key = PublicKey::from_secret_key(&secp, deployer_key);
 
         let timestamp = chrono::Utc::now();
-        let version = 0;
+        let version = AGENTS_TEAMS_ENV_VERSION;
         let sig = insert_signed_signature(env_key, timestamp, &deployer_public_key, version);
         let env_uri: Uri = env_public_key.into();
 
@@ -152,7 +180,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 write_client,
                 read_client,
                 observer_node_events,
+                service_key: *deployer_key,
                 aes_encryption_key,
+                continuation_store,
+                deploy_finalization_timeout,
+                run_locks: Arc::new(DashMap::new()),
                 firesky_accounts: Arc::new(firesky_accounts),
             },
             deploy_id,
@@ -175,7 +207,7 @@ mod template_tests {
 
         let code = InitAgentsTeamsEnv {
             env_uri: env_uri.clone(),
-            version: 0,
+            version: AGENTS_TEAMS_ENV_VERSION,
             public_key: pk.serialize_uncompressed().into(),
             sig: vec![1, 2, 3, 4],
         }
@@ -184,6 +216,10 @@ mod template_tests {
 
         assert!(!code.is_empty());
         assert!(code.contains("rho:registry:insertSigned:secp256k1"));
+        assert!(code.contains("runsCh!({})"));
+        assert!(code.contains("for(@runs <- runsCh)"));
+        assert!(code.contains("for(@runs <<- runsCh)"));
+        assert!(!code.contains("runsMapCh"));
         let uri_str: &str = env_uri.as_ref();
         assert!(code.contains(uri_str));
     }

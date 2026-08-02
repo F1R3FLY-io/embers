@@ -66,10 +66,10 @@ impl FinalizedDeploy {
 type FinalizedDeploys = Arc<DashMap<DeployId, FinalizedDeploy>>;
 
 /// How long finalized deploy results are retained in the cache.
-const FINALIZED_CACHE_TTL: Duration = Duration::from_secs(5 * 60);
+const FINALIZED_CACHE_TTL: Duration = Duration::from_mins(5);
 
 /// How often the cache cleanup task runs.
-const FINALIZED_CACHE_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
+const FINALIZED_CACHE_CLEANUP_INTERVAL: Duration = Duration::from_mins(1);
 
 /// Ring capacity for each wallet's live-event broadcast. Sized so that a burst
 /// of blocks cannot lag a subscriber that is briefly slow to poll.

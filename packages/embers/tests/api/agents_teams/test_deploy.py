@@ -20,7 +20,6 @@ def test_deploy_graph(client: ApiClient, funded_wallet: Wallet, graph: str):
     resp = client.agents_teams.deploy_graph(
         funded_wallet,
         graph=graph,
-        phlo_limit=5_000_000,
         deploy=deploy,
     )
     assert resp.first.status == 200
@@ -39,7 +38,6 @@ def test_deploy_code(client: ApiClient, funded_wallet: Wallet, agents_team: Agen
     resp = client.agents_teams.deploy(
         funded_wallet,
         agents_team=agents_team,
-        phlo_limit=5_000_000,
         deploy=deploy,
     ).wait_for_sync()
     assert resp.first.status == 200

@@ -29,6 +29,10 @@ pub struct OslfsService<
     pub uri: Uri,
     pub write_client: W,
     pub read_client: R,
+    #[expect(
+        dead_code,
+        reason = "retained for service symmetry and future OSLF deploy subscriptions"
+    )]
     pub observer_node_events: N,
 }
 

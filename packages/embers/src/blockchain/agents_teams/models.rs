@@ -51,6 +51,22 @@ impl<'de> Deserialize<'de> for Graph {
     }
 }
 
+#[derive(Debug, Clone, Into)]
+pub struct WorkflowDefinition(models::WorkflowDefinition);
+
+impl<'de> Deserialize<'de> for WorkflowDefinition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        let json = crate::blockchain::common::unescape_rho_string(&raw);
+        models::WorkflowDefinition::from_json(json)
+            .map(Self)
+            .map_err(de::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
 #[convert(into(models::AgentsTeam))]
 pub struct AgentsTeam {
@@ -64,6 +80,60 @@ pub struct AgentsTeam {
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Graph>,
+    #[serde(default)]
+    pub definition: Option<WorkflowDefinition>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::RunState))]
+pub struct RunState {
+    pub run_id: String,
+    pub agents_team: Uri,
+    pub created_at: DateTime,
+    pub status: String,
+    pub events: Vec<RunEvent>,
+    #[serde(default)]
+    pub definition_hash: Option<String>,
+    #[serde(default)]
+    pub revision: u64,
+    #[serde(default)]
+    pub request_content_hash: Option<String>,
+    #[serde(default)]
+    pub request_capability_hash: Option<String>,
+    #[serde(default)]
+    pub continuation_content_hash: Option<String>,
+    #[serde(default)]
+    pub continuation_capability_hash: Option<String>,
+    #[serde(default)]
+    pub command_id: Option<String>,
+    #[serde(default)]
+    pub command_content_hash: Option<String>,
+    #[serde(default)]
+    pub command_capability_hash: Option<String>,
+    #[serde(default)]
+    pub command_actor: Option<String>,
+    #[serde(default)]
+    pub command_class: Option<String>,
+    #[serde(default)]
+    pub command_wait_id: Option<String>,
+    #[serde(default)]
+    pub approval_authority_grants: Vec<String>,
+    #[serde(default)]
+    pub wait_ids: Vec<String>,
+    #[serde(default)]
+    pub due_at: Option<DateTime>,
+    #[serde(default)]
+    pub output_content_hash: Option<String>,
+    #[serde(default)]
+    pub output_capability_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::RunEvent))]
+pub struct RunEvent {
+    pub sequence: u64,
+    #[serde(rename = "type")]
+    pub event_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

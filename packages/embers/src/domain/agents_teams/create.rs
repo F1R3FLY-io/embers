@@ -20,6 +20,7 @@ struct Create {
     shard: Option<String>,
     logo: Option<String>,
     graph: Option<String>,
+    definition: Option<String>,
 }
 
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
@@ -46,6 +47,9 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             shard: request.shard,
             logo: request.logo,
             graph: request.graph.map(Graph::graphl),
+            definition: request
+                .definition
+                .map(super::workflow::WorkflowDefinition::json),
         }
         .render()?;
 

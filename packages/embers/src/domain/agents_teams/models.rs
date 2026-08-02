@@ -4,7 +4,9 @@ use std::sync::Mutex;
 use chrono::{DateTime, Utc};
 use firefly_client::models::{SignedCode, Uri, WalletAddress};
 
-use crate::domain::common::{PositiveNonZero, PreparedContract, RegistryDeploy};
+use crate::domain::agents_teams::runtime::ResumeCommand;
+pub use crate::domain::agents_teams::workflow::WorkflowDefinition;
+use crate::domain::common::{PreparedContract, RegistryDeploy};
 
 #[derive(Debug, Clone)]
 pub struct AgentsTeams {
@@ -24,7 +26,7 @@ pub struct AgentsTeamHeader {
     pub logo: Option<String>,
 }
 
-/// Mutex serializing all access to the graphl_parser C FFI.
+/// Mutex serializing all access to the `graphl_parser` C FFI.
 ///
 /// The underlying Flex/Bison parser and C printer use global mutable state
 /// (`buf_`, `cur_`, `buf_size`, `_n_`, and the Flex scanner buffer).
@@ -72,6 +74,7 @@ pub struct CreateReq {
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Graph>,
+    pub definition: Option<WorkflowDefinition>,
 }
 
 #[derive(Debug, Clone)]
@@ -86,6 +89,7 @@ pub struct AgentsTeam {
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Graph>,
+    pub definition: Option<WorkflowDefinition>,
 }
 
 #[derive(Debug, Clone)]
@@ -114,12 +118,10 @@ pub enum DeployReq {
         id: String,
         version: String,
         address: WalletAddress,
-        phlo_limit: PositiveNonZero<i64>,
         deploy: RegistryDeploy,
     },
     Graph {
         graph: Graph,
-        phlo_limit: PositiveNonZero<i64>,
         deploy: RegistryDeploy,
     },
 }
@@ -139,13 +141,84 @@ pub struct DeploySignedReq {
 #[derive(Debug, Clone)]
 pub struct RunReq {
     pub prompt: String,
-    pub phlo_limit: PositiveNonZero<i64>,
     pub agents_team: Uri,
 }
 
 #[derive(Debug, Clone)]
 pub struct RunResp {
+    pub run_id: String,
     pub contract: PreparedContract,
+    pub created_at: DateTime<Utc>,
+    pub durable: bool,
+    pub definition_hash: Option<String>,
+    pub request_content_hash: String,
+    pub request_capability_hash: String,
+    pub continuation_content_hash: Option<String>,
+    pub continuation_capability_hash: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedRunReq {
+    pub contract: SignedCode,
+    pub prepare_request: RunReq,
+    pub prepare_response: RunResp,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunCommandReq {
+    pub run_id: String,
+    pub expected_revision: u64,
+    pub command: ResumeCommand,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunCommandResp {
+    pub command_id: String,
+    pub command_class: String,
+    pub target_wait_id: Option<String>,
+    pub contract: PreparedContract,
+    pub issued_at: DateTime<Utc>,
+    pub command_content_hash: String,
+    pub command_capability_hash: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedRunCommandReq {
+    pub contract: SignedCode,
+    pub prepare_request: RunCommandReq,
+    pub prepare_response: RunCommandResp,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunState {
+    pub run_id: String,
+    pub agents_team: Uri,
+    pub created_at: DateTime<Utc>,
+    pub status: String,
+    pub events: Vec<RunEvent>,
+    pub definition_hash: Option<String>,
+    pub revision: u64,
+    pub request_content_hash: Option<String>,
+    pub request_capability_hash: Option<String>,
+    pub continuation_content_hash: Option<String>,
+    pub continuation_capability_hash: Option<String>,
+    pub command_id: Option<String>,
+    pub command_content_hash: Option<String>,
+    pub command_capability_hash: Option<String>,
+    pub command_actor: Option<String>,
+    pub command_class: Option<String>,
+    pub command_wait_id: Option<String>,
+    pub approval_authority_grants: Vec<String>,
+    pub wait_ids: Vec<String>,
+    pub due_at: Option<DateTime<Utc>>,
+    pub output_content_hash: Option<String>,
+    pub output_capability_hash: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunEvent {
+    pub sequence: u64,
+    pub event_type: String,
 }
 
 #[derive(Debug, Clone)]
@@ -230,9 +303,10 @@ pub struct PublishedState {
 
 #[derive(Debug, Clone)]
 pub struct DeploySignedRunOnFireskyReq {
-    pub contract: SignedCode,
     pub agents_team: Uri,
+    pub run_id: String,
     pub reply_to: Option<FireskyReply>,
+    pub run: DeploySignedRunReq,
 }
 
 #[derive(Debug, Clone)]

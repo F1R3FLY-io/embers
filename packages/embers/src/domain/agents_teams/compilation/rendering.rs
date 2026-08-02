@@ -386,7 +386,7 @@ mod tests {
         }
     }
 
-    fn agent_node<'a>(from: Vec<Vertex<'a>>, output: bool) -> Node<'a> {
+    fn agent_node(from: Vec<Vertex<'_>>, output: bool) -> Node<'_> {
         Node::Agent {
             agent_id: "agent-id".to_owned(),
             agent_version: "agent-version".to_owned(),
@@ -621,7 +621,7 @@ mod tests {
     // those back into one agent
     // -------------------------------------------------------
 
-    /// Stub body for a named agent; never calls `rho:ai:gpt4`, so assertions
+    /// Hermetic named-agent fixture; never calls `rho:ai:gpt4`, so assertions
     /// stay deterministic.
     fn named_agent<'a>(name: &str, from: Vec<Vertex<'a>>) -> Node<'a> {
         Node::Agent {

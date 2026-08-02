@@ -21,6 +21,9 @@ requires      = ["poetry-core>=2.0.0,<3.0.0"]
 [tool.poetry]
 package-mode = false
 
+[tool.uv]
+package = false
+
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.76"
 ruff         = "^0.15"
@@ -34,8 +37,11 @@ target-version = "py313"
 [tool.ruff.lint]
 ignore = [
     "ANN401",  # typing.Any
+    "COM812",  # formatter owns trailing-comma layout
+    "CPY001",  # repository copyright is recorded centrally, not per test file
     "D",       # docstrings
     "PLR0913", # Too many arguments
+    "PLR0917", # test clients mirror multi-field HTTP request contracts
     "PLR2004", # magic value
     "S101",    # assert
     "S311",    # suspicious-non-cryptographic-random-usage

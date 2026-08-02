@@ -76,9 +76,13 @@ betterproto2.check_compiler_version(_COMPILER_VERSION)
 
 @dataclass(eq=False, repr=False)
 class BindPattern(betterproto2.Message):
-    patterns: "list[Par]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    patterns: "list[Par]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    remainder: "Var | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    remainder: "Var | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     free_count: "int" = betterproto2.field(3, betterproto2.TYPE_INT32)
 
@@ -137,15 +141,21 @@ class Connective(betterproto2.Message):
         4, betterproto2.TYPE_MESSAGE, optional=True, group="connective_instance"
     )
 
-    conn_bool: "bool | None" = betterproto2.field(5, betterproto2.TYPE_BOOL, optional=True, group="connective_instance")
+    conn_bool: "bool | None" = betterproto2.field(
+        5, betterproto2.TYPE_BOOL, optional=True, group="connective_instance"
+    )
 
-    conn_int: "bool | None" = betterproto2.field(6, betterproto2.TYPE_BOOL, optional=True, group="connective_instance")
+    conn_int: "bool | None" = betterproto2.field(
+        6, betterproto2.TYPE_BOOL, optional=True, group="connective_instance"
+    )
 
     conn_string: "bool | None" = betterproto2.field(
         7, betterproto2.TYPE_BOOL, optional=True, group="connective_instance"
     )
 
-    conn_uri: "bool | None" = betterproto2.field(8, betterproto2.TYPE_BOOL, optional=True, group="connective_instance")
+    conn_uri: "bool | None" = betterproto2.field(
+        8, betterproto2.TYPE_BOOL, optional=True, group="connective_instance"
+    )
 
     conn_byte_array: "bool | None" = betterproto2.field(
         9, betterproto2.TYPE_BOOL, optional=True, group="connective_instance"
@@ -237,7 +247,9 @@ class EList(betterproto2.Message):
 
     connective_used: "bool" = betterproto2.field(4, betterproto2.TYPE_BOOL)
 
-    remainder: "Var | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True)
+    remainder: "Var | None" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("rhoapi", "EList", EList)
@@ -265,13 +277,17 @@ default_message_pool.register_message("rhoapi", "ELte", ELte)
 
 @dataclass(eq=False, repr=False)
 class EMap(betterproto2.Message):
-    kvs: "list[KeyValuePair]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    kvs: "list[KeyValuePair]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     locally_free: "bytes" = betterproto2.field(3, betterproto2.TYPE_BYTES)
 
     connective_used: "bool" = betterproto2.field(4, betterproto2.TYPE_BOOL)
 
-    remainder: "Var | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True)
+    remainder: "Var | None" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("rhoapi", "EMap", EMap)
@@ -279,9 +295,13 @@ default_message_pool.register_message("rhoapi", "EMap", EMap)
 
 @dataclass(eq=False, repr=False)
 class EMatches(betterproto2.Message):
-    target: "Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    target: "Par | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    pattern: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    pattern: "Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("rhoapi", "EMatches", EMatches)
@@ -296,9 +316,13 @@ class EMethod(betterproto2.Message):
 
     method_name: "str" = betterproto2.field(1, betterproto2.TYPE_STRING)
 
-    target: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    target: "Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    arguments: "list[Par]" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, repeated=True)
+    arguments: "list[Par]" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     locally_free: "bytes" = betterproto2.field(5, betterproto2.TYPE_BYTES)
 
@@ -396,7 +420,9 @@ class EPathMap(betterproto2.Message):
 
     connective_used: "bool" = betterproto2.field(4, betterproto2.TYPE_BOOL)
 
-    remainder: "Var | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True)
+    remainder: "Var | None" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("rhoapi", "EPathMap", EPathMap)
@@ -451,7 +477,9 @@ class ESet(betterproto2.Message):
 
     connective_used: "bool" = betterproto2.field(4, betterproto2.TYPE_BOOL)
 
-    remainder: "Var | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True)
+    remainder: "Var | None" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("rhoapi", "ESet", ESet)
@@ -494,47 +522,85 @@ class Expr(betterproto2.Message):
         - expr_instance:
     """
 
-    g_bool: "bool | None" = betterproto2.field(1, betterproto2.TYPE_BOOL, optional=True, group="expr_instance")
+    g_bool: "bool | None" = betterproto2.field(
+        1, betterproto2.TYPE_BOOL, optional=True, group="expr_instance"
+    )
 
-    g_int: "int | None" = betterproto2.field(2, betterproto2.TYPE_SINT64, optional=True, group="expr_instance")
+    g_int: "int | None" = betterproto2.field(
+        2, betterproto2.TYPE_SINT64, optional=True, group="expr_instance"
+    )
 
-    g_string: "str | None" = betterproto2.field(3, betterproto2.TYPE_STRING, optional=True, group="expr_instance")
+    g_string: "str | None" = betterproto2.field(
+        3, betterproto2.TYPE_STRING, optional=True, group="expr_instance"
+    )
 
-    g_uri: "str | None" = betterproto2.field(4, betterproto2.TYPE_STRING, optional=True, group="expr_instance")
+    g_uri: "str | None" = betterproto2.field(
+        4, betterproto2.TYPE_STRING, optional=True, group="expr_instance"
+    )
 
-    g_byte_array: "bytes | None" = betterproto2.field(25, betterproto2.TYPE_BYTES, optional=True, group="expr_instance")
+    g_byte_array: "bytes | None" = betterproto2.field(
+        25, betterproto2.TYPE_BYTES, optional=True, group="expr_instance"
+    )
 
-    e_not_body: "ENot | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_not_body: "ENot | None" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_neg_body: "ENeg | None" = betterproto2.field(6, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_neg_body: "ENeg | None" = betterproto2.field(
+        6, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_mult_body: "EMult | None" = betterproto2.field(7, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_mult_body: "EMult | None" = betterproto2.field(
+        7, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_div_body: "EDiv | None" = betterproto2.field(8, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_div_body: "EDiv | None" = betterproto2.field(
+        8, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_plus_body: "EPlus | None" = betterproto2.field(9, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_plus_body: "EPlus | None" = betterproto2.field(
+        9, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
     e_minus_body: "EMinus | None" = betterproto2.field(
         10, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
     )
 
-    e_lt_body: "ELt | None" = betterproto2.field(11, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_lt_body: "ELt | None" = betterproto2.field(
+        11, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_lte_body: "ELte | None" = betterproto2.field(12, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_lte_body: "ELte | None" = betterproto2.field(
+        12, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_gt_body: "EGt | None" = betterproto2.field(13, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_gt_body: "EGt | None" = betterproto2.field(
+        13, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_gte_body: "EGte | None" = betterproto2.field(14, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_gte_body: "EGte | None" = betterproto2.field(
+        14, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_eq_body: "EEq | None" = betterproto2.field(15, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_eq_body: "EEq | None" = betterproto2.field(
+        15, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_neq_body: "ENeq | None" = betterproto2.field(16, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_neq_body: "ENeq | None" = betterproto2.field(
+        16, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_and_body: "EAnd | None" = betterproto2.field(17, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_and_body: "EAnd | None" = betterproto2.field(
+        17, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_or_body: "EOr | None" = betterproto2.field(18, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_or_body: "EOr | None" = betterproto2.field(
+        18, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_var_body: "EVar | None" = betterproto2.field(19, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_var_body: "EVar | None" = betterproto2.field(
+        19, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
     e_list_body: "EList | None" = betterproto2.field(
         20, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
@@ -544,9 +610,13 @@ class Expr(betterproto2.Message):
         21, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
     )
 
-    e_set_body: "ESet | None" = betterproto2.field(22, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_set_body: "ESet | None" = betterproto2.field(
+        22, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    e_map_body: "EMap | None" = betterproto2.field(23, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_map_body: "EMap | None" = betterproto2.field(
+        23, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
     e_method_body: "EMethod | None" = betterproto2.field(
         24, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
@@ -585,9 +655,13 @@ class Expr(betterproto2.Message):
     set difference
     """
 
-    e_mod_body: "EMod | None" = betterproto2.field(31, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance")
+    e_mod_body: "EMod | None" = betterproto2.field(
+        31, betterproto2.TYPE_MESSAGE, optional=True, group="expr_instance"
+    )
 
-    g_double: "int | None" = betterproto2.field(34, betterproto2.TYPE_FIXED64, optional=True, group="expr_instance")
+    g_double: "int | None" = betterproto2.field(
+        34, betterproto2.TYPE_FIXED64, optional=True, group="expr_instance"
+    )
     """
     Fields 32-33 reserved for future use
 
@@ -597,7 +671,9 @@ class Expr(betterproto2.Message):
     IEEE 754 f64 stored as raw bits (covers f32 losslessly)
     """
 
-    g_big_int: "bytes | None" = betterproto2.field(35, betterproto2.TYPE_BYTES, optional=True, group="expr_instance")
+    g_big_int: "bytes | None" = betterproto2.field(
+        35, betterproto2.TYPE_BYTES, optional=True, group="expr_instance"
+    )
     """
     Arbitrary-precision signed integer (big-endian two's complement)
     """
@@ -629,12 +705,16 @@ class EZipper(betterproto2.Message):
     allowing efficient navigation and modification operations.
     """
 
-    pathmap: "EPathMap | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    pathmap: "EPathMap | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
     """
     The underlying PathMap being navigated
     """
 
-    current_path: "list[bytes]" = betterproto2.field(2, betterproto2.TYPE_BYTES, repeated=True)
+    current_path: "list[bytes]" = betterproto2.field(
+        2, betterproto2.TYPE_BYTES, repeated=True
+    )
     """
     Current path position in the zipper (list of path segments as bytes)
     Each segment is encoded as bytes representing a Par value
@@ -761,11 +841,17 @@ class If(betterproto2.Message):
     because the evaluator only walks par.exprs.
     """
 
-    condition: "Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    condition: "Par | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    if_true: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    if_true: "Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    if_false: "Par | None" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, optional=True)
+    if_false: "Par | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     locally_free: "bytes" = betterproto2.field(4, betterproto2.TYPE_BYTES)
 
@@ -779,7 +865,9 @@ default_message_pool.register_message("rhoapi", "If", If)
 class KeyValuePair(betterproto2.Message):
     key: "Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
 
-    value: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    value: "Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("rhoapi", "KeyValuePair", KeyValuePair)
@@ -787,7 +875,9 @@ default_message_pool.register_message("rhoapi", "KeyValuePair", KeyValuePair)
 
 @dataclass(eq=False, repr=False)
 class ListBindPatterns(betterproto2.Message):
-    patterns: "list[BindPattern]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    patterns: "list[BindPattern]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
 
 default_message_pool.register_message("rhoapi", "ListBindPatterns", ListBindPatterns)
@@ -805,9 +895,13 @@ default_message_pool.register_message("rhoapi", "ListParWithRandom", ListParWith
 
 @dataclass(eq=False, repr=False)
 class Match(betterproto2.Message):
-    target: "Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    target: "Par | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    cases: "list[MatchCase]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    cases: "list[MatchCase]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     locally_free: "bytes" = betterproto2.field(4, betterproto2.TYPE_BYTES)
 
@@ -819,13 +913,19 @@ default_message_pool.register_message("rhoapi", "Match", Match)
 
 @dataclass(eq=False, repr=False)
 class MatchCase(betterproto2.Message):
-    pattern: "Par | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    pattern: "Par | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    source: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    source: "Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     free_count: "int" = betterproto2.field(3, betterproto2.TYPE_INT32)
 
-    guard: "Par | None" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, optional=True)
+    guard: "Par | None" = betterproto2.field(
+        4, betterproto2.TYPE_MESSAGE, optional=True
+    )
     """
     Optional per-case `where`-clause guard. When non-empty, the case only
     fires if the pattern matches AND the guard evaluates to GBool(true)
@@ -862,7 +962,11 @@ class New(betterproto2.Message):
     """
 
     injections: "dict[str, Par]" = betterproto2.field(
-        4, betterproto2.TYPE_MAP, map_meta=betterproto2.map_meta(betterproto2.TYPE_STRING, betterproto2.TYPE_MESSAGE)
+        4,
+        betterproto2.TYPE_MAP,
+        map_meta=betterproto2.map_meta(
+            betterproto2.TYPE_STRING, betterproto2.TYPE_MESSAGE
+        ),
     )
 
     locally_free: "bytes" = betterproto2.field(5, betterproto2.TYPE_BYTES)
@@ -883,26 +987,42 @@ class Par(betterproto2.Message):
     The Nil process is a `Par` with no sends, receives, etc.
     """
 
-    sends: "list[Send]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    sends: "list[Send]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    receives: "list[Receive]" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, repeated=True)
+    receives: "list[Receive]" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     news: "list[New]" = betterproto2.field(4, betterproto2.TYPE_MESSAGE, repeated=True)
 
-    exprs: "list[Expr]" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, repeated=True)
+    exprs: "list[Expr]" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    matches: "list[Match]" = betterproto2.field(6, betterproto2.TYPE_MESSAGE, repeated=True)
+    matches: "list[Match]" = betterproto2.field(
+        6, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    unforgeables: "list[GUnforgeable]" = betterproto2.field(7, betterproto2.TYPE_MESSAGE, repeated=True)
+    unforgeables: "list[GUnforgeable]" = betterproto2.field(
+        7, betterproto2.TYPE_MESSAGE, repeated=True
+    )
     """
     unforgeable names
     """
 
-    bundles: "list[Bundle]" = betterproto2.field(11, betterproto2.TYPE_MESSAGE, repeated=True)
+    bundles: "list[Bundle]" = betterproto2.field(
+        11, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    connectives: "list[Connective]" = betterproto2.field(8, betterproto2.TYPE_MESSAGE, repeated=True)
+    connectives: "list[Connective]" = betterproto2.field(
+        8, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    conditionals: "list[If]" = betterproto2.field(12, betterproto2.TYPE_MESSAGE, repeated=True)
+    conditionals: "list[If]" = betterproto2.field(
+        12, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     locally_free: "bytes" = betterproto2.field(9, betterproto2.TYPE_BYTES)
 
@@ -952,7 +1072,9 @@ class Receive(betterproto2.Message):
     It's an error for free Variable to occur more than once in a pattern.
     """
 
-    binds: "list[ReceiveBind]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    binds: "list[ReceiveBind]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
     body: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
 
@@ -966,7 +1088,9 @@ class Receive(betterproto2.Message):
 
     connective_used: "bool" = betterproto2.field(7, betterproto2.TYPE_BOOL)
 
-    condition: "Par | None" = betterproto2.field(8, betterproto2.TYPE_MESSAGE, optional=True)
+    condition: "Par | None" = betterproto2.field(
+        8, betterproto2.TYPE_MESSAGE, optional=True
+    )
     """
     Optional `where`-clause guard. When non-empty, the receive only commits
     (consumes the matched messages) if every spatial pattern matches AND
@@ -980,11 +1104,17 @@ default_message_pool.register_message("rhoapi", "Receive", Receive)
 
 @dataclass(eq=False, repr=False)
 class ReceiveBind(betterproto2.Message):
-    patterns: "list[Par]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    patterns: "list[Par]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    source: "Par | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    source: "Par | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    remainder: "Var | None" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, optional=True)
+    remainder: "Var | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     free_count: "int" = betterproto2.field(4, betterproto2.TYPE_INT32)
 
@@ -1029,9 +1159,13 @@ class TaggedContinuation(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="tagged_cont"
     )
 
-    scala_body_ref: "int | None" = betterproto2.field(2, betterproto2.TYPE_INT64, optional=True, group="tagged_cont")
+    scala_body_ref: "int | None" = betterproto2.field(
+        2, betterproto2.TYPE_INT64, optional=True, group="tagged_cont"
+    )
 
-    guard: "Par | None" = betterproto2.field(3, betterproto2.TYPE_MESSAGE, optional=True)
+    guard: "Par | None" = betterproto2.field(
+        3, betterproto2.TYPE_MESSAGE, optional=True
+    )
     """
     Optional `where`-clause guard, lifted from `Receive.condition` when the
     continuation is registered with rspace. The matcher coordinator evaluates
@@ -1041,7 +1175,9 @@ class TaggedContinuation(betterproto2.Message):
     """
 
 
-default_message_pool.register_message("rhoapi", "TaggedContinuation", TaggedContinuation)
+default_message_pool.register_message(
+    "rhoapi", "TaggedContinuation", TaggedContinuation
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -1056,9 +1192,13 @@ class Var(betterproto2.Message):
         - var_instance:
     """
 
-    bound_var: "int | None" = betterproto2.field(1, betterproto2.TYPE_SINT32, optional=True, group="var_instance")
+    bound_var: "int | None" = betterproto2.field(
+        1, betterproto2.TYPE_SINT32, optional=True, group="var_instance"
+    )
 
-    free_var: "int | None" = betterproto2.field(2, betterproto2.TYPE_SINT32, optional=True, group="var_instance")
+    free_var: "int | None" = betterproto2.field(
+        2, betterproto2.TYPE_SINT32, optional=True, group="var_instance"
+    )
 
     wildcard: "VarWildcardMsg | None" = betterproto2.field(
         3, betterproto2.TYPE_MESSAGE, optional=True, group="var_instance"

@@ -47,12 +47,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
         record_trace!(request);
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
-        let (code, phlo_limit, system) = match request {
+        let (code, system) = match request {
             DeployReq::Agent {
                 id,
                 version,
                 address,
-                phlo_limit,
             } => {
                 let agent = self
                     .get_with_retry(
@@ -97,7 +96,6 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
 
                 (
                     code,
-                    phlo_limit,
                     Some(
                         prepare_for_signing()
                             .code(system_code)
@@ -106,14 +104,13 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
                     ),
                 )
             }
-            DeployReq::Code { code, phlo_limit } => (code, phlo_limit, None),
+            DeployReq::Code { code } => (code, None),
         };
 
         Ok(DeployResp {
             contract: prepare_for_signing()
                 .code(code)
                 .valid_after_block_number(valid_after)
-                .phlo_limit(phlo_limit)
                 .call(),
             system,
         })
@@ -131,15 +128,17 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
 
         let mut write_client = self.write_client.clone();
 
-        let deploy_id = write_client
+        let main_deploy_id = write_client
             .deploy_signed_contract(request.contract)
             .await?;
 
-        if let Some(system) = request.system {
-            write_client.deploy_signed_contract(system).await?;
+        // Return the final ordered write as the synchronization barrier. For
+        // named deployments that is the system record containing the URI and
+        // last-deploy metadata, not the executable contract submitted first.
+        match request.system {
+            Some(system) => write_client.deploy_signed_contract(system).await,
+            None => Ok(main_deploy_id),
         }
-
-        Ok(deploy_id)
     }
 }
 
@@ -212,7 +211,7 @@ mod deploy_wrapping_tests {
     const AGENT_SOURCE: &str = "contract main(@input, return) = { return!(input) }";
 
     fn agent_json(code: serde_json::Value) -> serde_json::Value {
-        json!({
+        let mut agent = json!({
             "id": "agent-id",
             "version": "agent-version",
             "created_at": 0,
@@ -221,8 +220,10 @@ mod deploy_wrapping_tests {
             "description": null,
             "shard": null,
             "logo": null,
-            "code": code,
-        })
+            "code": null,
+        });
+        agent["code"] = code;
+        agent
     }
 
     fn service_returning(
@@ -241,7 +242,6 @@ mod deploy_wrapping_tests {
             id: "agent-id".to_owned(),
             version: "agent-version".to_owned(),
             address: WalletAddress::from(test_public_key()),
-            phlo_limit: 50_000i64.try_into().expect("positive phlo limit"),
         }
     }
 
@@ -297,10 +297,7 @@ mod deploy_wrapping_tests {
         let raw = "new x in { x!(1) }".to_owned();
 
         let response = service
-            .prepare_deploy_contract(DeployReq::Code {
-                code: raw.clone(),
-                phlo_limit: 50_000i64.try_into().expect("positive phlo limit"),
-            })
+            .prepare_deploy_contract(DeployReq::Code { code: raw.clone() })
             .await
             .expect("raw code should deploy");
 

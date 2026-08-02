@@ -27,6 +27,7 @@ pub struct TestnetService<
     pub write_client: W,
     pub read_client: R,
     pub observer_node_events: N,
+    pub deploy_finalization_timeout: Duration,
 }
 
 #[allow(unused)]
@@ -48,6 +49,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetService<R, W, N> {
         observer_node_events: N,
         deployer_key: SecretKey,
         env_key: &SecretKey,
+        deploy_finalization_timeout: Duration,
     ) -> anyhow::Result<(Self, DeployId)> {
         let secp = Secp256k1::new();
         let env_public_key = PublicKey::from_secret_key(&secp, env_key);
@@ -82,8 +84,10 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetService<R, W, N> {
                 write_client,
                 read_client,
                 observer_node_events,
+                deploy_finalization_timeout,
             },
             deploy_id,
         ))
     }
 }
+use std::time::Duration;

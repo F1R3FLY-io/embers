@@ -1,4 +1,5 @@
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use atrium_api::agent::Agent;
 use atrium_api::agent::atp_agent::CredentialSession;
@@ -103,7 +104,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         let handle_str = handle.as_str().to_owned();
 
         let agent_team = self
-            .get(address, id, "latest".into())
+            .get_deployed_with_retry(address, id, "latest".into(), 10, Duration::from_millis(500))
             .await?
             .ok_or_else(|| anyhow::anyhow!("agents team not found"))?;
 

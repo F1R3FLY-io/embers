@@ -32,6 +32,10 @@ struct MockReadResponse {
     /// before `value` is served — simulates the read-node visibility lag a
     /// retrying caller must tolerate.
     empty_before: usize,
+    /// Complete stale values returned after any leading empty reads and before
+    /// the final value. This models an observer that answers successfully with
+    /// an older finalized record rather than returning no value.
+    values_before: Vec<serde_json::Value>,
     /// How many times this response has matched so far (interior mutability so
     /// `find_response` can sequence empty-then-data through `&self`).
     hits: AtomicUsize,
@@ -54,6 +58,7 @@ impl MockReadNode {
                 value,
                 error: None,
                 empty_before: 0,
+                values_before: Vec::new(),
                 hits: AtomicUsize::new(0),
             });
         self
@@ -75,26 +80,34 @@ impl MockReadNode {
                 value,
                 error: None,
                 empty_before,
+                values_before: Vec::new(),
                 hits: AtomicUsize::new(0),
             });
         self
     }
 
-    /// Add an error response that triggers when the Rholang code contains `substr`.
-    pub fn on_code_containing_error(mut self, substr: &str, error: ReadNodeError) -> Self {
+    /// Add a response that returns each stale value once and then serves the
+    /// final value for all subsequent matching reads.
+    pub fn on_code_containing_values_then(
+        mut self,
+        substr: &str,
+        values_before: Vec<serde_json::Value>,
+        value: serde_json::Value,
+    ) -> Self {
         Arc::get_mut(&mut self.responses)
             .expect("no other clones should exist during setup")
             .push(MockReadResponse {
                 contains: substr.to_owned(),
-                value: serde_json::Value::Null,
-                error: Some(error),
+                value,
+                error: None,
                 empty_before: 0,
+                values_before,
                 hits: AtomicUsize::new(0),
             });
         self
     }
 
-    /// Return the list of Rholang codes that were passed to get_data/get_data_or_none.
+    /// Return the list of Rholang codes that were passed to `get_data/get_data_or_none`.
     pub fn calls(&self) -> Vec<String> {
         self.calls.lock().unwrap().clone()
     }
@@ -109,6 +122,9 @@ impl MockReadNode {
                 let hit = resp.hits.fetch_add(1, Ordering::SeqCst);
                 if hit < resp.empty_before {
                     return Err(ReadNodeError::ReturnValueMissing);
+                }
+                if let Some(value) = resp.values_before.get(hit - resp.empty_before) {
+                    return Ok(value.clone());
                 }
                 if let Some(ref err) = resp.error {
                     return Err(match err {
@@ -242,7 +258,7 @@ impl WriteNode for MockWriteNode {
         self.deployed_contracts
             .lock()
             .unwrap()
-            .push(contract.contract.clone());
+            .push(contract.contract);
         self.next_deploy_response()
     }
 
@@ -276,7 +292,7 @@ impl MockNodeEventSource {
         }
     }
 
-    /// Configure wait_for_deploy to return the given result for the given deploy ID.
+    /// Configure `wait_for_deploy` to return the given result for the given deploy ID.
     pub fn with_wait_result(self, deploy_id: &str, result: Option<bool>) -> Self {
         self.wait_results
             .lock()

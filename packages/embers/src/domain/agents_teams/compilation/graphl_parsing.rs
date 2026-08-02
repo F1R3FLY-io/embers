@@ -438,7 +438,7 @@ pub fn references_agent(graph: &Graph, agent_id: &str) -> anyhow::Result<bool> {
     }))
 }
 
-pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
+pub fn parse(graph: &Graph) -> anyhow::Result<Code<'_>> {
     record_trace!(graph);
 
     let flat = graph.try_visit(FlatGraph::default(), Visitor)?;

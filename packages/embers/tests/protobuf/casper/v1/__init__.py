@@ -61,7 +61,9 @@ class BlockInfoResponse(betterproto2.Message):
     )
 
 
-default_message_pool.register_message("casper.v1", "BlockInfoResponse", BlockInfoResponse)
+default_message_pool.register_message(
+    "casper.v1", "BlockInfoResponse", BlockInfoResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -98,10 +100,14 @@ class BondStatusResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    is_bonded: "bool | None" = betterproto2.field(2, betterproto2.TYPE_BOOL, optional=True, group="message")
+    is_bonded: "bool | None" = betterproto2.field(
+        2, betterproto2.TYPE_BOOL, optional=True, group="message"
+    )
 
 
-default_message_pool.register_message("casper.v1", "BondStatusResponse", BondStatusResponse)
+default_message_pool.register_message(
+    "casper.v1", "BondStatusResponse", BondStatusResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -113,7 +119,9 @@ class ContinuationAtNamePayload(betterproto2.Message):
     length: "int" = betterproto2.field(2, betterproto2.TYPE_INT32)
 
 
-default_message_pool.register_message("casper.v1", "ContinuationAtNamePayload", ContinuationAtNamePayload)
+default_message_pool.register_message(
+    "casper.v1", "ContinuationAtNamePayload", ContinuationAtNamePayload
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -134,7 +142,9 @@ class ContinuationAtNameResponse(betterproto2.Message):
     )
 
 
-default_message_pool.register_message("casper.v1", "ContinuationAtNameResponse", ContinuationAtNameResponse)
+default_message_pool.register_message(
+    "casper.v1", "ContinuationAtNameResponse", ContinuationAtNameResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -155,7 +165,9 @@ class DeployFinalizationStatusResponse(betterproto2.Message):
     )
 
 
-default_message_pool.register_message("casper.v1", "DeployFinalizationStatusResponse", DeployFinalizationStatusResponse)
+default_message_pool.register_message(
+    "casper.v1", "DeployFinalizationStatusResponse", DeployFinalizationStatusResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -171,7 +183,9 @@ class DeployResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    result: "str | None" = betterproto2.field(2, betterproto2.TYPE_STRING, optional=True, group="message")
+    result: "str | None" = betterproto2.field(
+        2, betterproto2.TYPE_STRING, optional=True, group="message"
+    )
 
 
 default_message_pool.register_message("casper.v1", "DeployResponse", DeployResponse)
@@ -195,7 +209,9 @@ class EventInfoResponse(betterproto2.Message):
     )
 
 
-default_message_pool.register_message("casper.v1", "EventInfoResponse", EventInfoResponse)
+default_message_pool.register_message(
+    "casper.v1", "EventInfoResponse", EventInfoResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -218,7 +234,9 @@ class ExploratoryDeployResponse(betterproto2.Message):
     cost: "int" = betterproto2.field(3, betterproto2.TYPE_UINT64)
 
 
-default_message_pool.register_message("casper.v1", "ExploratoryDeployResponse", ExploratoryDeployResponse)
+default_message_pool.register_message(
+    "casper.v1", "ExploratoryDeployResponse", ExploratoryDeployResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -238,8 +256,18 @@ class FindDeployResponse(betterproto2.Message):
         2, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
+    finalization_state: "__casper__.DeployFinalizationStateProto" = betterproto2.field(
+        3,
+        betterproto2.TYPE_ENUM,
+        default_factory=lambda: __casper__.DeployFinalizationStateProto(0),
+    )
 
-default_message_pool.register_message("casper.v1", "FindDeployResponse", FindDeployResponse)
+    rejection_count: "int" = betterproto2.field(4, betterproto2.TYPE_UINT32)
+
+
+default_message_pool.register_message(
+    "casper.v1", "FindDeployResponse", FindDeployResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -255,10 +283,14 @@ class IsFinalizedResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    is_finalized: "bool | None" = betterproto2.field(2, betterproto2.TYPE_BOOL, optional=True, group="message")
+    is_finalized: "bool | None" = betterproto2.field(
+        2, betterproto2.TYPE_BOOL, optional=True, group="message"
+    )
 
 
-default_message_pool.register_message("casper.v1", "IsFinalizedResponse", IsFinalizedResponse)
+default_message_pool.register_message(
+    "casper.v1", "IsFinalizedResponse", IsFinalizedResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -279,7 +311,9 @@ class LastFinalizedBlockResponse(betterproto2.Message):
     )
 
 
-default_message_pool.register_message("casper.v1", "LastFinalizedBlockResponse", LastFinalizedBlockResponse)
+default_message_pool.register_message(
+    "casper.v1", "LastFinalizedBlockResponse", LastFinalizedBlockResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -295,10 +329,14 @@ class MachineVerifyResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    content: "str | None" = betterproto2.field(2, betterproto2.TYPE_STRING, optional=True, group="message")
+    content: "str | None" = betterproto2.field(
+        2, betterproto2.TYPE_STRING, optional=True, group="message"
+    )
 
 
-default_message_pool.register_message("casper.v1", "MachineVerifyResponse", MachineVerifyResponse)
+default_message_pool.register_message(
+    "casper.v1", "MachineVerifyResponse", MachineVerifyResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -309,7 +347,9 @@ class PrivateNamePreviewPayload(betterproto2.Message):
     """
 
 
-default_message_pool.register_message("casper.v1", "PrivateNamePreviewPayload", PrivateNamePreviewPayload)
+default_message_pool.register_message(
+    "casper.v1", "PrivateNamePreviewPayload", PrivateNamePreviewPayload
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -330,7 +370,9 @@ class PrivateNamePreviewResponse(betterproto2.Message):
     )
 
 
-default_message_pool.register_message("casper.v1", "PrivateNamePreviewResponse", PrivateNamePreviewResponse)
+default_message_pool.register_message(
+    "casper.v1", "PrivateNamePreviewResponse", PrivateNamePreviewResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -346,7 +388,9 @@ class ProposeResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    result: "str | None" = betterproto2.field(2, betterproto2.TYPE_STRING, optional=True, group="message")
+    result: "str | None" = betterproto2.field(
+        2, betterproto2.TYPE_STRING, optional=True, group="message"
+    )
 
 
 default_message_pool.register_message("casper.v1", "ProposeResponse", ProposeResponse)
@@ -365,17 +409,25 @@ class ProposeResultResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    result: "str | None" = betterproto2.field(2, betterproto2.TYPE_STRING, optional=True, group="message")
+    result: "str | None" = betterproto2.field(
+        2, betterproto2.TYPE_STRING, optional=True, group="message"
+    )
 
 
-default_message_pool.register_message("casper.v1", "ProposeResultResponse", ProposeResultResponse)
+default_message_pool.register_message(
+    "casper.v1", "ProposeResultResponse", ProposeResultResponse
+)
 
 
 @dataclass(eq=False, repr=False)
 class RhoDataPayload(betterproto2.Message):
-    par: "list[__rhoapi__.Par]" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, repeated=True)
+    par: "list[__rhoapi__.Par]" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, repeated=True
+    )
 
-    block: "__casper__.LightBlockInfo | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True)
+    block: "__casper__.LightBlockInfo | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("casper.v1", "RhoDataPayload", RhoDataPayload)
@@ -394,7 +446,9 @@ class RhoDataResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    payload: "RhoDataPayload | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True, group="message")
+    payload: "RhoDataPayload | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True, group="message"
+    )
 
 
 default_message_pool.register_message("casper.v1", "RhoDataResponse", RhoDataResponse)
@@ -434,10 +488,14 @@ class UpdateNotificationResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    result: "str | None" = betterproto2.field(2, betterproto2.TYPE_STRING, optional=True, group="message")
+    result: "str | None" = betterproto2.field(
+        2, betterproto2.TYPE_STRING, optional=True, group="message"
+    )
 
 
-default_message_pool.register_message("casper.v1", "UpdateNotificationResponse", UpdateNotificationResponse)
+default_message_pool.register_message(
+    "casper.v1", "UpdateNotificationResponse", UpdateNotificationResponse
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -453,10 +511,14 @@ class VisualizeBlocksResponse(betterproto2.Message):
         1, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    content: "str | None" = betterproto2.field(2, betterproto2.TYPE_STRING, optional=True, group="message")
+    content: "str | None" = betterproto2.field(
+        2, betterproto2.TYPE_STRING, optional=True, group="message"
+    )
 
 
-default_message_pool.register_message("casper.v1", "VisualizeBlocksResponse", VisualizeBlocksResponse)
+default_message_pool.register_message(
+    "casper.v1", "VisualizeBlocksResponse", VisualizeBlocksResponse
+)
 
 
 class DeployServiceStub:
@@ -493,7 +555,9 @@ class DeployServiceStub:
             BlockResponse.FromString,
         )(message)
 
-    def visualize_dag(self, message: "__casper__.VisualizeDagQuery") -> "Iterator[VisualizeBlocksResponse]":
+    def visualize_dag(
+        self, message: "__casper__.VisualizeDagQuery"
+    ) -> "Iterator[VisualizeBlocksResponse]":
         """
         Get dag
         """
@@ -504,7 +568,9 @@ class DeployServiceStub:
             VisualizeBlocksResponse.FromString,
         )(message)
 
-    def machine_verifiable_dag(self, message: "__casper__.MachineVerifyQuery | None" = None) -> "MachineVerifyResponse":
+    def machine_verifiable_dag(
+        self, message: "__casper__.MachineVerifyQuery | None" = None
+    ) -> "MachineVerifyResponse":
         if message is None:
             message = __casper__.MachineVerifyQuery()
 
@@ -514,7 +580,9 @@ class DeployServiceStub:
             MachineVerifyResponse.FromString,
         )(message)
 
-    def show_main_chain(self, message: "__casper__.BlocksQuery") -> "Iterator[BlockInfoResponse]":
+    def show_main_chain(
+        self, message: "__casper__.BlocksQuery"
+    ) -> "Iterator[BlockInfoResponse]":
         """
         Returns on success LightBlockInfo
         """
@@ -525,7 +593,9 @@ class DeployServiceStub:
             BlockInfoResponse.FromString,
         )(message)
 
-    def get_blocks(self, message: "__casper__.BlocksQuery") -> "Iterator[BlockInfoResponse]":
+    def get_blocks(
+        self, message: "__casper__.BlocksQuery"
+    ) -> "Iterator[BlockInfoResponse]":
         """
         Get a summary of blocks on the blockchain.
         """
@@ -536,7 +606,9 @@ class DeployServiceStub:
             BlockInfoResponse.FromString,
         )(message)
 
-    def get_data_at_name(self, message: "__casper__.DataAtNameByBlockQuery") -> "RhoDataResponse":
+    def get_data_at_name(
+        self, message: "__casper__.DataAtNameByBlockQuery"
+    ) -> "RhoDataResponse":
         """
         Find data sent to a name.
         """
@@ -560,9 +632,13 @@ class DeployServiceStub:
             ContinuationAtNameResponse.FromString,
         )(message)
 
-    def find_deploy(self, message: "__casper__.FindDeployQuery") -> "FindDeployResponse":
+    def find_deploy(
+        self, message: "__casper__.FindDeployQuery"
+    ) -> "FindDeployResponse":
         """
-        Find block containing a deploy.
+        Find block containing a deploy. The response's blockInfo.isFinalized is
+        block-level; for deploy effect-finality use finalizationState or
+        deployFinalizationStatus.
         """
 
         return self._channel.unary_unary(
@@ -571,7 +647,9 @@ class DeployServiceStub:
             FindDeployResponse.FromString,
         )(message)
 
-    def preview_private_names(self, message: "__casper__.PrivateNamePreviewQuery") -> "PrivateNamePreviewResponse":
+    def preview_private_names(
+        self, message: "__casper__.PrivateNamePreviewQuery"
+    ) -> "PrivateNamePreviewResponse":
         """
         Preview new top-level unforgeable names (for example, to compute signatures over them).
         """
@@ -598,7 +676,9 @@ class DeployServiceStub:
             LastFinalizedBlockResponse.FromString,
         )(message)
 
-    def is_finalized(self, message: "__casper__.IsFinalizedQuery") -> "IsFinalizedResponse":
+    def is_finalized(
+        self, message: "__casper__.IsFinalizedQuery"
+    ) -> "IsFinalizedResponse":
         """
         Check if a given block is finalized.
         """
@@ -624,7 +704,9 @@ class DeployServiceStub:
             DeployFinalizationStatusResponse.FromString,
         )(message)
 
-    def bond_status(self, message: "__casper__.BondStatusQuery") -> "BondStatusResponse":
+    def bond_status(
+        self, message: "__casper__.BondStatusQuery"
+    ) -> "BondStatusResponse":
         """
         Check if a given validator is bonded.
         Returns on success BondStatusResponse
@@ -636,7 +718,9 @@ class DeployServiceStub:
             BondStatusResponse.FromString,
         )(message)
 
-    def exploratory_deploy(self, message: "__casper__.ExploratoryDeployQuery") -> "ExploratoryDeployResponse":
+    def exploratory_deploy(
+        self, message: "__casper__.ExploratoryDeployQuery"
+    ) -> "ExploratoryDeployResponse":
         """
         Executes deploy as user deploy with immediate rollback and return result
         """
@@ -647,7 +731,9 @@ class DeployServiceStub:
             ExploratoryDeployResponse.FromString,
         )(message)
 
-    def get_blocks_by_heights(self, message: "__casper__.BlocksQueryByHeight") -> "Iterator[BlockInfoResponse]":
+    def get_blocks_by_heights(
+        self, message: "__casper__.BlocksQueryByHeight"
+    ) -> "Iterator[BlockInfoResponse]":
         """
         get blocks by block height
         """
@@ -658,7 +744,9 @@ class DeployServiceStub:
             BlockInfoResponse.FromString,
         )(message)
 
-    def get_event_by_hash(self, message: "__casper__.ReportQuery") -> "EventInfoResponse":
+    def get_event_by_hash(
+        self, message: "__casper__.ReportQuery"
+    ) -> "EventInfoResponse":
         """
         temporary api for testing
         """
@@ -669,7 +757,9 @@ class DeployServiceStub:
             EventInfoResponse.FromString,
         )(message)
 
-    def status(self, message: "__google__protobuf__.Empty | None" = None) -> "StatusResponse":
+    def status(
+        self, message: "__google__protobuf__.Empty | None" = None
+    ) -> "StatusResponse":
         """
         Get node status
         """
@@ -688,7 +778,9 @@ class ExternalCommunicationServiceStub:
     def __init__(self, channel: grpc.Channel):
         self._channel = channel
 
-    def send_notification(self, message: "__casper__.UpdateNotification") -> "UpdateNotificationResponse":
+    def send_notification(
+        self, message: "__casper__.UpdateNotification"
+    ) -> "UpdateNotificationResponse":
         return self._channel.unary_unary(
             "/casper.v1.ExternalCommunicationService/sendNotification",
             __casper__.UpdateNotification.SerializeToString,
@@ -707,7 +799,9 @@ class ProposeServiceStub:
             ProposeResponse.FromString,
         )(message)
 
-    def propose_result(self, message: "__casper__.ProposeResultQuery | None" = None) -> "ProposeResultResponse":
+    def propose_result(
+        self, message: "__casper__.ProposeResultQuery | None" = None
+    ) -> "ProposeResultResponse":
         if message is None:
             message = __casper__.ProposeResultQuery()
 

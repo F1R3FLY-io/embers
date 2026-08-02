@@ -62,7 +62,7 @@ impl IntoValue for DeployId {
     }
 }
 
-#[derive(derive_more::Debug, Clone)]
+#[derive(derive_more::Debug, Clone, Serialize, Deserialize)]
 pub struct SignedCode {
     #[debug("{:?}", contract.short_hex(32))]
     pub contract: Vec<u8>,
@@ -244,9 +244,6 @@ pub enum ValidAfter {
 pub struct DeployData {
     #[builder(start_fn)]
     pub term: String,
-
-    #[builder(default = 5_000_000)]
-    pub phlo_limit: u64,
 
     #[builder(default = chrono::Utc::now())]
     pub timestamp: DateTime<Utc>,
@@ -473,7 +470,7 @@ mod tests {
         let addr_string: String = addr.clone().into();
 
         // Re-parsing the produced string must succeed and yield the same value.
-        let parsed = WalletAddress::try_from(addr_string.clone())
+        let parsed = WalletAddress::try_from(addr_string)
             .expect("WalletAddress produced by From<PublicKey> must parse successfully");
         assert_eq!(
             addr, parsed,
@@ -523,7 +520,7 @@ mod tests {
         let addr_string: String = addr.into();
 
         // Corrupt the last character of the base58 string to invalidate the checksum.
-        let mut corrupted = addr_string.clone();
+        let mut corrupted = addr_string;
         let last = corrupted.pop().expect("non-empty address");
         // Pick a different valid base58 character.
         let replacement = if last == '1' { '2' } else { '1' };
@@ -558,7 +555,7 @@ mod tests {
             "URI must start with rho:id: prefix, got: {uri_string}"
         );
 
-        let parsed = Uri::try_from(uri_string.clone())
+        let parsed = Uri::try_from(uri_string)
             .expect("Uri produced by From<PublicKey> must parse successfully");
         assert_eq!(uri, parsed, "roundtripped Uri should equal the original");
     }
@@ -1231,10 +1228,6 @@ mod tests {
         let after = chrono::Utc::now();
 
         assert_eq!(deploy.term, "new Nil", "term should match");
-        assert_eq!(
-            deploy.phlo_limit, 5_000_000,
-            "default phlo_limit should be 5 million"
-        );
         assert!(
             deploy.timestamp >= before && deploy.timestamp <= after,
             "timestamp should be approximately now"
@@ -1252,23 +1245,15 @@ mod tests {
             .with_timezone(&Utc);
 
         let deploy = DeployData::builder("@0!(true)".to_string())
-            .phlo_limit(1_000)
             .timestamp(custom_time)
             .valid_after_block_number(ValidAfter::Index(42))
             .build();
 
         assert_eq!(deploy.term, "@0!(true)");
-        assert_eq!(deploy.phlo_limit, 1_000);
         assert_eq!(deploy.timestamp, custom_time);
         assert!(
             matches!(deploy.valid_after_block_number, ValidAfter::Index(42)),
             "valid_after should be Index(42)"
         );
-    }
-
-    #[test]
-    fn deploy_data_builder_zero_phlo_limit() {
-        let deploy = DeployData::builder("Nil".to_string()).phlo_limit(0).build();
-        assert_eq!(deploy.phlo_limit, 0, "phlo_limit of 0 should be allowed");
     }
 }

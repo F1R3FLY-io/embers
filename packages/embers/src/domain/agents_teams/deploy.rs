@@ -10,8 +10,21 @@ use futures::future::try_join_all;
 
 use crate::domain::agents::AgentsService;
 use crate::domain::agents_teams::AgentsTeamsService;
-use crate::domain::agents_teams::compilation::{AgentCodes, Code, parse, render};
-use crate::domain::agents_teams::models::{DeployReq, DeployResp, DeploySignedReq};
+use crate::domain::agents_teams::compilation::{
+    AgentCodes,
+    AgentRef,
+    Code,
+    parse,
+    render,
+    render_workflow,
+};
+use crate::domain::agents_teams::models::{
+    DeployReq,
+    DeployResp,
+    DeploySignedReq,
+    Graph,
+    WorkflowDefinition,
+};
 use crate::domain::common::{prepare_for_signing, record_trace};
 
 #[derive(Debug, Clone, Render)]
@@ -22,6 +35,11 @@ struct RecordDeploy {
     version: String,
     last_deploy: DateTime<Utc>,
     uri: Uri,
+}
+
+enum TeamSource {
+    Graph(Graph),
+    Workflow(WorkflowDefinition),
 }
 
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
@@ -42,7 +60,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         // Diagnostic: check if registry entry is still accessible before deploy
         let env_uri_str: &str = self.uri.as_ref();
         let probe_code =
-            format!(r#"new ret, rl(`rho:registry:lookup`) in {{ rl!(`{env_uri_str}`, *ret) }}"#,);
+            format!(r"new ret, rl(`rho:registry:lookup`) in {{ rl!(`{env_uri_str}`, *ret) }}",);
         match self
             .read_client
             .get_data::<serde_json::Value>(probe_code)
@@ -64,7 +82,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
         // Control probe: check a well-known system URI
         let system_probe_code =
-            r#"new ret, rl(`rho:registry:lookup`) in { rl!(`rho:lang:treeHashMap`, *ret) }"#
+            r"new ret, rl(`rho:registry:lookup`) in { rl!(`rho:lang:treeHashMap`, *ret) }"
                 .to_string();
         match self
             .read_client
@@ -117,12 +135,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         }
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
-        let (graph, phlo_limit, deploy, system, address) = match request {
+        let (source, deploy, system, address) = match request {
             DeployReq::AgentsTeam {
                 id,
                 version,
                 address,
-                phlo_limit,
                 deploy,
             } => {
                 let agents_team = self
@@ -143,7 +160,12 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                     )
                     .await?
                     .context("agents team not found")?;
-                let graph = agents_team.graph.context("agents team has no graph")?;
+                let source = match agents_team.definition {
+                    Some(definition) => TeamSource::Workflow(definition),
+                    None => TeamSource::Graph(agents_team.graph.context(
+                        "agents team has neither a Workflow v2 definition nor a legacy graph",
+                    )?),
+                };
 
                 let system_code = RecordDeploy {
                     env_uri: self.uri.clone(),
@@ -155,8 +177,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 .render()?;
 
                 (
-                    graph,
-                    phlo_limit,
+                    source,
                     deploy,
                     Some(
                         prepare_for_signing()
@@ -167,27 +188,36 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                     Some(address),
                 )
             }
-            DeployReq::Graph {
-                graph,
-                phlo_limit,
-                deploy,
-            } => (graph, phlo_limit, deploy, None, None),
+            DeployReq::Graph { graph, deploy } => (TeamSource::Graph(graph), deploy, None, None),
         };
 
         let timestamp = deploy.timestamp;
 
-        let code = parse(&graph)?;
-        let agent_codes = self
-            .resolve_agent_codes(&code, address.as_ref(), agents)
-            .await?;
-        let code = render(code, deploy, &agent_codes)?;
+        let code = match source {
+            TeamSource::Graph(graph) => {
+                let graph_code = parse(&graph)?;
+                let agent_codes = self
+                    .resolve_agent_codes(&graph_code, address.as_ref(), agents)
+                    .await?;
+                render(graph_code, deploy, &agent_codes)?
+            }
+            TeamSource::Workflow(definition) => {
+                definition
+                    .parsed()
+                    .validate_publishable()
+                    .context("agents team workflow is not publishable")?;
+                let agent_codes = self
+                    .resolve_workflow_agent_codes(&definition, address.as_ref(), agents)
+                    .await?;
+                render_workflow(&definition, deploy, &agent_codes)?
+            }
+        };
 
         Ok(DeployResp {
             contract: prepare_for_signing()
                 .code(code)
                 .valid_after_block_number(valid_after)
                 .timestamp(timestamp)
-                .phlo_limit(phlo_limit)
                 .call(),
             system,
         })
@@ -203,23 +233,52 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         address: Option<&WalletAddress>,
         agents: &AgentsService<R, W, N>,
     ) -> anyhow::Result<AgentCodes> {
-        let refs = code.agent_refs();
-        if refs.is_empty() {
+        let references = code
+            .agent_refs()
+            .into_iter()
+            .map(|agent_ref| {
+                let name = code
+                    .agent_name(&agent_ref)
+                    .map_or_else(|| agent_ref.id.clone(), str::to_owned);
+                (agent_ref, name)
+            })
+            .collect();
+        self.resolve_named_agent_codes(references, address, agents)
+            .await
+    }
+
+    async fn resolve_workflow_agent_codes(
+        &self,
+        definition: &WorkflowDefinition,
+        address: Option<&WalletAddress>,
+        agents: &AgentsService<R, W, N>,
+    ) -> anyhow::Result<AgentCodes> {
+        let references = definition
+            .parsed()
+            .agent_references()
+            .into_iter()
+            .map(|((id, version), name)| (AgentRef { id, version }, name))
+            .collect();
+        self.resolve_named_agent_codes(references, address, agents)
+            .await
+    }
+
+    async fn resolve_named_agent_codes(
+        &self,
+        references: Vec<(AgentRef, String)>,
+        address: Option<&WalletAddress>,
+        agents: &AgentsService<R, W, N>,
+    ) -> anyhow::Result<AgentCodes> {
+        if references.is_empty() {
             return Ok(AgentCodes::default());
         }
 
         let address = address.context(
-            "this graph uses agent nodes, so it must be deployed by agents team id and version; \
+            "this workflow uses agent nodes, so it must be deployed by team id and version; \
              the raw graph deploy path carries no wallet address to resolve agents against",
         )?;
 
-        let fetched = try_join_all(refs.into_iter().map(|agent_ref| {
-            // Resolved before the async block so the error can name the agent the
-            // way its author does. A bare uuid pair tells the reader nothing about
-            // which node in their team is the problem.
-            let name = code
-                .agent_name(&agent_ref)
-                .map_or_else(|| agent_ref.id.clone(), str::to_owned);
+        let fetched = try_join_all(references.into_iter().map(|(agent_ref, name)| {
             async move {
                 // Reads that may trail a recent write go through the retrying
                 // variant: the observer lags the validator briefly after finalization.
@@ -289,15 +348,19 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
         let mut write_client = self.write_client.clone();
 
-        let deploy_id = write_client
+        let main_deploy_id = write_client
             .deploy_signed_contract(request.contract)
             .await?;
 
-        if let Some(system) = request.system {
-            write_client.deploy_signed_contract(system).await?;
+        // The client treats the returned id as the synchronization barrier. A
+        // named team deploy has a second, ordered metadata write that records
+        // its registry URI and last-deploy time. Returning the first id lets
+        // wait_for_sync finish while that observable projection is still old.
+        // Therefore the barrier is always the last submitted deploy.
+        match request.system {
+            Some(system) => write_client.deploy_signed_contract(system).await,
+            None => Ok(main_deploy_id),
         }
-
-        Ok(deploy_id)
     }
 }
 
@@ -306,7 +369,6 @@ mod tests {
     use std::collections::BTreeMap;
     use std::sync::Arc;
 
-    use aes_gcm::{Aes256Gcm, Key};
     use dashmap::DashMap;
     use firefly_client::models::SignedCode;
     use serde_json::json;
@@ -327,7 +389,16 @@ mod tests {
             write_client: write,
             read_client: read,
             observer_node_events: MockNodeEventSource::new(),
-            aes_encryption_key: *Key::<Aes256Gcm>::from_slice(&[42u8; 32]),
+            service_key: test_secret_key(),
+            aes_encryption_key: [42u8; 32].into(),
+            continuation_store: crate::domain::agents_teams::continuation_store::F1r3driveContinuationStore::open_for_test(
+                tempfile::tempdir().expect("temporary store").path(),
+                [7u8; 32],
+                [9u8; 32],
+            )
+            .expect("test continuation store"),
+            deploy_finalization_timeout: Duration::from_secs(5),
+            run_locks: Arc::new(DashMap::new()),
             firesky_accounts: Arc::new(DashMap::new()),
         }
     }
@@ -400,7 +471,7 @@ mod tests {
     }
 
     fn agent_json(code: serde_json::Value) -> serde_json::Value {
-        json!({
+        let mut agent = json!({
             "id": "agent-id",
             "version": "agent-version",
             "created_at": 0,
@@ -409,8 +480,10 @@ mod tests {
             "description": null,
             "shard": null,
             "logo": null,
-            "code": code,
-        })
+            "code": null,
+        });
+        agent["code"] = code;
+        agent
     }
 
     fn test_wallet_address() -> WalletAddress {
@@ -488,8 +561,9 @@ mod tests {
             .await
             .expect("deploy_signed_deploy should succeed");
 
-        // The returned deploy ID should be from the first (main) deploy
-        assert_eq!(deploy_id, main_id);
+        // The returned deploy ID is the final metadata write: clients use it
+        // as the barrier after which the named deployment must be observable.
+        assert_eq!(deploy_id, DeployId::from("system-deploy-id".to_owned()));
 
         // Both contracts should have been deployed in order
         let deployed = write.deployed_contracts();

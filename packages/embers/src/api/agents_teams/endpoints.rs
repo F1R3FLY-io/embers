@@ -18,8 +18,11 @@ use crate::api::agents_teams::models::{
     PublishToFireskyResp,
     PublishedState,
     ReferencingTeam,
+    RunCommandReq,
+    RunCommandResp,
     RunReq,
     RunResp,
+    RunState,
     SaveAgentsTeamReq,
     SaveAgentsTeamResp,
 };
@@ -158,7 +161,11 @@ impl AgentsTeamsApi {
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<Json<serde_json::Value>> {
         agents_teams
-            .deploy_signed_run_agents_team(body.request.into())
+            .deploy_signed_run_agents_team(models::DeploySignedRunReq {
+                contract: body.request.into(),
+                prepare_request: body.prepare_request.into(),
+                prepare_response: body.prepare_response.into(),
+            })
             .await
             .map(Json)
             .map_err(Into::into)
@@ -187,14 +194,69 @@ impl AgentsTeamsApi {
         SendRequest(body): SendRequest<DeploySignedRunOnFireskyReq, RunReq, RunResp>,
         Data(agents_teams): Data<&AgentsTeamsService>,
     ) -> poem::Result<()> {
-        agents_teams
-            .deploy_signed_run_on_firesky(models::DeploySignedRunOnFireskyReq {
-                contract: body.request.contract.into(),
-                agents_team: body.prepare_request.agents_team.into(),
+        Box::pin(
+            agents_teams.deploy_signed_run_on_firesky(models::DeploySignedRunOnFireskyReq {
+                agents_team: body.prepare_request.agents_team.clone().into(),
                 reply_to: body.request.reply_to.map(Into::into),
-            })
-            .await?;
+                run_id: body.prepare_response.run_id.clone(),
+                run: models::DeploySignedRunReq {
+                    contract: body.request.contract.into(),
+                    prepare_request: body.prepare_request.into(),
+                    prepare_response: body.prepare_response.into(),
+                },
+            }),
+        )
+        .await?;
         Ok(())
+    }
+
+    #[oai(path = "/runs/:run_id", method = "get")]
+    async fn get_run(
+        &self,
+        Path(run_id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> MaybeNotFound<RunState> {
+        agents_teams.get_run(run_id).await.into()
+    }
+
+    #[oai(path = "/runs/:run_id/commands/prepare", method = "post")]
+    async fn prepare_run_command(
+        &self,
+        Path(run_id): Path<String>,
+        Json(body): Json<RunCommandReq>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> poem::Result<Json<PrepareResponse<RunCommandResp>>> {
+        PrepareResponse::from_call(
+            body,
+            |body| async {
+                let request = body.into_domain(run_id)?;
+                agents_teams.prepare_run_command(request).await
+            },
+            encoding_key,
+        )
+        .await
+        .map(Json)
+        .map_err(Into::into)
+    }
+
+    #[oai(path = "/runs/:run_id/commands/send", method = "post")]
+    async fn send_run_command(
+        &self,
+        Path(run_id): Path<String>,
+        SendRequest(body): SendRequest<SignedContract, RunCommandReq, RunCommandResp>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> poem::Result<Json<serde_json::Value>> {
+        let prepare_request = body.prepare_request.into_domain(run_id)?;
+        agents_teams
+            .deploy_signed_run_command(models::DeploySignedRunCommandReq {
+                contract: body.request.into(),
+                prepare_request,
+                prepare_response: body.prepare_response.into(),
+            })
+            .await
+            .map(Json)
+            .map_err(Into::into)
     }
 
     #[oai(path = "/:id/save/prepare", method = "post")]

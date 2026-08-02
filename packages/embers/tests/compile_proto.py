@@ -9,9 +9,10 @@ ROOT = pathlib.Path(__file__).resolve().parent.parent.parent  # embers/packages
 # Proto definitions are sourced directly from the f1r3node-rust `models` subcrate
 # (the single source of truth) rather than being vendored into this repository,
 # which is error prone to keep in sync. Point F1R3NODE_MODELS_DIR at the `models`
-# subcrate of a f1r3node-rust checkout/worktree; the default assumes the
-# cost-accounting-transpiler worktree sits alongside this repository.
-DEFAULT_MODELS_DIR = ROOT.parent.parent / "f1r3node-rust-cost-accounting-transpiler" / "models"
+# subcrate of a f1r3node-rust checkout/worktree. The default is the stable
+# sibling selected by the local stack, so generated acceptance-test bindings
+# and the running node cannot silently drift to different protocol revisions.
+DEFAULT_MODELS_DIR = ROOT.parent.parent / "f1r3node-rust" / "models"
 MODELS_DIR = pathlib.Path(os.environ.get("F1R3NODE_MODELS_DIR", DEFAULT_MODELS_DIR)).resolve()
 
 PROTO_DIR = MODELS_DIR / "src" / "main" / "protobuf"
@@ -72,10 +73,19 @@ def compile_all():
     # (several files share the `casper` / `casper.v1` packages). `--no-project`
     # stops `uv` from trying to build this (non-package) project.
     cmd = [
-        "uv", "run", "--no-project", "--python", COMPILER_PYTHON,
-        "--with", "grpcio-tools", "--with", COMPILER_PLUGIN,
+        "uv",
+        "run",
+        "--no-project",
+        "--python",
+        COMPILER_PYTHON,
+        "--with",
+        "grpcio-tools",
+        "--with",
+        COMPILER_PLUGIN,
         "--",
-        "python", "-m", "grpc_tools.protoc",
+        "python",
+        "-m",
+        "grpc_tools.protoc",
         f"-I{PROTO_DIR}",
         f"-I{PROTO_INCLUDE_DIR}",
         f"--python_betterproto2_out={OUT_DIR}",

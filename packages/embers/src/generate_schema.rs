@@ -1,3 +1,8 @@
+#![allow(
+    dead_code,
+    reason = "the schema generator intentionally imports the complete API service graph"
+)]
+
 use poem_openapi::OpenApiService;
 
 use crate::api::agents::AgentsApi;

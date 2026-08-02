@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+use std::time::Duration;
+
 use anyhow::Context;
 use figment::Figment;
 use figment::providers::Env;
@@ -36,13 +39,70 @@ pub struct Config {
     pub testnet: TestNet,
     #[serde(deserialize_with = "deserialize_hex_key")]
     pub aes_encryption_key: [u8; 32],
+    pub continuation_store: ContinuationStore,
+    #[serde(default)]
+    pub finalization: Finalization,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Finalization {
+    #[serde(default = "default_deploy_timeout_millis")]
+    pub deploy_timeout_millis: u64,
+}
+
+impl Default for Finalization {
+    fn default() -> Self {
+        Self {
+            deploy_timeout_millis: default_deploy_timeout_millis(),
+        }
+    }
+}
+
+impl Finalization {
+    pub const fn deploy_timeout(&self) -> Duration {
+        Duration::from_millis(self.deploy_timeout_millis)
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContinuationStore {
+    pub mount_path: PathBuf,
+    #[serde(deserialize_with = "deserialize_hex_key")]
+    pub encryption_key: [u8; 32],
+    #[serde(deserialize_with = "deserialize_hex_key")]
+    pub capability_key: [u8; 32],
+    #[serde(default)]
+    pub max_object_bytes: Option<u64>,
+    #[serde(default = "default_recovery_poll_millis")]
+    pub recovery_poll_millis: u64,
+}
+
+const fn default_recovery_poll_millis() -> u64 {
+    1_000
+}
+
+const fn default_deploy_timeout_millis() -> u64 {
+    120_000
 }
 
 pub fn collect_config() -> anyhow::Result<Config> {
-    Figment::new()
+    let config: Config = Figment::new()
         .merge(Env::prefixed("EMBERS__").split("__"))
         .extract()
-        .context("failed to collect config")
+        .context("failed to collect config")?;
+    anyhow::ensure!(
+        config.continuation_store.encryption_key != config.continuation_store.capability_key,
+        "continuation encryption and capability keys must be independent"
+    );
+    anyhow::ensure!(
+        config.continuation_store.recovery_poll_millis > 0,
+        "continuation recovery poll interval must be positive"
+    );
+    anyhow::ensure!(
+        config.finalization.deploy_timeout_millis > 0,
+        "deploy finalization timeout must be positive"
+    );
+    Ok(config)
 }
 
 fn deserialize_hex_key<'de, D, const S: usize>(deserializer: D) -> Result<[u8; S], D::Error>
@@ -53,4 +113,16 @@ where
     let mut array = [0u8; S];
     hex::decode_to_slice(&s, &mut array).map_err(serde::de::Error::custom)?;
     Ok(array)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn finalization_default_is_load_tolerant() {
+        let policy = Finalization::default();
+
+        assert_eq!(policy.deploy_timeout(), Duration::from_mins(2));
+    }
 }

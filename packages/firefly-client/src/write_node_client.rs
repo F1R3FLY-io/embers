@@ -19,16 +19,12 @@ use crate::traits::WriteNode;
 
 /// Transport resilience settings for the deploy-service gRPC channel.
 ///
-/// These exist because a default `tonic::Endpoint` sets **none** of them, which
-/// made the client wedge permanently: with no HTTP/2 keep-alive, a half-open
-/// connection (NAT/conntrack eviction, container blip, peer restart without a
-/// clean FIN) is never detected, so the h2 connection never reports an error —
-/// and tonic's `Reconnect` only re-establishes on error. With no request
-/// deadline, calls on that dead connection hang forever. Because every clone of
-/// `Channel` shares one tower `Buffer` worker, a single hung call parks the
-/// worker and *every* caller stalls. That is exactly the observed failure: all
-/// `*/prepare` endpoints hung indefinitely while HTTP reads stayed fast, and
-/// only a process restart cleared it.
+/// A default `tonic::Endpoint` supplies no request deadline or TCP keepalive.
+/// Without those bounds, a half-open connection can park the shared tower
+/// buffer and stall every caller. Conversely, application-level HTTP/2 PINGs
+/// can falsely kill a healthy node whose runtime is busy processing blocks.
+/// The default policy therefore combines hard call deadlines, kernel TCP
+/// keepalive, and bounded retry of idempotent reads only.
 #[derive(Clone, Copy, Debug)]
 pub struct WriteNodeConfig {
     /// Hard deadline for any single call. Bounds queue-wait + connect + headers
@@ -72,30 +68,30 @@ impl Default for WriteNodeConfig {
             // failed repeatedly -- eleven consecutive requests died at exactly
             // 10.00s while the node was busy, and the same request succeeded
             // moments later -- so the deadline was rejecting a healthy node rather
-            // than catching a wedged one. A wedge is still caught: 20s is well
-            // inside the ~60s the keep-alive needs to notice a dead peer, and an
-            // unreachable node is refused by `connect_timeout` in 5s.
-            //
-            // Kept *below* the 30s a typical HTTP client allows, so that a caller
-            // waiting on one of these sees this client's diagnostic rather than its
-            // own timeout with nothing to say about the cause.
-            request_timeout: Duration::from_secs(20),
+            // than catching a wedged one. Sustained acceptance traffic later showed
+            // that even 20s can reject a healthy busy node. One attempt is therefore
+            // bounded at 30s; idempotent reads may make three attempts (under the
+            // API client's 120s budget), while writes remain single-attempt.
+            request_timeout: Duration::from_secs(30),
             // Must stay < request_timeout so a reconnect inside a request cannot
             // consume the whole budget.
             connect_timeout: Duration::from_secs(5),
-            // Generous on purpose: the node must ack these from its application
-            // task, and it can stall for seconds while processing a block. A dead
-            // peer is still detected within interval + timeout (~60s) and the
-            // channel then self-heals via tonic's `Reconnect`, while a merely-busy
-            // node is never torn down. (Measured: 10s/5s spuriously killed a
-            // healthy connection.)
-            http2_keep_alive_interval: Some(Duration::from_secs(30)),
-            keep_alive_timeout: Some(Duration::from_secs(30)),
+            // Do not use application-level h2 PINGs by default. Sustained local
+            // block processing delayed a healthy Rust node's ACK beyond even a
+            // 30s window, which tore down the shared channel and made unrelated
+            // prepare endpoints fail together. TCP keepalive is answered by the
+            // peer kernel, so it detects dead sockets without mistaking a busy
+            // node for a dead one; request deadlines bound active calls.
+            http2_keep_alive_interval: None,
+            keep_alive_timeout: None,
             keep_alive_while_idle: false,
             tcp_keepalive: Some(Duration::from_secs(20)),
         }
     }
 }
+
+const READ_ONLY_MAX_ATTEMPTS: usize = 3;
+const READ_ONLY_RETRY_DELAY: Duration = Duration::from_millis(250);
 
 #[derive(Clone)]
 pub struct WriteNodeClient {
@@ -180,32 +176,71 @@ impl WriteNodeClient {
             .map_err(|_| anyhow!("deploy service call timed out after {timeout:?}"))?
     }
 
+    /// Retry an idempotent node read within a finite budget. Deploy submissions
+    /// never use this path: retrying an ambiguous write could submit it twice.
+    async fn retry_read_only<T, F, Fut>(
+        operation: &'static str,
+        per_attempt_timeout: Duration,
+        max_attempts: usize,
+        retry_delay: Duration,
+        mut make_attempt: F,
+    ) -> anyhow::Result<T>
+    where
+        F: FnMut() -> Fut,
+        Fut: Future<Output = anyhow::Result<T>>,
+    {
+        anyhow::ensure!(max_attempts > 0, "read-only retry needs an attempt");
+        for attempt in 1..=max_attempts {
+            match Self::deadline(per_attempt_timeout, make_attempt()).await {
+                Ok(value) => return Ok(value),
+                Err(error) if attempt < max_attempts => {
+                    tracing::warn!(
+                        operation,
+                        attempt,
+                        max_attempts,
+                        error = %error,
+                        "transient deploy-service read failed; retrying"
+                    );
+                    let backoff_factor = u32::try_from(attempt)
+                        .context("read-only retry attempt exceeds the backoff range")?;
+                    tokio::time::sleep(retry_delay.saturating_mul(backoff_factor)).await;
+                }
+                Err(error) => {
+                    return Err(error).with_context(|| {
+                        format!("{operation} failed after {max_attempts} attempts")
+                    });
+                }
+            }
+        }
+        unreachable!("positive retry budget must return from the loop")
+    }
+
     pub async fn deploy(
         &mut self,
         key: &SecretKey,
         deploy_data: DeployData,
     ) -> anyhow::Result<DeployId> {
+        let valid_after_block_number = match deploy_data.valid_after_block_number {
+            ValidAfter::Head => self.get_head_block_index().await?,
+            ValidAfter::Index(index) => index,
+        };
         let timeout = self.request_timeout;
-        Self::deadline(timeout, self.deploy_inner(key, deploy_data)).await
+        Self::deadline(
+            timeout,
+            self.deploy_inner(key, deploy_data, valid_after_block_number),
+        )
+        .await
     }
 
     async fn deploy_inner(
         &mut self,
         key: &SecretKey,
         deploy_data: DeployData,
+        valid_after_block_number: u64,
     ) -> anyhow::Result<DeployId> {
-        let valid_after_block_number = match deploy_data.valid_after_block_number {
-            // `_inner`: the public caller already holds the single deadline for
-            // this whole call, so we must not nest a second one here.
-            ValidAfter::Head => self.get_head_block_index_inner().await?,
-            ValidAfter::Index(i) => i,
-        };
-
         let mut msg = DeployDataProto {
             term: deploy_data.term,
             timestamp: deploy_data.timestamp.timestamp_millis(),
-            phlo_price: 1,
-            phlo_limit: deploy_data.phlo_limit as _,
             valid_after_block_number: valid_after_block_number as _,
             shard_id: "root".into(),
             ..Default::default()
@@ -281,12 +316,24 @@ impl WriteNodeClient {
 
     pub async fn get_head_block_index(&mut self) -> anyhow::Result<u64> {
         let timeout = self.request_timeout;
-        Self::deadline(timeout, self.get_head_block_index_inner()).await
+        let deploy_client = self.deploy_client.clone();
+        Self::retry_read_only(
+            "show_main_chain",
+            timeout,
+            READ_ONLY_MAX_ATTEMPTS,
+            READ_ONLY_RETRY_DELAY,
+            move || {
+                let mut attempt_client = deploy_client.clone();
+                async move { Self::get_head_block_index_inner(&mut attempt_client).await }
+            },
+        )
+        .await
     }
 
-    async fn get_head_block_index_inner(&mut self) -> anyhow::Result<u64> {
-        let mut stream = self
-            .deploy_client
+    async fn get_head_block_index_inner(
+        deploy_client: &mut DeployServiceClient<Channel>,
+    ) -> anyhow::Result<u64> {
+        let mut stream = deploy_client
             .show_main_chain(BlocksQuery { depth: 1 })
             .await?
             .into_inner();
@@ -455,7 +502,6 @@ mod tests {
         let data = DeployData::builder("new Nil".into()).build();
 
         assert_eq!(data.term, "new Nil");
-        assert_eq!(data.phlo_limit, 5_000_000);
         assert!(matches!(data.valid_after_block_number, ValidAfter::Head));
         // Timestamp should be very close to now
         let diff = (data.timestamp - now).num_milliseconds().unsigned_abs();
@@ -471,13 +517,11 @@ mod tests {
             .unwrap()
             .to_utc();
         let data = DeployData::builder("code".into())
-            .phlo_limit(1_000_000)
             .timestamp(ts)
             .valid_after_block_number(ValidAfter::Index(42))
             .build();
 
         assert_eq!(data.term, "code");
-        assert_eq!(data.phlo_limit, 1_000_000);
         assert_eq!(data.timestamp, ts);
         assert!(matches!(
             data.valid_after_block_number,
@@ -531,6 +575,54 @@ mod tests {
         assert_eq!(result.expect("a fast call must not time out"), 42);
     }
 
+    #[tokio::test]
+    async fn read_only_retry_recovers_a_transient_transport_failure() {
+        let attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = attempts.clone();
+        let value = WriteNodeClient::retry_read_only(
+            "test-read",
+            Duration::from_secs(1),
+            3,
+            Duration::ZERO,
+            move || {
+                let attempt = observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                async move {
+                    if attempt == 0 {
+                        Err(anyhow::anyhow!("transient transport failure"))
+                    } else {
+                        Ok(42_u64)
+                    }
+                }
+            },
+        )
+        .await
+        .expect("the idempotent read should recover");
+
+        assert_eq!(value, 42);
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 2);
+    }
+
+    #[tokio::test]
+    async fn read_only_retry_is_bounded_and_preserves_context() {
+        let attempts = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = attempts.clone();
+        let error = WriteNodeClient::retry_read_only::<(), _, _>(
+            "test-read",
+            Duration::from_secs(1),
+            3,
+            Duration::ZERO,
+            move || {
+                observed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                async { Err(anyhow::anyhow!("still unavailable")) }
+            },
+        )
+        .await
+        .expect_err("the finite retry budget must be enforced");
+
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 3);
+        assert!(error.to_string().contains("failed after 3 attempts"));
+    }
+
     /// A peer that accepts TCP but never speaks HTTP/2 models the production
     /// wedge: the socket looks alive, so tonic's `Reconnect` never fires (it only
     /// re-establishes on a connection *error*), and with no deadline the call
@@ -578,7 +670,7 @@ mod tests {
         // cannot cover: queue-wait while the worker is head-of-line blocked, and
         // a streaming body that stalls after headers.
         let err = result.expect_err("a call to a peer that never speaks HTTP/2 must not hang");
-        let msg = err.to_string().to_lowercase();
+        let msg = format!("{err:#}").to_lowercase();
         assert!(
             msg.contains("timed out") || msg.contains("timeout"),
             "expected a timeout, got: {err}"
@@ -603,18 +695,10 @@ mod tests {
              inside a request cannot consume the whole budget"
         );
 
-        // Regression guard for a real mistake: a 10s interval with a 5s ack window
-        // was *measured* to spuriously kill a healthy connection against a live
-        // node (`KeepAliveTimedOut`). Unlike a TCP keepalive, which the peer's
-        // kernel answers, an h2 PING must be acked by the node's application task
-        // — which stalls for seconds while processing a block. The ack window must
-        // therefore tolerate a busy-but-alive node.
-        if let Some(ack_window) = config.keep_alive_timeout {
-            assert!(
-                ack_window >= Duration::from_secs(20),
-                "h2 PING ack window must tolerate a busy node; {ack_window:?} is too tight"
-            );
-        }
+        assert!(
+            config.http2_keep_alive_interval.is_none() && config.keep_alive_timeout.is_none(),
+            "application-level h2 pings can kill a busy healthy node and must remain opt-in"
+        );
 
         assert!(
             config.tcp_keepalive.is_some(),
