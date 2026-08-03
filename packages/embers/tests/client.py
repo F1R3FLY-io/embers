@@ -509,6 +509,7 @@ class AgentsTeamsApi:
         to_definition_hash: str | None = None,
         target_team_uri: str | None = None,
         state_patch: list[dict[str, Any]] | None = None,
+        expected_status: int = 200,
     ) -> Responce:
         prepare_request = {
             "expected_revision": str(expected_revision),
@@ -539,7 +540,7 @@ class AgentsTeamsApi:
                 "token": resp.json["token"],
             },
         )
-        assert resp_next.status == 200, resp_next.body
+        assert resp_next.status == expected_status, resp_next.body
         return resp_next
 
     def save(

@@ -161,9 +161,7 @@ fn canonical_run_events(
         _ => None,
     };
     if let Some(terminal_event) = terminal_event
-        && event_types
-            .last()
-            .is_none_or(|event| event != terminal_event)
+        && !event_types.iter().any(|event| event == terminal_event)
     {
         event_types.push(terminal_event.to_owned());
     }
@@ -178,11 +176,12 @@ fn canonical_run_events(
         .collect()
 }
 
-/// Compute the shortest order-preserving audit sequence using the rightmost
+/// Merge the protocol's two ordered audit sequences using the rightmost
 /// compatible occurrence as the anchor for repeated ledger events. Durable
 /// events between checkpoints precede later coordination-only ledger events;
 /// repeated command claims therefore align with the successful, latest claim
-/// rather than an earlier rejected attempt.
+/// rather than an earlier rejected attempt. Both inputs remain subsequences of
+/// the result even if a legacy record lacks an expected common anchor.
 fn merge_event_sequences(durable: &[String], on_chain: &[String]) -> Vec<String> {
     let mut matches = Vec::new();
     let mut on_chain_end = on_chain.len();
@@ -315,6 +314,45 @@ mod tests {
                 .iter()
                 .enumerate()
                 .all(|(sequence, event)| event.sequence == sequence as u64)
+        );
+    }
+
+    #[test]
+    fn suspended_status_does_not_duplicate_an_earlier_suspension_event() {
+        let mut continuation = continuation();
+        continuation.record_public_event("runSuspended");
+        let events = canonical_run_events(
+            &continuation,
+            &[
+                RunEvent {
+                    sequence: 0,
+                    event_type: "runStarted".to_owned(),
+                },
+                RunEvent {
+                    sequence: 1,
+                    event_type: "runSuspended".to_owned(),
+                },
+                RunEvent {
+                    sequence: 2,
+                    event_type: "commandClaimed".to_owned(),
+                },
+                RunEvent {
+                    sequence: 3,
+                    event_type: "commandRejected".to_owned(),
+                },
+            ],
+            "suspended",
+        );
+        assert_eq!(
+            events
+                .iter()
+                .filter(|event| event.event_type == "runSuspended")
+                .count(),
+            1
+        );
+        assert_eq!(
+            events.last().map(|event| event.event_type.as_str()),
+            Some("commandRejected")
         );
     }
 }

@@ -301,7 +301,15 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .wait_for_deploy(&deploy_id, self.deploy_finalization_timeout)
             .await
         {
-            Some(false) => Ok(()),
+            Some(false) => {
+                self.wait_for_run_state(run_id, "cleared command", |run| {
+                    run.revision == expected_revision
+                        && run.status == "suspended"
+                        && run.command_id.is_none()
+                })
+                .await?;
+                Ok(())
+            }
             Some(true) => bail!("command clear deploy {deploy_id} errored on chain"),
             None => bail!("command clear deploy {deploy_id} was not finalized"),
         }

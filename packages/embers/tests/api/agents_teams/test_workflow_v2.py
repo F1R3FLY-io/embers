@@ -438,6 +438,21 @@ def test_authenticated_approval_and_rejection_route_end_to_end(
     ).json
     assert approved["disposition"] == "suspended"
     assert len(approved["waits"]) == 1
+    invalid_result = client.agents_teams.run_command(
+        funded_wallet,
+        approved["runId"],
+        expected_revision=approved["revision"],
+        command_type="signal",
+        wait_id=approved["waits"][0]["id"],
+        name="not-an-approval",
+        payload={"decision": "invalid"},
+        expected_status=500,
+    )
+    assert "approval" in invalid_result.body.lower()
+    after_invalid = client.agents_teams.get_run(approved["runId"]).json
+    assert after_invalid["status"] == "suspended"
+    assert [event["event_type"] for event in after_invalid["events"]].count("runSuspended") == 1
+
     approved_result = client.agents_teams.run_command(
         funded_wallet,
         approved["runId"],
@@ -451,6 +466,16 @@ def test_authenticated_approval_and_rejection_route_end_to_end(
     approved_run = client.agents_teams.get_run(approved["runId"]).json
     assert approved_run["status"] == "completed"
     assert any(event["event_type"] == "approvalRecorded" for event in approved_run["events"])
+    approved_event_types = [event["event_type"] for event in approved_run["events"]]
+    cursor = -1
+    for expected_event in [
+        "commandClaimed",
+        "commandRejected",
+        "commandClaimed",
+        "approvalRecorded",
+        "runCompleted",
+    ]:
+        cursor = approved_event_types.index(expected_event, cursor + 1)
 
     rejected = client.agents_teams.run(
         funded_wallet,
