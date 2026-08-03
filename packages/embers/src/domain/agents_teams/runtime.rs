@@ -407,13 +407,24 @@ impl ContinuationEnvelope {
             } => {
                 let wait = self.snapshot_wait(&wait_id)?;
                 ensure!(
-                    matches!(wait.kind, SuspensionKind::Timer | SuspensionKind::Retry),
-                    "wait {wait_id} is not a timer"
+                    matches!(
+                        wait.kind,
+                        SuspensionKind::Timer
+                            | SuspensionKind::Retry
+                            | SuspensionKind::Approval
+                            | SuspensionKind::DurableYield
+                    ),
+                    "wait {wait_id} does not accept timerFired"
                 );
                 let deadline = wait.due_at.context("timer has no deadline")?;
                 ensure!(deadline == expected_deadline, "timer deadline mismatch");
                 ensure!(now >= deadline, "timer fired before its deadline");
-                self.resume_wait(wait, Value::Null, "completed");
+                let disposition = if matches!(wait.kind, SuspensionKind::Approval) {
+                    "timedOut"
+                } else {
+                    "completed"
+                };
+                self.resume_wait(wait, Value::Null, disposition);
             }
             ResumeCommand::Approve {
                 wait_id,
@@ -501,7 +512,8 @@ impl ContinuationEnvelope {
         Ok(())
     }
 
-    /// Finds the earliest timer/retry that is eligible at `now`, preserving
+    /// Finds the earliest scheduler-fireable wait — a timer, retry, approval
+    /// deadline, or durable yield — that is eligible at `now`, preserving
     /// every nested execution prefix required to route the command back to the
     /// exact child continuation. Ordering by wait identity breaks equal-time
     /// ties deterministically across map traversal and process restarts.
@@ -509,7 +521,15 @@ impl ContinuationEnvelope {
         let local = self
             .pending_waits
             .values()
-            .filter(|wait| matches!(wait.kind, SuspensionKind::Timer | SuspensionKind::Retry))
+            .filter(|wait| {
+                matches!(
+                    wait.kind,
+                    SuspensionKind::Timer
+                        | SuspensionKind::Retry
+                        | SuspensionKind::Approval
+                        | SuspensionKind::DurableYield
+                )
+            })
             .filter_map(|wait| {
                 wait.due_at
                     .filter(|deadline| *deadline <= now)
@@ -542,7 +562,10 @@ impl ContinuationEnvelope {
             token.value = payload;
         }
         disposition.clone_into(&mut token.disposition);
-        token.phase = if matches!(wait.kind, SuspensionKind::Retry) {
+        token.phase = if matches!(
+            wait.kind,
+            SuspensionKind::Retry | SuspensionKind::DurableYield
+        ) {
             TokenPhase::Enter
         } else {
             TokenPhase::Route
@@ -701,7 +724,7 @@ impl ContinuationEnvelope {
             match token.phase {
                 TokenPhase::Enter => self.enter_node(definition, token, now)?,
                 TokenPhase::Route => {
-                    if !self.route_token(definition, &mut token)? {
+                    if !self.route_token(definition, &mut token, now)? {
                         self.queue.push_front(token);
                         break;
                     }
@@ -1195,7 +1218,12 @@ impl ContinuationEnvelope {
         Ok(Some(merged))
     }
 
-    fn route_token(&mut self, definition: &Definition, token: &mut Token) -> anyhow::Result<bool> {
+    fn route_token(
+        &mut self,
+        definition: &Definition,
+        token: &mut Token,
+        now: DateTime<Utc>,
+    ) -> anyhow::Result<bool> {
         let node = definition
             .nodes
             .get(&token.node_id)
@@ -1334,6 +1362,7 @@ impl ContinuationEnvelope {
                     LoopPolicy::Durable { .. } => {
                         child.node_id.clone_from(&transition.target_node_id);
                         child.phase = TokenPhase::Enter;
+                        child.joined = false;
                         child.source_transition_id = Some(transition.id.clone());
                         child.source_label.clone_from(&node.label);
                         let wait_id = format!("yield:{}:{}", child.id, transition.id);
@@ -1344,7 +1373,7 @@ impl ContinuationEnvelope {
                                 node_id: node.id.clone(),
                                 kind: SuspensionKind::DurableYield,
                                 signal: None,
-                                due_at: None,
+                                due_at: Some(now),
                                 token: child,
                                 approval: None,
                             },
@@ -3134,6 +3163,357 @@ mod tests {
                 ),
                 due_at,
             ))
+        );
+    }
+
+    #[test]
+    fn durable_yield_parks_with_due_now_and_resumes_via_timer_fired_in_enter_phase() {
+        let definition = definition(
+            json!({
+                "in":{"id":"in","label":"Input","scopeId":"root","kind":"input"},
+                "act":{"id":"act","label":"Act","scopeId":"root","kind":"activity","activity":{"kind":"builtin","name":"compress"}},
+                "out":{"id":"out","label":"Output","scopeId":"root","kind":"output"}
+            }),
+            json!({
+                "start":{"id":"start","mode":"allMatches","noMatch":"fail"},
+                "route":{"id":"route","mode":"allMatches","noMatch":"fail"}
+            }),
+            json!({
+                "start":{"id":"start","sourceNodeId":"in","targetNodeId":"act","trigger":"completed","priority":0,"routeGroupId":"start"},
+                "again":{"id":"again","sourceNodeId":"act","targetNodeId":"act","trigger":"completed","priority":0,"routeGroupId":"route",
+                         "loop":{"durableYield":true},
+                         "guard":{"kind":"compare","left":{"kind":"path","root":"output","path":["counter"]},"operator":"lt","right":{"kind":"literal","value":3}}},
+                "done":{"id":"done","sourceNodeId":"act","targetNodeId":"out","trigger":"completed","priority":1,"routeGroupId":"route",
+                        "guard":{"kind":"compare","left":{"kind":"path","root":"output","path":["counter"]},"operator":"ge","right":{"kind":"literal","value":3}}}
+            }),
+        );
+        definition
+            .parsed()
+            .validate_publishable()
+            .expect("definition should be publishable");
+        let now = DateTime::<Utc>::UNIX_EPOCH;
+        let mut continuation = ContinuationEnvelope::start(
+            definition.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            definition.definition_hash(),
+            json!({"topic":"loop"}),
+        )
+        .expect("continuation should start");
+
+        let mut counter = 0i64;
+        loop {
+            let KernelOutcome::Effects(requests) = continuation
+                .run_until_blocked(definition.parsed(), now)
+                .expect("kernel should request the activity")
+            else {
+                panic!("expected an activity effect request")
+            };
+            let request = requests.first().expect("one effect request");
+            assert_eq!(
+                request.node_id, "act",
+                "every iteration re-enters the target activity"
+            );
+            counter += 1;
+            continuation
+                .apply_effect_observation(
+                    observation(request, json!({"counter": counter}), "completed", now),
+                    now,
+                )
+                .expect("observation should apply");
+            if counter >= 3 {
+                break;
+            }
+
+            let KernelOutcome::Suspended(waits) = continuation
+                .run_until_blocked(definition.parsed(), now)
+                .expect("kernel should park the durable yield")
+            else {
+                panic!("expected a durable-yield suspension")
+            };
+            let wait = waits.first().expect("one yield wait");
+            assert!(wait.id.starts_with("yield:"), "wait id is {}", wait.id);
+            assert!(matches!(wait.kind, SuspensionKind::DurableYield));
+            let due = wait.due_at.expect("durable yields now carry a deadline");
+            assert_eq!(due, now, "the yield deadline is the park instant");
+            assert_eq!(
+                continuation.earliest_due_timer(now),
+                Some((wait.id.clone(), due)),
+                "the scheduler search finds the yield"
+            );
+
+            let mismatched = continuation.apply_command(
+                ResumeCommand::TimerFired {
+                    run_id: "run".into(),
+                    wait_id: wait.id.clone(),
+                    expected_deadline: due + chrono::Duration::seconds(1),
+                },
+                "scheduler",
+                due,
+            );
+            assert!(
+                mismatched
+                    .expect_err("mismatched deadline must be rejected")
+                    .to_string()
+                    .contains("timer deadline mismatch")
+            );
+            let early = continuation.apply_command(
+                ResumeCommand::TimerFired {
+                    run_id: "run".into(),
+                    wait_id: wait.id.clone(),
+                    expected_deadline: due,
+                },
+                "scheduler",
+                due - chrono::Duration::milliseconds(1),
+            );
+            assert!(
+                early
+                    .expect_err("early fire must be rejected")
+                    .to_string()
+                    .contains("timer fired before its deadline")
+            );
+            continuation
+                .apply_command(
+                    ResumeCommand::TimerFired {
+                        run_id: "run".into(),
+                        wait_id: wait.id.clone(),
+                        expected_deadline: due,
+                    },
+                    "scheduler",
+                    due,
+                )
+                .expect("the due yield should resume");
+            let tail = continuation
+                .events
+                .iter()
+                .rev()
+                .take(2)
+                .map(|event| event.event_type.as_str())
+                .collect::<Vec<_>>();
+            assert_eq!(tail, ["runResumed", "waitSatisfied"]);
+        }
+
+        assert!(matches!(
+            continuation
+                .run_until_blocked(definition.parsed(), now)
+                .expect("kernel should complete"),
+            KernelOutcome::Completed(value) if value == json!({"counter": 3})
+        ));
+        let scheduler_events = continuation
+            .events
+            .iter()
+            .filter(|event| {
+                matches!(
+                    event.event_type.as_str(),
+                    "durableYield" | "waitSatisfied" | "runResumed"
+                )
+            })
+            .map(|event| event.event_type.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            scheduler_events,
+            [
+                "durableYield",
+                "waitSatisfied",
+                "runResumed",
+                "durableYield",
+                "waitSatisfied",
+                "runResumed"
+            ],
+            "each iteration parks and resumes exactly once"
+        );
+    }
+
+    fn approval_deadline_definition() -> WorkflowDefinition {
+        definition(
+            json!({
+                "in":{"id":"in","label":"Input","scopeId":"root","kind":"input"},
+                "gate":{"id":"gate","label":"Gate","scopeId":"root","kind":"approval","policyId":"owner","quorum":1,"approvers":["alice"],
+                        "policy":{"timeout":{"afterMillis":1000}}},
+                "out-ok":{"id":"out-ok","label":"Approved","scopeId":"root","kind":"output"},
+                "out-rej":{"id":"out-rej","label":"Rejected","scopeId":"root","kind":"output"},
+                "out-late":{"id":"out-late","label":"TimedOut","scopeId":"root","kind":"output"}
+            }),
+            json!({
+                "start":{"id":"start","mode":"allMatches","noMatch":"fail"},
+                "ok":{"id":"ok","mode":"allMatches","noMatch":"fail"},
+                "rej":{"id":"rej","mode":"allMatches","noMatch":"fail"},
+                "late":{"id":"late","mode":"allMatches","noMatch":"fail"}
+            }),
+            json!({
+                "start":{"id":"start","sourceNodeId":"in","targetNodeId":"gate","trigger":"completed","priority":0,"routeGroupId":"start"},
+                "ok":{"id":"ok","sourceNodeId":"gate","targetNodeId":"out-ok","trigger":"completed","priority":0,"routeGroupId":"ok"},
+                "rej":{"id":"rej","sourceNodeId":"gate","targetNodeId":"out-rej","trigger":"rejected","priority":0,"routeGroupId":"rej"},
+                "late":{"id":"late","sourceNodeId":"gate","targetNodeId":"out-late","trigger":"timedOut","priority":0,"routeGroupId":"late"}
+            }),
+        )
+    }
+
+    #[test]
+    fn approval_deadline_expiry_resumes_timed_out_and_rejects_late_decisions() {
+        let definition = approval_deadline_definition();
+        definition
+            .parsed()
+            .validate_publishable()
+            .expect("definition should be publishable");
+        let now = DateTime::<Utc>::UNIX_EPOCH;
+        let mut continuation = ContinuationEnvelope::start(
+            definition.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            definition.definition_hash(),
+            json!("value"),
+        )
+        .expect("continuation should start");
+        let KernelOutcome::Suspended(waits) = continuation
+            .run_until_blocked(definition.parsed(), now)
+            .expect("kernel should suspend")
+        else {
+            panic!("expected the approval suspension")
+        };
+        let wait = waits.first().expect("one approval wait");
+        assert!(matches!(wait.kind, SuspensionKind::Approval));
+        let due = wait.due_at.expect("the timeout policy sets a deadline");
+        assert_eq!(due, now + chrono::Duration::milliseconds(1000));
+        assert_eq!(
+            continuation.earliest_due_timer(due),
+            Some((wait.id.clone(), due)),
+            "the scheduler search finds the approval deadline"
+        );
+
+        continuation
+            .apply_command(
+                ResumeCommand::TimerFired {
+                    run_id: "run".into(),
+                    wait_id: wait.id.clone(),
+                    expected_deadline: due,
+                },
+                "scheduler",
+                due,
+            )
+            .expect("the expired approval should time out");
+        assert!(
+            continuation
+                .events
+                .iter()
+                .all(|event| event.event_type != "approvalRecorded"),
+            "a timeout is not an approval decision"
+        );
+        assert!(matches!(
+            continuation
+                .run_until_blocked(definition.parsed(), due)
+                .expect("kernel should complete via the timedOut route"),
+            KernelOutcome::Completed(_)
+        ));
+        assert!(
+            continuation
+                .events
+                .iter()
+                .any(|event| event.event_type == "nodeEntered"
+                    && event.node_id.as_deref() == Some("out-late")),
+            "the timedOut trigger routes to the late branch"
+        );
+
+        let late_approve = continuation.apply_command(
+            ResumeCommand::Approve {
+                run_id: "run".into(),
+                wait_id: wait.id.clone(),
+                decision_id: "d1".into(),
+                payload: Value::Null,
+            },
+            "alice",
+            due,
+        );
+        assert!(
+            late_approve
+                .expect_err("a decision after expiry must fail")
+                .to_string()
+                .contains("is not pending")
+        );
+        let late_reject = continuation.apply_command(
+            ResumeCommand::Reject {
+                run_id: "run".into(),
+                wait_id: wait.id.clone(),
+                payload: Value::Null,
+            },
+            "alice",
+            due,
+        );
+        assert!(
+            late_reject
+                .expect_err("a rejection after expiry must fail")
+                .to_string()
+                .contains("is not pending")
+        );
+    }
+
+    #[test]
+    fn approval_quorum_before_deadline_still_completes_and_late_timer_fire_is_rejected() {
+        let definition = approval_deadline_definition();
+        let now = DateTime::<Utc>::UNIX_EPOCH;
+        let mut continuation = ContinuationEnvelope::start(
+            definition.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            definition.definition_hash(),
+            json!("value"),
+        )
+        .expect("continuation should start");
+        let KernelOutcome::Suspended(waits) = continuation
+            .run_until_blocked(definition.parsed(), now)
+            .expect("kernel should suspend")
+        else {
+            panic!("expected the approval suspension")
+        };
+        let wait = waits.first().expect("one approval wait");
+        let due = wait.due_at.expect("the timeout policy sets a deadline");
+
+        continuation
+            .apply_command(
+                ResumeCommand::Approve {
+                    run_id: "run".into(),
+                    wait_id: wait.id.clone(),
+                    decision_id: "d1".into(),
+                    payload: Value::Null,
+                },
+                "alice",
+                now,
+            )
+            .expect("the quorum decision should resume the run");
+        assert!(
+            continuation
+                .events
+                .iter()
+                .any(|event| event.event_type == "approvalRecorded")
+        );
+        assert!(matches!(
+            continuation
+                .run_until_blocked(definition.parsed(), now)
+                .expect("kernel should complete via the approved route"),
+            KernelOutcome::Completed(_)
+        ));
+        assert!(
+            continuation
+                .events
+                .iter()
+                .any(|event| event.event_type == "nodeEntered"
+                    && event.node_id.as_deref() == Some("out-ok"))
+        );
+
+        let stale_fire = continuation.apply_command(
+            ResumeCommand::TimerFired {
+                run_id: "run".into(),
+                wait_id: wait.id.clone(),
+                expected_deadline: due,
+            },
+            "scheduler",
+            due,
+        );
+        assert!(
+            stale_fire
+                .expect_err("the resolved approval's deadline must not fire")
+                .to_string()
+                .contains("is not pending")
         );
     }
 }

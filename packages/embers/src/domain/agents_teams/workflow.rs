@@ -179,6 +179,16 @@ impl Definition {
                         quorum,
                         node.id
                     );
+                    if node.policy.timeout.is_some() {
+                        ensure!(
+                            self.transitions.values().any(|transition| {
+                                transition.source_node_id == node.id
+                                    && transition.trigger == "timedOut"
+                            }),
+                            "approval node {} declares a timeout but no timedOut route",
+                            node.id
+                        );
+                    }
                 }
                 NodeKind::Wait {
                     wait_for,
@@ -1591,5 +1601,74 @@ mod tests {
                 .any(|cause| cause.to_string().contains("rho:id:")),
             "unexpected validation error: {error:#}"
         );
+    }
+
+    #[test]
+    fn approvals_with_timeouts_must_route_timed_out() {
+        let approval_document = |gate_policy: serde_json::Value,
+                                 transitions: serde_json::Value,
+                                 groups: serde_json::Value| {
+            json!({
+                "schemaVersion": "2.0",
+                "entryScopeId": "root",
+                "interface": { "inputs": {"input": {"kind": "string"}}, "outputs": {"output": {"kind": "legacy"}} },
+                "nodes": {
+                    "in": {"id":"in", "label":"Input", "scopeId":"root", "kind":"input"},
+                    "gate": {"id":"gate", "label":"Gate", "scopeId":"root", "kind":"approval",
+                             "policyId":"owner", "quorum":1, "approvers":["alice"], "policy": gate_policy},
+                    "out": {"id":"out", "label":"Output", "scopeId":"root", "kind":"output"},
+                    "late": {"id":"late", "label":"Late", "scopeId":"root", "kind":"output"}
+                },
+                "policies": {"defaultExecution":"auto", "visibility":"private"},
+                "presentation": {"edges": {}, "nodes": {}},
+                "routeGroups": groups,
+                "scopes": {"root": {"id":"root", "label":"Root", "kind":"root", "initialNodeIds":["in"], "entryActivities":[], "exitActivities":[], "history":"none"}},
+                "transitions": transitions,
+                "types": {}
+            })
+        };
+        let base_groups = json!({
+            "start": {"id":"start", "mode":"allMatches", "noMatch":"fail"},
+            "ok": {"id":"ok", "mode":"allMatches", "noMatch":"fail"}
+        });
+        let base_transitions = json!({
+            "start": {"id":"start", "sourceNodeId":"in", "targetNodeId":"gate", "trigger":"completed", "priority":0, "routeGroupId":"start"},
+            "ok": {"id":"ok", "sourceNodeId":"gate", "targetNodeId":"out", "trigger":"completed", "priority":0, "routeGroupId":"ok"}
+        });
+
+        let unrouted = WorkflowDefinition::new(approval_document(
+            json!({"timeout": {"afterMillis": 1000}}),
+            base_transitions.clone(),
+            base_groups.clone(),
+        ))
+        .expect("timeout without a timedOut route is still a valid draft");
+        assert!(
+            unrouted
+                .parsed()
+                .validate_publishable()
+                .expect_err("a declared timeout must route timedOut")
+                .to_string()
+                .contains("declares a timeout but no timedOut route")
+        );
+
+        let mut routed_transitions = base_transitions.clone();
+        routed_transitions["late"] = json!({"id":"late", "sourceNodeId":"gate", "targetNodeId":"late", "trigger":"timedOut", "priority":0, "routeGroupId":"late"});
+        let mut routed_groups = base_groups.clone();
+        routed_groups["late"] = json!({"id":"late", "mode":"allMatches", "noMatch":"fail"});
+        WorkflowDefinition::new(approval_document(
+            json!({"timeout": {"afterMillis": 1000}}),
+            routed_transitions,
+            routed_groups,
+        ))
+        .expect("routed timeout is a valid draft")
+        .parsed()
+        .validate_publishable()
+        .expect("a timeout with a timedOut route is publishable");
+
+        WorkflowDefinition::new(approval_document(json!({}), base_transitions, base_groups))
+            .expect("timeout-free approval is a valid draft")
+            .parsed()
+            .validate_publishable()
+            .expect("an approval without a timeout needs no timedOut route");
     }
 }

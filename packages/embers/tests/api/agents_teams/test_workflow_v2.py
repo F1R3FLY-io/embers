@@ -8,6 +8,8 @@ fan-out, correlated all-join fan-in, and a bounded back-edge whose
 ``iterationLimit`` disposition exits the cycle.
 """
 
+import time
+
 from datetime import UTC, datetime
 from typing import Any
 
@@ -496,3 +498,193 @@ def test_authenticated_approval_and_rejection_route_end_to_end(
     rejected_run = client.agents_teams.get_run(rejected["runId"]).json
     assert rejected_run["status"] == "completed"
     assert rejected_run["wait_ids"] == []
+
+
+def poll_run_until(
+    client: ApiClient,
+    run_id: str,
+    statuses: set[str],
+    timeout_seconds: float = 180.0,
+) -> dict[str, Any]:
+    """Poll the run inspector until the run reaches one of ``statuses``."""
+    deadline = time.monotonic() + timeout_seconds
+    run = client.agents_teams.get_run(run_id).json
+    while run["status"] not in statuses:
+        assert time.monotonic() < deadline, (
+            f"run {run_id} stayed {run['status']!r}; events: "
+            f"{[event['event_type'] for event in run['events']]}"
+        )
+        time.sleep(2.0)
+        run = client.agents_teams.get_run(run_id).json
+    return run
+
+
+DURABLE_YIELD_WORKFLOW_V2 = {
+    **SIGNAL_WAIT_WORKFLOW_V2,
+    "nodes": {
+        "input": {"id": "input", "label": "Input", "scopeId": "root", "kind": "input"},
+        "gate": {"id": "gate", "label": "Gate", "scopeId": "root", "kind": "gateway"},
+        "output": {"id": "output", "label": "Output", "scopeId": "root", "kind": "output"},
+    },
+    "routeGroups": {
+        "to-gate": {"id": "to-gate", "mode": "allMatches", "noMatch": "fail"},
+        "to-output": {"id": "to-output", "mode": "allMatches", "noMatch": "fail"},
+    },
+    "transitions": {
+        "input-gate": {
+            "id": "input-gate",
+            "sourceNodeId": "input",
+            "targetNodeId": "gate",
+            "trigger": "completed",
+            "priority": 0,
+            "routeGroupId": "to-gate",
+        },
+        "gate-output": {
+            "id": "gate-output",
+            "sourceNodeId": "gate",
+            "targetNodeId": "output",
+            "trigger": "completed",
+            "priority": 0,
+            "routeGroupId": "to-output",
+            "loop": {"durableYield": True},
+        },
+    },
+}
+
+
+@pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
+def test_durable_yield_auto_resumes_via_scheduler(client: ApiClient, funded_wallet: Wallet):
+    created = client.agents_teams.create(
+        funded_wallet,
+        name="workflow-v2-durable-yield-acceptance",
+        definition=DURABLE_YIELD_WORKFLOW_V2,
+    ).wait_for_sync()
+    team = AgentsTeam(
+        id=created.first.json["response"]["id"],
+        version=created.first.json["response"]["version"],
+        name="workflow-v2-durable-yield-acceptance",
+        definition=DURABLE_YIELD_WORKFLOW_V2,
+    )
+
+    client.agents_teams.deploy(
+        funded_wallet,
+        agents_team=team,
+        deploy=insert_signed_deploy(
+            SECP256k1.generate(),
+            datetime.now(UTC),
+            funded_wallet,
+            version=0,
+        ),
+    ).wait_for_sync()
+    deployed = client.agents_teams.get(funded_wallet.address, team.id, team.version).json
+
+    suspended = client.agents_teams.run(
+        funded_wallet,
+        "yield-then-continue",
+        agents_team=deployed["uri"],
+    ).json
+    assert suspended["disposition"] == "suspended"
+    assert len(suspended["waits"]) == 1
+    assert suspended["waits"][0]["id"].startswith("yield:")
+
+    parked = client.agents_teams.get_run(suspended["runId"]).json
+    assert parked["due_at"] is not None, "a durable yield publishes its resume deadline"
+
+    completed = poll_run_until(client, suspended["runId"], {"completed", "failed", "cancelled"})
+    assert completed["status"] == "completed", (
+        f"scheduler auto-resume should complete the run; events: "
+        f"{[event['event_type'] for event in completed['events']]}"
+    )
+    assert completed["wait_ids"] == []
+    event_types = [event["event_type"] for event in completed["events"]]
+    cursor = -1
+    for expected_event in ["durableYield", "waitSatisfied", "runResumed", "runCompleted"]:
+        cursor = event_types.index(expected_event, cursor + 1)
+
+
+def approval_timeout_workflow_v2(approver: str) -> dict[str, Any]:
+    """An approval workflow whose deadline must fire the timedOut route."""
+    workflow = approval_workflow_v2(approver)
+    workflow["nodes"]["approval"]["policy"] = {"timeout": {"afterMillis": 5000}}
+    workflow["nodes"]["timed-out"] = {
+        "id": "timed-out",
+        "label": "Timed out",
+        "scopeId": "root",
+        "kind": "output",
+    }
+    workflow["routeGroups"]["timed-out"] = {
+        "id": "timed-out",
+        "mode": "allMatches",
+        "noMatch": "fail",
+    }
+    workflow["transitions"]["approval-timed-out"] = {
+        "id": "approval-timed-out",
+        "sourceNodeId": "approval",
+        "targetNodeId": "timed-out",
+        "trigger": "timedOut",
+        "priority": 0,
+        "routeGroupId": "timed-out",
+    }
+    return workflow
+
+
+@pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
+def test_approval_deadline_times_out_and_rejects_late_approval(
+    client: ApiClient,
+    funded_wallet: Wallet,
+):
+    workflow = approval_timeout_workflow_v2(funded_wallet.address)
+    created = client.agents_teams.create(
+        funded_wallet,
+        name="workflow-v2-approval-timeout-acceptance",
+        definition=workflow,
+    ).wait_for_sync()
+    team = AgentsTeam(
+        id=created.first.json["response"]["id"],
+        version=created.first.json["response"]["version"],
+        name="workflow-v2-approval-timeout-acceptance",
+        definition=workflow,
+    )
+
+    client.agents_teams.deploy(
+        funded_wallet,
+        agents_team=team,
+        deploy=insert_signed_deploy(
+            SECP256k1.generate(),
+            datetime.now(UTC),
+            funded_wallet,
+            version=0,
+        ),
+    ).wait_for_sync()
+    deployed = client.agents_teams.get(funded_wallet.address, team.id, team.version).json
+
+    suspended = client.agents_teams.run(
+        funded_wallet,
+        "await-expiry",
+        agents_team=deployed["uri"],
+    ).json
+    assert suspended["disposition"] == "suspended"
+    assert len(suspended["waits"]) == 1
+
+    timed_out = poll_run_until(client, suspended["runId"], {"completed", "failed", "cancelled"})
+    assert timed_out["status"] == "completed", (
+        f"the expired deadline should route timedOut to completion; events: "
+        f"{[event['event_type'] for event in timed_out['events']]}"
+    )
+    event_types = [event["event_type"] for event in timed_out["events"]]
+    assert "approvalRecorded" not in event_types, "a timeout is not an approval decision"
+    cursor = -1
+    for expected_event in ["approvalRequired", "waitSatisfied", "runResumed", "runCompleted"]:
+        cursor = event_types.index(expected_event, cursor + 1)
+
+    late = client.agents_teams.run_command(
+        funded_wallet,
+        suspended["runId"],
+        expected_revision=timed_out["revision"],
+        command_type="approve",
+        wait_id=suspended["waits"][0]["id"],
+        decision_id="live-decision-late",
+        payload={"decision": "too-late"},
+        expected_status=500,
+    )
+    assert "not" in late.body.lower() and "pending" in late.body.lower()
