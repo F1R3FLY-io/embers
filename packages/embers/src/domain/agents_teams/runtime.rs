@@ -1035,6 +1035,7 @@ impl ContinuationEnvelope {
             .map(|history| history.active_node_ids.clone())
             .filter(|targets| !targets.is_empty())
             .unwrap_or_else(|| scope.initial_node_ids.clone());
+        self.adjust_scope_fanout(token, targets.len());
         for (index, target) in targets.into_iter().enumerate() {
             let mut restored = if index == 0 {
                 token.clone()
@@ -3515,5 +3516,148 @@ mod tests {
                 .to_string()
                 .contains("is not pending")
         );
+    }
+
+    #[test]
+    fn history_node_multi_target_restore_preserves_scope_accounting() {
+        let document = json!({
+            "schemaVersion":"2.0",
+            "entryScopeId":"root",
+            "interface":{"inputs":{"input":{"kind":"legacy"}},"outputs":{"output":{"kind":"legacy"}}},
+            "policies":{"defaultExecution":"durable","visibility":"private"},
+            "presentation":{"edges":{},"nodes":{}},
+            "nodes":{
+                "in":{"id":"in","label":"Input","scopeId":"root","kind":"input"},
+                "review":{"id":"review","label":"Review scope","scopeId":"root","kind":"scope","childScopeId":"child"},
+                "out":{"id":"out","label":"Output","scopeId":"root","kind":"output"},
+                "gate":{"id":"gate","label":"Gate","scopeId":"child","kind":"gateway"},
+                "act-a":{"id":"act-a","label":"Act A","scopeId":"child","kind":"activity","activity":{"kind":"builtin","name":"compress"}},
+                "act-b":{"id":"act-b","label":"Act B","scopeId":"child","kind":"activity","activity":{"kind":"builtin","name":"compress"}},
+                "h":{"id":"h","label":"History","scopeId":"child","kind":"history","history":"deep"}
+            },
+            "routeGroups":{
+                "start":{"id":"start","mode":"allMatches","noMatch":"fail"},
+                "again":{"id":"again","mode":"allMatches","noMatch":"fail"},
+                "limit":{"id":"limit","mode":"allMatches","noMatch":"fail"},
+                "fan":{"id":"fan","mode":"allMatches","noMatch":"fail"},
+                "a-done":{"id":"a-done","mode":"allMatches","noMatch":"skip"},
+                "a-failed":{"id":"a-failed","mode":"allMatches","noMatch":"fail"},
+                "b-done":{"id":"b-done","mode":"allMatches","noMatch":"skip"}
+            },
+            "scopes":{
+                "root":{"id":"root","label":"Root","kind":"root","initialNodeIds":["in"],"entryActivities":[],"exitActivities":[],"history":"none"},
+                "child":{"id":"child","label":"Child","kind":"parallel","parentScopeId":"root","initialNodeIds":["gate"],"entryActivities":[],"exitActivities":[],"history":"deep"}
+            },
+            "transitions":{
+                "start":{"id":"start","sourceNodeId":"in","targetNodeId":"review","trigger":"completed","priority":0,"routeGroupId":"start"},
+                "again":{"id":"again","sourceNodeId":"review","targetNodeId":"review","trigger":"completed","priority":0,"routeGroupId":"again","loop":{"maxIterations":1}},
+                "limit":{"id":"limit","sourceNodeId":"review","targetNodeId":"out","trigger":"iterationLimit","priority":0,"routeGroupId":"limit"},
+                "fan-a":{"id":"fan-a","sourceNodeId":"gate","targetNodeId":"act-a","trigger":"completed","priority":0,"routeGroupId":"fan"},
+                "fan-b":{"id":"fan-b","sourceNodeId":"gate","targetNodeId":"act-b","trigger":"completed","priority":1,"routeGroupId":"fan"},
+                "a-done":{"id":"a-done","sourceNodeId":"act-a","targetNodeId":"h","trigger":"completed","priority":0,"routeGroupId":"a-done",
+                          "guard":{"kind":"literal","value":false}},
+                "a-failed":{"id":"a-failed","sourceNodeId":"act-a","targetNodeId":"h","trigger":"failed","priority":0,"routeGroupId":"a-failed"},
+                "b-done":{"id":"b-done","sourceNodeId":"act-b","targetNodeId":"h","trigger":"completed","priority":0,"routeGroupId":"b-done",
+                          "guard":{"kind":"literal","value":false}}
+            },
+            "types":{}
+        });
+        let definition = WorkflowDefinition::new(document).expect("definition should parse");
+        definition
+            .parsed()
+            .validate_publishable()
+            .expect("definition should be publishable");
+        let now = DateTime::<Utc>::UNIX_EPOCH;
+        let mut continuation = ContinuationEnvelope::start(
+            definition.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            definition.definition_hash(),
+            json!("value"),
+        )
+        .expect("continuation should start");
+
+        let observe_effects =
+            |continuation: &mut ContinuationEnvelope,
+             definition_ref: &super::super::workflow::Definition,
+             dispositions: &[(&str, &str)]| {
+                let KernelOutcome::Effects(requests) = continuation
+                    .run_until_blocked(definition_ref, now)
+                    .expect("kernel should request the child activities")
+                else {
+                    panic!("expected activity effect requests")
+                };
+                assert_eq!(requests.len(), dispositions.len());
+                for (node, disposition) in dispositions {
+                    let request = requests
+                        .iter()
+                        .find(|request| request.node_id == *node)
+                        .unwrap_or_else(|| panic!("no pending effect for {node}"));
+                    continuation
+                        .apply_effect_observation(
+                            observation(request, json!({"from": node}), disposition, now),
+                            now,
+                        )
+                        .expect("observation should apply");
+                }
+            };
+
+        observe_effects(
+            &mut continuation,
+            definition.parsed(),
+            &[("act-a", "completed"), ("act-b", "completed")],
+        );
+        assert_eq!(
+            continuation.history.len(),
+            0,
+            "history is captured only at completion"
+        );
+
+        observe_effects(
+            &mut continuation,
+            definition.parsed(),
+            &[("act-b", "completed"), ("act-a", "failed")],
+        );
+
+        let KernelOutcome::Effects(restored) = continuation
+            .run_until_blocked(definition.parsed(), now)
+            .expect("the history node should restore both remembered targets")
+        else {
+            panic!("expected the restored activity effects")
+        };
+        assert_eq!(
+            restored.len(),
+            2,
+            "the deep history node restores both remembered nodes"
+        );
+        let instance = continuation
+            .scopes
+            .values()
+            .next()
+            .expect("the child scope instance is live");
+        assert_eq!(
+            instance.active_tokens, 2,
+            "restoration adjusts the live-token count for every emitted target"
+        );
+
+        for (node, disposition) in [("act-a", "completed"), ("act-b", "completed")] {
+            let request = restored
+                .iter()
+                .find(|request| request.node_id == node)
+                .unwrap_or_else(|| panic!("no restored effect for {node}"));
+            continuation
+                .apply_effect_observation(
+                    observation(request, json!({"from": node}), disposition, now),
+                    now,
+                )
+                .expect("observation should apply");
+        }
+        assert!(matches!(
+            continuation
+                .run_until_blocked(definition.parsed(), now)
+                .expect("the scope must complete exactly once, with no lost instance"),
+            KernelOutcome::Completed(Value::String(value)) if value == "value"
+        ));
+        assert!(continuation.scopes.is_empty(), "no instance leaks");
     }
 }
