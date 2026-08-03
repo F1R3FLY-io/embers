@@ -132,34 +132,24 @@ fn canonical_run_events(
     on_chain_events: &[RunEvent],
     status: &str,
 ) -> Vec<RunEvent> {
-    let mut event_types = continuation
+    let durable_event_types = continuation
         .events
         .iter()
         .map(|event| event.event_type.clone())
         .collect::<Vec<_>>();
+    let on_chain_event_types = on_chain_events
+        .iter()
+        .map(|event| match event.event_type.as_str() {
+            "runStarted" => "runCreated".to_owned(),
+            event_type => event_type.to_owned(),
+        })
+        .collect::<Vec<_>>();
+    let mut event_types = merge_event_sequences(&durable_event_types, &on_chain_event_types);
     if event_types
         .first()
         .is_none_or(|event| event != "runCreated")
     {
         event_types.insert(0, "runCreated".to_owned());
-    }
-
-    // These events can occur between durable checkpoints. Preserve any excess
-    // occurrences from the on-chain coordination log while avoiding duplicates
-    // already recorded by current continuations.
-    for supplemental in ["commandClaimed", "commandRejected", "runReturned"] {
-        let durable_count = event_types
-            .iter()
-            .filter(|event| event.as_str() == supplemental)
-            .count();
-        let on_chain_count = on_chain_events
-            .iter()
-            .filter(|event| event.event_type == supplemental)
-            .count();
-        event_types.extend(std::iter::repeat_n(
-            supplemental.to_owned(),
-            on_chain_count - durable_count.min(on_chain_count),
-        ));
     }
 
     let terminal_event = match status {
@@ -186,6 +176,39 @@ fn canonical_run_events(
             event_type,
         })
         .collect()
+}
+
+/// Compute the shortest order-preserving audit sequence using the rightmost
+/// compatible occurrence as the anchor for repeated ledger events. Durable
+/// events between checkpoints precede later coordination-only ledger events;
+/// repeated command claims therefore align with the successful, latest claim
+/// rather than an earlier rejected attempt.
+fn merge_event_sequences(durable: &[String], on_chain: &[String]) -> Vec<String> {
+    let mut matches = Vec::new();
+    let mut on_chain_end = on_chain.len();
+    for durable_index in (0..durable.len()).rev() {
+        if let Some(on_chain_index) = on_chain[..on_chain_end]
+            .iter()
+            .rposition(|event| event == &durable[durable_index])
+        {
+            matches.push((durable_index, on_chain_index));
+            on_chain_end = on_chain_index;
+        }
+    }
+    matches.reverse();
+
+    let mut merged = Vec::with_capacity(durable.len() + on_chain.len() - matches.len());
+    let (mut durable_start, mut on_chain_start) = (0, 0);
+    for (durable_index, on_chain_index) in matches {
+        merged.extend_from_slice(&durable[durable_start..durable_index]);
+        merged.extend_from_slice(&on_chain[on_chain_start..on_chain_index]);
+        merged.push(durable[durable_index].clone());
+        durable_start = durable_index + 1;
+        on_chain_start = on_chain_index + 1;
+    }
+    merged.extend_from_slice(&durable[durable_start..]);
+    merged.extend_from_slice(&on_chain[on_chain_start..]);
+    merged
 }
 
 #[cfg(test)]
@@ -243,17 +266,31 @@ mod tests {
     #[test]
     fn canonical_events_preserve_durable_audit_and_transient_coordination() {
         let mut continuation = continuation();
+        continuation.record_public_event("commandClaimed");
         continuation.record_public_event("approvalRecorded");
+        continuation.record_public_event("runCompleted");
         let events = canonical_run_events(
             &continuation,
             &[
                 RunEvent {
                     sequence: 0,
-                    event_type: "runCreated".to_owned(),
+                    event_type: "runStarted".to_owned(),
                 },
                 RunEvent {
                     sequence: 1,
                     event_type: "commandClaimed".to_owned(),
+                },
+                RunEvent {
+                    sequence: 2,
+                    event_type: "commandRejected".to_owned(),
+                },
+                RunEvent {
+                    sequence: 3,
+                    event_type: "commandClaimed".to_owned(),
+                },
+                RunEvent {
+                    sequence: 4,
+                    event_type: "runCompleted".to_owned(),
                 },
             ],
             "completed",
@@ -266,8 +303,10 @@ mod tests {
             [
                 "runCreated",
                 "runKernelStarted",
-                "approvalRecorded",
                 "commandClaimed",
+                "commandRejected",
+                "commandClaimed",
+                "approvalRecorded",
                 "runCompleted"
             ]
         );
