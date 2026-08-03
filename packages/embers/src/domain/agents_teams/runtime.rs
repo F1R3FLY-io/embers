@@ -846,24 +846,56 @@ impl ContinuationEnvelope {
                 timer,
             } => {
                 let wait_id = format!("wait:{}:{}", token.id, node.id);
-                let due_at = timer.as_ref().and_then(|timer| {
-                    timer
-                        .delay_millis
-                        .map(|delay| now + chrono::Duration::milliseconds(delay as i64))
-                        .or_else(|| {
-                            timer.deadline.as_ref().and_then(|expression| {
-                                evaluate_expression(
-                                    expression,
-                                    &token,
-                                    &self.original_input,
-                                    &self.state,
-                                )
-                                .ok()
-                                .and_then(|value| value.as_str().map(str::to_owned))
-                                .and_then(|value| value.parse::<DateTime<Utc>>().ok())
-                            })
-                        })
-                });
+                let mut due_at = None;
+                if let Some(timer) = timer {
+                    if let Some(delay) = timer.delay_millis {
+                        due_at = Some(now + chrono::Duration::milliseconds(delay as i64));
+                    } else if let Some(expression) = &timer.deadline {
+                        let raw = evaluate_expression(
+                            expression,
+                            &token,
+                            &self.original_input,
+                            &self.state,
+                        );
+                        let computed = raw
+                            .as_ref()
+                            .ok()
+                            .and_then(|value| value.as_str())
+                            .and_then(|text| text.parse::<DateTime<Utc>>().ok());
+                        match computed {
+                            Some(deadline) => due_at = Some(deadline),
+                            // A timer whose deadline cannot be computed must
+                            // never park: the wait would carry no due_at and
+                            // no command could ever resume it. The token
+                            // routes a failed disposition instead, carrying a
+                            // structured error record readable through the
+                            // error value root.
+                            None if matches!(wait_for, WaitKind::Timer) => {
+                                let reason = match &raw {
+                                    Err(error) => format!(
+                                        "timer deadline expression failed to evaluate: {error:#}"
+                                    ),
+                                    Ok(value) if value.as_str().is_none() => format!(
+                                        "timer deadline evaluated to a non-string value: {value}"
+                                    ),
+                                    Ok(value) => format!(
+                                        "timer deadline {:?} is not an RFC 3339 timestamp",
+                                        value.as_str().unwrap_or_default()
+                                    ),
+                                };
+                                token.value = json!({
+                                    "error": reason,
+                                    "deadline": raw.unwrap_or(Value::Null),
+                                });
+                                "failed".clone_into(&mut token.disposition);
+                                token.phase = TokenPhase::Route;
+                                self.queue.push_back(token);
+                                return Ok(());
+                            }
+                            None => {}
+                        }
+                    }
+                }
                 self.pending_waits.insert(
                     wait_id.clone(),
                     PendingWait {
@@ -3659,5 +3691,115 @@ mod tests {
             KernelOutcome::Completed(Value::String(value)) if value == "value"
         ));
         assert!(continuation.scopes.is_empty(), "no instance leaks");
+    }
+
+    fn path_deadline_definition(with_failed_route: bool) -> WorkflowDefinition {
+        let mut transitions = json!({
+            "start":{"id":"start","sourceNodeId":"in","targetNodeId":"wait","trigger":"completed","priority":0,"routeGroupId":"start"},
+            "done":{"id":"done","sourceNodeId":"wait","targetNodeId":"out","trigger":"completed","priority":0,"routeGroupId":"done"}
+        });
+        let mut groups = json!({
+            "start":{"id":"start","mode":"allMatches","noMatch":"fail"},
+            "done":{"id":"done","mode":"allMatches","noMatch":"fail"}
+        });
+        if with_failed_route {
+            transitions["fail"] = json!({"id":"fail","sourceNodeId":"wait","targetNodeId":"err","trigger":"failed","priority":0,"routeGroupId":"fail"});
+            groups["fail"] = json!({"id":"fail","mode":"allMatches","noMatch":"fail"});
+        }
+        definition(
+            json!({
+                "in":{"id":"in","label":"Input","scopeId":"root","kind":"input"},
+                "wait":{"id":"wait","label":"Deadline","scopeId":"root","kind":"wait","waitFor":"timer",
+                        "timer":{"deadline":{"kind":"path","root":"input","path":["deadline"]}}},
+                "out":{"id":"out","label":"Output","scopeId":"root","kind":"output"},
+                "err":{"id":"err","label":"Error output","scopeId":"root","kind":"output"}
+            }),
+            groups,
+            transitions,
+        )
+    }
+
+    #[test]
+    fn invalid_timer_deadline_fails_loudly_instead_of_parking() {
+        let now = DateTime::<Utc>::UNIX_EPOCH;
+
+        let routed = path_deadline_definition(true);
+        routed
+            .parsed()
+            .validate_publishable()
+            .expect("path deadlines stay publishable");
+        let mut continuation = ContinuationEnvelope::start(
+            routed.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            routed.definition_hash(),
+            json!({"deadline": "not-a-timestamp"}),
+        )
+        .expect("continuation should start");
+        let outcome = continuation
+            .run_until_blocked(routed.parsed(), now)
+            .expect("the failed disposition must route, not park");
+        let KernelOutcome::Completed(value) = outcome else {
+            panic!("expected completion through the failed route, got {outcome:?}")
+        };
+        assert!(
+            value["error"]
+                .as_str()
+                .expect("the error record carries a reason")
+                .contains("is not an RFC 3339 timestamp"),
+            "unexpected reason: {value}"
+        );
+        assert_eq!(value["deadline"], json!("not-a-timestamp"));
+        assert!(
+            continuation.pending_waits.is_empty(),
+            "no unresumable wait may exist"
+        );
+        assert!(
+            continuation
+                .events
+                .iter()
+                .all(|event| event.event_type != "runSuspended"),
+            "an uncomputable deadline never suspends"
+        );
+
+        let unrouted = path_deadline_definition(false);
+        let mut continuation = ContinuationEnvelope::start(
+            unrouted.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            unrouted.definition_hash(),
+            json!({"deadline": 42}),
+        )
+        .expect("continuation should start");
+        let error = continuation
+            .run_until_blocked(unrouted.parsed(), now)
+            .expect_err("with no failed route the run must fail loudly");
+        assert!(
+            error
+                .to_string()
+                .contains("produced disposition failed with no matching route group"),
+            "unexpected error: {error:#}"
+        );
+        assert!(continuation.pending_waits.is_empty());
+
+        let control = path_deadline_definition(true);
+        let mut continuation = ContinuationEnvelope::start(
+            control.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            control.definition_hash(),
+            json!({"deadline": "1970-01-01T00:00:20Z"}),
+        )
+        .expect("continuation should start");
+        let KernelOutcome::Suspended(waits) = continuation
+            .run_until_blocked(control.parsed(), now)
+            .expect("a computable deadline parks normally")
+        else {
+            panic!("expected the timer suspension")
+        };
+        assert_eq!(
+            waits.first().and_then(|wait| wait.due_at),
+            Some(now + chrono::Duration::seconds(20))
+        );
     }
 }

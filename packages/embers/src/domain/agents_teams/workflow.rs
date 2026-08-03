@@ -207,6 +207,15 @@ impl Definition {
                         if let Some(delay) = timer.delay_millis {
                             ensure!(delay > 0, "timer wait node {} has zero delay", node.id);
                         }
+                        if let Some(ValueExpression::Literal { value }) = &timer.deadline {
+                            ensure!(
+                                value.as_str().is_some_and(|text| {
+                                    text.parse::<chrono::DateTime<chrono::Utc>>().is_ok()
+                                }),
+                                "timer wait node {} deadline literal must be an RFC 3339 timestamp",
+                                node.id
+                            );
+                        }
                         ensure!(
                             signal.is_none(),
                             "timer wait node {} cannot also declare a signal",
@@ -318,6 +327,16 @@ impl Definition {
 
         self.validate_scope_hierarchy()?;
 
+        let lifecycle_nodes = self
+            .scopes
+            .values()
+            .flat_map(|scope| {
+                scope
+                    .entry_activities
+                    .iter()
+                    .chain(scope.exit_activities.iter())
+            })
+            .collect::<BTreeSet<_>>();
         let mut priorities = BTreeSet::new();
         let mut group_shapes = BTreeMap::<String, (String, String)>::new();
         for transition in self.transitions.values() {
@@ -333,6 +352,18 @@ impl Definition {
                 transition.id,
                 transition.target_node_id
             );
+            if lifecycle_nodes.contains(&transition.source_node_id) {
+                ensure!(
+                    matches!(
+                        self.nodes[&transition.target_node_id].kind,
+                        NodeKind::Activity { .. }
+                    ),
+                    "transition {} routes lifecycle activity {} to {}, which is not an activity",
+                    transition.id,
+                    transition.source_node_id,
+                    transition.target_node_id
+                );
+            }
             ensure!(
                 self.route_groups.contains_key(&transition.route_group_id),
                 "transition {} refers to missing route group {}",
@@ -1670,5 +1701,122 @@ mod tests {
             .parsed()
             .validate_publishable()
             .expect("an approval without a timeout needs no timedOut route");
+    }
+
+    fn timer_literal_document(deadline: &str) -> serde_json::Value {
+        json!({
+            "schemaVersion": "2.0",
+            "entryScopeId": "root",
+            "interface": { "inputs": {"input": {"kind": "string"}}, "outputs": {"output": {"kind": "legacy"}} },
+            "nodes": {
+                "in": {"id":"in", "label":"Input", "scopeId":"root", "kind":"input"},
+                "wait": {"id":"wait", "label":"Deadline", "scopeId":"root", "kind":"wait", "waitFor":"timer",
+                         "timer": {"deadline": {"kind":"literal", "value": deadline}}},
+                "out": {"id":"out", "label":"Output", "scopeId":"root", "kind":"output"}
+            },
+            "policies": {"defaultExecution":"auto", "visibility":"private"},
+            "presentation": {"edges": {}, "nodes": {}},
+            "routeGroups": {
+                "start": {"id":"start", "mode":"allMatches", "noMatch":"fail"},
+                "done": {"id":"done", "mode":"allMatches", "noMatch":"fail"}
+            },
+            "scopes": {"root": {"id":"root", "label":"Root", "kind":"root", "initialNodeIds":["in"], "entryActivities":[], "exitActivities":[], "history":"none"}},
+            "transitions": {
+                "start": {"id":"start", "sourceNodeId":"in", "targetNodeId":"wait", "trigger":"completed", "priority":0, "routeGroupId":"start"},
+                "done": {"id":"done", "sourceNodeId":"wait", "targetNodeId":"out", "trigger":"completed", "priority":0, "routeGroupId":"done"}
+            },
+            "types": {}
+        })
+    }
+
+    #[test]
+    fn timer_deadline_literals_must_be_rfc3339() {
+        // Parity vectors: the frontend regex in validation.ts must accept and
+        // reject exactly these strings; chrono's RFC 3339 parser is the truth.
+        for valid in [
+            "2026-01-01T00:00:00Z",
+            "2026-01-01T00:00:00+00:00",
+            "2026-01-01T00:00:00.123Z",
+            "2026-01-01t00:00:00z",
+            "2026-01-01 00:00:00Z",
+        ] {
+            WorkflowDefinition::new(timer_literal_document(valid))
+                .expect("valid draft")
+                .parsed()
+                .validate_publishable()
+                .unwrap_or_else(|error| {
+                    panic!("literal {valid:?} should be publishable: {error:#}")
+                });
+        }
+        for invalid in ["2026-01-01", "not-a-date", "2026-01-01T00:00:00"] {
+            let error = match WorkflowDefinition::new(timer_literal_document(invalid))
+                .expect("still a valid draft")
+                .parsed()
+                .validate_publishable()
+            {
+                Ok(()) => panic!("literal {invalid:?} must be rejected"),
+                Err(error) => error,
+            };
+            assert!(
+                error.to_string().contains("RFC 3339"),
+                "unexpected validation error for {invalid:?}: {error:#}"
+            );
+        }
+    }
+
+    fn lifecycle_route_document(
+        target: &str,
+        trigger: &str,
+    ) -> serde_json::Value {
+        json!({
+            "schemaVersion": "2.0",
+            "entryScopeId": "root",
+            "interface": { "inputs": {"input": {"kind": "string"}}, "outputs": {"output": {"kind": "legacy"}} },
+            "nodes": {
+                "prep": {"id":"prep", "label":"Prepare", "scopeId":"root", "kind":"activity", "activity":{"kind":"builtin","name":"compress"}},
+                "recover": {"id":"recover", "label":"Recover", "scopeId":"root", "kind":"activity", "activity":{"kind":"builtin","name":"compress"}},
+                "gate": {"id":"gate", "label":"Gate", "scopeId":"root", "kind":"gateway"},
+                "out": {"id":"out", "label":"Output", "scopeId":"root", "kind":"output"}
+            },
+            "policies": {"defaultExecution":"auto", "visibility":"private"},
+            "presentation": {"edges": {}, "nodes": {}},
+            "routeGroups": {
+                "flow": {"id":"flow", "mode":"allMatches", "noMatch":"fail"},
+                "case": {"id":"case", "mode":"allMatches", "noMatch":"fail"}
+            },
+            "scopes": {"root": {"id":"root", "label":"Root", "kind":"root", "initialNodeIds":["gate"], "entryActivities":["prep"], "exitActivities":[], "history":"none"}},
+            "transitions": {
+                "flow": {"id":"flow", "sourceNodeId":"gate", "targetNodeId":"out", "trigger":"completed", "priority":0, "routeGroupId":"flow"},
+                "case": {"id":"case", "sourceNodeId":"prep", "targetNodeId": target, "trigger": trigger, "priority":0, "routeGroupId":"case"}
+            },
+            "types": {}
+        })
+    }
+
+    #[test]
+    fn lifecycle_failure_routes_must_target_activities() {
+        for trigger in ["failed", "completed"] {
+            WorkflowDefinition::new(lifecycle_route_document("recover", trigger))
+                .expect("valid draft")
+                .parsed()
+                .validate_publishable()
+                .unwrap_or_else(|error| {
+                    panic!("lifecycle route to an activity ({trigger}) is publishable: {error:#}")
+                });
+            let error = match WorkflowDefinition::new(lifecycle_route_document("gate", trigger))
+                .expect("still a valid draft")
+                .parsed()
+                .validate_publishable()
+            {
+                Ok(()) => panic!("lifecycle route to a gateway ({trigger}) must be rejected"),
+                Err(error) => error,
+            };
+            assert!(
+                error
+                    .to_string()
+                    .contains("routes lifecycle activity prep to gate, which is not an activity"),
+                "unexpected validation error: {error:#}"
+            );
+        }
     }
 }
