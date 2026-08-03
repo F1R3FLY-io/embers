@@ -603,9 +603,24 @@ def test_durable_yield_auto_resumes_via_scheduler(client: ApiClient, funded_wall
 
 
 def approval_timeout_workflow_v2(approver: str) -> dict[str, Any]:
-    """An approval workflow whose deadline must fire the timedOut route."""
+    """An approval workflow whose deadline must fire the timedOut route.
+
+    The timedOut branch deliberately parks at a signal wait instead of
+    completing: a suspended run is the only state in which a late decision
+    can reach the kernel's "wait ... is not pending" rejection -- a completed
+    run refuses commands at the status gate before the kernel ever sees them
+    -- and the closing signal then proves the branch routes to completion.
+    """
     workflow = approval_workflow_v2(approver)
     workflow["nodes"]["approval"]["policy"] = {"timeout": {"afterMillis": 5000}}
+    workflow["nodes"]["hold"] = {
+        "id": "hold",
+        "label": "Hold after timeout",
+        "scopeId": "root",
+        "kind": "wait",
+        "waitFor": "signal",
+        "signal": "release",
+    }
     workflow["nodes"]["timed-out"] = {
         "id": "timed-out",
         "label": "Timed out",
@@ -617,13 +632,26 @@ def approval_timeout_workflow_v2(approver: str) -> dict[str, Any]:
         "mode": "allMatches",
         "noMatch": "fail",
     }
+    workflow["routeGroups"]["hold-done"] = {
+        "id": "hold-done",
+        "mode": "allMatches",
+        "noMatch": "fail",
+    }
     workflow["transitions"]["approval-timed-out"] = {
         "id": "approval-timed-out",
         "sourceNodeId": "approval",
-        "targetNodeId": "timed-out",
+        "targetNodeId": "hold",
         "trigger": "timedOut",
         "priority": 0,
         "routeGroupId": "timed-out",
+    }
+    workflow["transitions"]["hold-timed-out"] = {
+        "id": "hold-timed-out",
+        "sourceNodeId": "hold",
+        "targetNodeId": "timed-out",
+        "trigger": "completed",
+        "priority": 0,
+        "routeGroupId": "hold-done",
     }
     return workflow
 
@@ -666,25 +694,68 @@ def test_approval_deadline_times_out_and_rejects_late_approval(
     assert suspended["disposition"] == "suspended"
     assert len(suspended["waits"]) == 1
 
-    timed_out = poll_run_until(client, suspended["runId"], {"completed", "failed", "cancelled"})
-    assert timed_out["status"] == "completed", (
-        f"the expired deadline should route timedOut to completion; events: "
-        f"{[event['event_type'] for event in timed_out['events']]}"
-    )
-    event_types = [event["event_type"] for event in timed_out["events"]]
+    approval_wait_id = suspended["waits"][0]["id"]
+
+    # The expired deadline fires the timedOut route, which rests at the hold
+    # wait: the run stays suspended, so the late decision below reaches the
+    # kernel instead of the coarser commandable-status gate.
+    deadline = time.monotonic() + 180.0
+    held = client.agents_teams.get_run(suspended["runId"]).json
+    while not (
+        held["status"] == "suspended" and held["wait_ids"] not in ([], [approval_wait_id])
+    ):
+        assert time.monotonic() < deadline, (
+            f"run {suspended['runId']} never reached the hold wait; status "
+            f"{held['status']!r}; events: "
+            f"{[event['event_type'] for event in held['events']]}"
+        )
+        time.sleep(2.0)
+        held = client.agents_teams.get_run(suspended["runId"]).json
+
+    event_types = [event["event_type"] for event in held["events"]]
     assert "approvalRecorded" not in event_types, "a timeout is not an approval decision"
     cursor = -1
-    for expected_event in ["approvalRequired", "waitSatisfied", "runResumed", "runCompleted"]:
+    for expected_event in ["approvalRequired", "waitSatisfied", "runResumed", "runSuspended"]:
         cursor = event_types.index(expected_event, cursor + 1)
 
     late = client.agents_teams.run_command(
         funded_wallet,
         suspended["runId"],
-        expected_revision=timed_out["revision"],
+        expected_revision=held["revision"],
         command_type="approve",
-        wait_id=suspended["waits"][0]["id"],
+        wait_id=approval_wait_id,
         decision_id="live-decision-late",
         payload={"decision": "too-late"},
         expected_status=500,
     )
     assert "not" in late.body.lower() and "pending" in late.body.lower()
+
+    # Releasing the hold proves the timedOut branch routes to completion.
+    before_signal = client.agents_teams.get_run(suspended["runId"]).json
+    client.agents_teams.run_command(
+        funded_wallet,
+        suspended["runId"],
+        expected_revision=before_signal["revision"],
+        command_type="signal",
+        wait_id=before_signal["wait_ids"][0],
+        name="release",
+        payload=None,
+    )
+    completed = poll_run_until(client, suspended["runId"], {"completed", "failed", "cancelled"})
+    assert completed["status"] == "completed", (
+        f"the released hold should complete the run; events: "
+        f"{[event['event_type'] for event in completed['events']]}"
+    )
+    final_events = [event["event_type"] for event in completed["events"]]
+    assert "approvalRecorded" not in final_events, "a timeout is not an approval decision"
+    cursor = -1
+    for expected_event in [
+        "approvalRequired",
+        "waitSatisfied",
+        "runResumed",
+        "runSuspended",
+        "waitSatisfied",
+        "runResumed",
+        "runCompleted",
+    ]:
+        cursor = final_events.index(expected_event, cursor + 1)
