@@ -1,0 +1,36 @@
+@startuml
+title GET /api/ai-agents/{address} — list a wallet's agents (headers, latest versions)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Agent owner" as Owner #FFD8C2
+participant "AgentsApiSdk\n.get()" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Owner -> SDK : get()
+SDK -> SDK : address = privateKey\n  .getPublicKey().getAddress()
+SDK -> API : GET /api/ai-agents/{address}
+API -> Domain : list(address)
+Domain -> Chain : explore-deploy list.rho\n(registry env URI, address)
+Chain --> Domain : AgentHeader[] or nothing
+Domain --> API : Agents { agents }\n(empty list when the wallet has none)
+API --> SDK : 200 Agents
+SDK --> Owner : headers
+
+note over Domain #FFF0C7
+Headers carry id, version, created_at,
+last_deploy, name, description, shard, and
+logo — not the code body. Fetch one version
+to obtain the agent's Rholang source.
+end note
+@enduml

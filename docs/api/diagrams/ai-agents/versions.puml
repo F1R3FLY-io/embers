@@ -1,0 +1,40 @@
+@startuml
+title GET /api/ai-agents/{address}/{id}/versions — every stored version of one agent
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Agent owner" as Owner #FFD8C2
+participant "AgentsApiSdk\n.getVersions(id)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Owner -> SDK : getVersions(id)
+SDK -> API : GET /api/ai-agents/{address}/{id}/versions
+API -> Domain : list_versions(address, id)
+Domain -> Chain : explore-deploy list_versions.rho
+alt agent exists
+  Chain --> Domain : AgentHeader[] (one per version)
+  Domain --> API : Agents { agents }
+  API --> SDK : 200 Agents
+  SDK --> Owner : version headers
+else unknown id for this address
+  Chain --> Domain : nothing
+  API <-- Domain : not found
+  SDK <-- API : 404, no body
+end
+
+note over Domain #FFF0C7
+Versions are UUIDv7 identifiers, time-ordered
+by construction; last_deploy marks versions
+that have been deployed standalone.
+end note
+@enduml

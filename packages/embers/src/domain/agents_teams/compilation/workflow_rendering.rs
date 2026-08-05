@@ -375,8 +375,8 @@ fn render_node_body(
                     AgentProtocol::SimpleV1 => "$value".to_owned(),
                     AgentProtocol::StructuredV1 => {
                         r#"{"kind":"invoke","input":$value,"context":{"nodeId":"#.to_owned()
-                            + &escape_rho_string(&node.id)
-                            + r#""}}"#
+                            + &rho_string(&node.id)
+                            + "}}"
                     }
                 };
                 let completion = match protocol {
@@ -834,6 +834,7 @@ mod tests {
     use serde_json::json;
 
     use super::render;
+    use crate::domain::agents_teams::compilation::AgentRef;
     use crate::domain::agents_teams::workflow::WorkflowDefinition;
     use crate::domain::common::RegistryDeploy;
     use crate::domain::test_helpers::test_public_key;
@@ -867,6 +868,45 @@ mod tests {
         assert!(rho.contains("contract workflowNode1"));
         assert!(rho.contains("getOrElse(\"iterations\", {}).getOrElse(\"again\", 0) < 3"));
         assert!(rho.contains("workflowNode1!(value, context.set(\"iterations\""));
+    }
+
+    #[test]
+    fn structured_invocation_quotes_the_node_id() {
+        let value = json!({
+            "schemaVersion":"2.0", "entryScopeId":"root",
+            "interface":{"inputs":{"input":{"kind":"string"}},"outputs":{"output":{"kind":"legacy"}}},
+            "nodes":{
+                "in":{"id":"in","label":"Input","scopeId":"root","kind":"input"},
+                "draft":{"id":"draft","label":"Draft","scopeId":"root","kind":"activity","activity":{"kind":"agent","agentId":"agent-1","agentVersion":"v1","protocol":"structured-v1"}},
+                "out":{"id":"out","label":"Output","scopeId":"root","kind":"output"}
+            },
+            "policies":{"defaultExecution":"bounded","visibility":"private"},
+            "presentation":{"edges":{},"nodes":{}},
+            "routeGroups":{
+                "start":{"id":"start","mode":"allMatches","noMatch":"fail"},
+                "finish":{"id":"finish","mode":"allMatches","noMatch":"fail"}
+            },
+            "scopes":{"root":{"id":"root","label":"Root","kind":"root","initialNodeIds":["in"],"entryActivities":[],"exitActivities":[],"history":"none"}},
+            "transitions":{
+                "start":{"id":"start","sourceNodeId":"in","targetNodeId":"draft","trigger":"completed","priority":0,"routeGroupId":"start"},
+                "finish":{"id":"finish","sourceNodeId":"draft","targetNodeId":"out","trigger":"completed","priority":0,"routeGroupId":"finish"}
+            },
+            "types":{}
+        });
+        let definition = WorkflowDefinition::new(value).unwrap();
+        let codes = BTreeMap::from([(
+            AgentRef {
+                id: "agent-1".to_owned(),
+                version: "v1".to_owned(),
+            },
+            "contract main(@invocation, return) = { return!({\"output\": invocation, \"disposition\": \"completed\"}) }".to_owned(),
+        )]);
+        let rho = render(&definition, deploy(), &codes).unwrap();
+        // The invocation record must carry the node id as a quoted Rholang
+        // string; the bare form parses as a variable and the stray closing
+        // quote corrupts the string context of the whole compiled contract.
+        assert!(rho.contains(r#""context":{"nodeId":"draft"}}"#));
+        assert!(!rho.contains(r#""nodeId":draft"#));
     }
 
     #[test]

@@ -1,0 +1,38 @@
+@startuml
+title GET /api/ai-agents-teams/{address} — list a wallet's teams (headers, latest versions)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Team owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.get()" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Owner -> SDK : get()
+SDK -> SDK : address = privateKey\n  .getPublicKey().getAddress()
+SDK -> API : GET /api/ai-agents-teams/{address}
+API -> Domain : list(address)
+Domain -> Chain : explore-deploy list.rho\n(registry env URI, address)
+Chain --> Domain : AgentsTeamHeader[] or nothing
+Domain --> API : AgentsTeams { agents_teams }\n(empty list when the wallet has none)
+API --> SDK : 200 AgentsTeams
+SDK --> Owner : headers
+
+note over Domain #FFF0C7
+Headers carry id, version, created_at,
+last_deploy, uri (the registry URI of the last
+deployment), name, description, shard, and
+logo — neither the graphl graph nor the
+Workflow v2 definition. Fetch one version for
+the team's content.
+end note
+@enduml

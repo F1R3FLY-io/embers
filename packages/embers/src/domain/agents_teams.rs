@@ -25,7 +25,7 @@ use crate::domain::common::deserialize_decrypted;
 /// On-chain registry schema version. Increment whenever the private persistent
 /// state or public contract semantics change so an existing environment key is
 /// upgraded atomically by `insertSigned` on the next bootstrap.
-const AGENTS_TEAMS_ENV_VERSION: i64 = 1;
+const AGENTS_TEAMS_ENV_VERSION: i64 = 2;
 
 mod compilation;
 pub mod continuation_store;
@@ -42,6 +42,7 @@ mod publish_to_firesky;
 mod published_state;
 mod recovery;
 mod referencing_teams;
+mod reveal_output;
 mod run_agents_team;
 mod run_commands;
 mod run_on_firesky;
@@ -49,6 +50,8 @@ pub mod runtime;
 mod save;
 mod unpublish;
 pub mod workflow;
+
+pub use reveal_output::RevealOutputError;
 
 #[derive(Clone)]
 pub struct AgentsTeamsService<

@@ -429,6 +429,46 @@ in {
         }
     } |
 
+    contract agentsTeams(@"claimOutputReveal", @run_id, @reveal_id, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @runs <- runsCh) {
+                if (runs.contains(run_id)) {
+                    new runCh in {
+                        runCh!(runs.get(run_id)) |
+                        for(@run <- runCh) {
+                    if (run.get("output_content_hash") == Nil) {
+                        abort!("run has no recorded output")
+                    } else if (run.get("owner") == address) {
+                        // The reveal event carries no actor: publishing the
+                        // revealer would de-anonymize the owner this ledger
+                        // deliberately scrubs from reads.
+                        runsCh!(runs.set(run_id,
+                            run.set("events", run.get("events") ++ [{
+                                "sequence": run.get("events").length(),
+                                "type": "outputRevealed"
+                            }])
+                        )) |
+                        acknowledged!({
+                            "revealId": reveal_id,
+                            "outputContentHash": run.get("output_content_hash"),
+                            "outputCapabilityHash": run.get("output_capability_hash")
+                        })
+                    } else {
+                        abort!("output reveal actor is unauthorized")
+                    }
+                        }
+                    }
+                } else {
+                    abort!("run capability not found")
+                }
+            }
+        }
+    } |
+
     contract agentsTeams(@"advanceRun", @run_id, @expected_revision, @status,
                          @definition_hash, @continuation_content_hash,
                          @continuation_capability_hash, @wait_ids, @due_at,

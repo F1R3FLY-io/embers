@@ -1,0 +1,58 @@
+@startuml
+title POST /api/ai-agents-teams/runs/{run_id}/commands/prepare + /send — revision-fenced durable command
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Authorized actor" as Actor #FFD8C2
+participant "AgentsTeamsApiSdk\n.command(runId, req)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Actor -> SDK : command(runId, { type, expected_revision,\n  wait_id?, payload?, ... })
+
+group Phase 1 — prepare (mints the command; deploys nothing)
+SDK -> API : POST .../runs/{run_id}/commands/prepare
+API -> Domain : prepare command
+Domain -> Domain : mint command_id; classify the\ncommand; build the encrypted\ncommand artifact; render the\nclaim contract; compute command\ncontent and capability hashes
+Domain --> API : RunCommandResp { command_id,\n  command_class, target_wait_id?,\n  contract, issued_at, hashes }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign and send — byte-exact echo required
+SDK -> SDK : signed = signContract(contract, privateKey)
+SDK -> API : POST .../commands/send\n{ prepare_request (byte-identical),\n  prepare_response, request: signed, token }
+API -> API : verify the echo hash binding;\ncross-check the signed public claim\nagainst the encrypted command artifact
+API -> Domain : deploy claim and await finality
+Domain -> Chain : deploy signed command claim
+Chain --> Domain : finalized
+alt claim wins at expected_revision
+  Chain --> Domain : command applied;\nrevision advanced
+else stale revision (CAS loses)
+  Chain --> Domain : command deploys but does not apply;\nrevision unchanged
+end
+Domain -> Chain : observer readback of the run ledger
+Chain --> Domain : run-state JSON
+API <-- Domain : run-state JSON
+SDK <-- API : 200 (untyped run-state readback)
+SDK --> Actor : { prepareResponse, sendResponse }
+end
+
+note over API #FFF0C7
+Authorization is adjudicated by the on-chain
+command ledger: the run owner and the configured
+Embers service hold run-level authority; a
+delegated approver may decide exactly the wait
+named in their grant. A stale expected_revision
+is not an HTTP error — the readback shows the
+unchanged revision; refresh and re-issue.
+end note
+@enduml

@@ -1,0 +1,43 @@
+@startuml
+title POST /api/testnet/wallet — faucet: mint and fund a throwaway test wallet
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Test author" as Author #FFD8C2
+participant "TestnetApiSdk\n.getWallet()" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "TestnetService" as Domain #CDEACC
+participant "F1r3node chain" as Chain #FFE4A6
+
+Author -> SDK : getWallet()
+SDK -> API : POST /api/testnet/wallet
+API -> Domain : create_wallet()
+Domain -> Domain : generate a fresh\nsecp256k1 keypair
+Domain -> Domain : render fund_test_wallet.rho\nservice wallet -> new wallet,\namount 1,000,000,000
+Domain -> Chain : deploy the funding contract\n(signed by the service key)
+Domain --> API : CreateTestwalletResp { key }
+API --> SDK : 200 { key: hex secret key }
+SDK -> SDK : PrivateKey.tryFromHex(key)
+SDK --> Author : PrivateKey
+
+note over Domain, Chain #FFF6C9
+The response does not await finalization of the
+funding deploy: reading the balance or spending
+immediately can race the funding block.
+end note
+
+note over API #FAD8D8
+Test-network convenience only. The private key
+is generated server-side and transits the
+network in the response: never hold real value
+with a wallet minted here.
+end note
+@enduml

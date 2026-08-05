@@ -29,7 +29,7 @@ pub struct OslfsApi;
 
 #[OpenApi(prefix_path = "/oslfs", tag = ApiTags::Oslfs)]
 impl OslfsApi {
-    #[oai(path = "/:address", method = "get")]
+    #[oai(path = "/:address", method = "get", operation_id = "oslfs_list")]
     async fn list(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -39,7 +39,11 @@ impl OslfsApi {
         Ok(Json(oslfs.into()))
     }
 
-    #[oai(path = "/:address/:id/versions", method = "get")]
+    #[oai(
+        path = "/:address/:id/versions",
+        method = "get",
+        operation_id = "oslfs_list_versions"
+    )]
     async fn list_versions(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -49,7 +53,11 @@ impl OslfsApi {
         oslfs.list_versions(address.0, id).await.into()
     }
 
-    #[oai(path = "/:address/:id/versions/:version", method = "get")]
+    #[oai(
+        path = "/:address/:id/versions/:version",
+        method = "get",
+        operation_id = "oslfs_get_version"
+    )]
     async fn get(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -60,7 +68,11 @@ impl OslfsApi {
         oslfs.get(address.0, id, version).await.into()
     }
 
-    #[oai(path = "/create/prepare", method = "post")]
+    #[oai(
+        path = "/create/prepare",
+        method = "post",
+        operation_id = "oslfs_prepare_create"
+    )]
     async fn prepare_create(
         &self,
         Json(body): Json<CreateOslfReq>,
@@ -77,7 +89,11 @@ impl OslfsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/create/send", method = "post")]
+    #[oai(
+        path = "/create/send",
+        method = "post",
+        operation_id = "oslfs_send_create"
+    )]
     async fn create(
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateOslfReq, CreateOslfResp>,
@@ -87,7 +103,11 @@ impl OslfsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/:id/save/prepare", method = "post")]
+    #[oai(
+        path = "/:id/save/prepare",
+        method = "post",
+        operation_id = "oslfs_prepare_save"
+    )]
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
@@ -105,7 +125,11 @@ impl OslfsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/:id/save/send", method = "post")]
+    #[oai(
+        path = "/:id/save/send",
+        method = "post",
+        operation_id = "oslfs_send_save"
+    )]
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
@@ -116,7 +140,11 @@ impl OslfsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/:id/delete/prepare", method = "post")]
+    #[oai(
+        path = "/:id/delete/prepare",
+        method = "post",
+        operation_id = "oslfs_prepare_delete"
+    )]
     async fn prepare_delete(
         &self,
         Path(id): Path<String>,
@@ -126,7 +154,11 @@ impl OslfsApi {
         Ok(Json(contract.into()))
     }
 
-    #[oai(path = "/:id/delete/send", method = "post")]
+    #[oai(
+        path = "/:id/delete/send",
+        method = "post",
+        operation_id = "oslfs_send_delete"
+    )]
     async fn delete(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,

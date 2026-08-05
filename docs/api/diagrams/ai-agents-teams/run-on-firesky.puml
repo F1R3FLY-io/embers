@@ -1,0 +1,56 @@
+@startuml
+title POST /api/ai-agents-teams/run-on-firesky/prepare + /send — run a team whose answer is a social post
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Caller" as Caller #FFD8C2
+participant "AgentsTeamsApiSdk\n.runOnFiresky(uri, prompt, replyTo?)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+participant "F1r3sky\n(PDS)" as Firesky #FFDFC4
+
+Caller -> SDK : runOnFiresky(agentTeamUri,\n  prompt, replyTo?)
+
+group Phase 1 — prepare (same shape as run)
+SDK -> API : POST .../run-on-firesky/prepare\n{ agents_team: uri, prompt }
+API -> Domain : prepare invocation
+Domain -> Domain : mint run_id (capability),\nhashes; render contract
+Domain --> API : RunResp { run_id, contract, ... }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign and send — response carries nothing
+SDK -> SDK : signed = signContract(contract, privateKey)
+SDK -> API : POST .../run-on-firesky/send\n{ prepare_request, prepare_response,\n  request: { contract: signed, reply_to? },\n  token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy invocation
+Domain -> Chain : deploy signed invocation
+Chain --> Domain : accepted
+SDK <-- API : 200, no content
+SDK --> Caller : prepareResponse only\n(run_id is the observation handle)
+end
+
+group The answer arrives socially, not over HTTP
+Chain -> Domain : team reaches its terminal response
+Domain -> Firesky : post the terminal reply\n(threaded under reply_to when given)
+Firesky --> Caller : reply appears in the thread /\nthe team account's feed
+end
+
+note over API #FFF0C7
+The send response is empty by design: the
+terminal reply is posted socially. Observe the
+run via GET /runs/{run_id} (the run_id from
+prepare) or by watching the F1r3sky thread.
+reply_to threads the answer under an existing
+post (parent and root refs).
+end note
+@enduml

@@ -30,7 +30,11 @@ pub struct WalletsApi;
 
 #[OpenApi(prefix_path = "/wallets", tag = ApiTags::Wallets)]
 impl WalletsApi {
-    #[oai(path = "/:address/state", method = "get")]
+    #[oai(
+        path = "/:address/state",
+        method = "get",
+        operation_id = "wallets_state_and_history"
+    )]
     async fn wallet_state_and_history(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -44,7 +48,11 @@ impl WalletsApi {
         Ok(Json(wallet_state_and_history))
     }
 
-    #[oai(path = "/transfer/prepare", method = "post")]
+    #[oai(
+        path = "/transfer/prepare",
+        method = "post",
+        operation_id = "wallets_prepare_transfer"
+    )]
     async fn prepare_transfer(
         &self,
         Json(body): Json<TransferReq>,
@@ -61,7 +69,11 @@ impl WalletsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/transfer/send", method = "post")]
+    #[oai(
+        path = "/transfer/send",
+        method = "post",
+        operation_id = "wallets_send_transfer"
+    )]
     async fn transfer(
         &self,
         SendRequest(body): SendRequest<SignedContract, TransferReq, TransferResp>,
@@ -71,7 +83,11 @@ impl WalletsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/boost/prepare", method = "post")]
+    #[oai(
+        path = "/boost/prepare",
+        method = "post",
+        operation_id = "wallets_prepare_boost"
+    )]
     async fn prepare_boost(
         &self,
         Json(body): Json<BoostReq>,
@@ -88,7 +104,11 @@ impl WalletsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/boost/send", method = "post")]
+    #[oai(
+        path = "/boost/send",
+        method = "post",
+        operation_id = "wallets_send_boost"
+    )]
     async fn boost(
         &self,
         SendRequest(body): SendRequest<SignedContract, BoostReq, BoostResp>,
@@ -99,7 +119,11 @@ impl WalletsApi {
     }
 
     #[allow(clippy::unused_async)]
-    #[oai(path = "/:address/deploys", method = "get")]
+    #[oai(
+        path = "/:address/deploys",
+        method = "get",
+        operation_id = "wallets_subscribe_deploys"
+    )]
     async fn deploys(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,

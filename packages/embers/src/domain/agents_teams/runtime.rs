@@ -979,9 +979,21 @@ impl ContinuationEnvelope {
             .last()
             .cloned()
             .unwrap_or_else(|| "root".into());
+        // The iteration counters are part of the effect identity: a bounded
+        // cycle revisits the same node with a new input, and without them the
+        // revisit collides with the continuation store's replay of the
+        // previous iteration's observation (input hash mismatch). BTreeMap
+        // iteration keeps the serialization canonical, and an unchanged token
+        // still derives the same key, so crash-resume replay is preserved.
+        let iterations = token
+            .iterations
+            .iter()
+            .map(|(transition, count)| format!("{transition}={count}"))
+            .collect::<Vec<_>>()
+            .join(",");
         let effect_key = hash_text(&format!(
-            "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
-            self.run_id, self.execution_id, node.id, correlation, token.attempt
+            "{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}\u{0}{}",
+            self.run_id, self.execution_id, node.id, correlation, token.attempt, iterations
         ));
         if self.pending_effects.contains_key(&effect_key) {
             return;
@@ -2275,6 +2287,81 @@ mod tests {
     }
 
     #[test]
+    fn cyclic_activity_iterations_get_distinct_effect_keys() {
+        // A bounded cycle re-invokes the same activity node with a new input
+        // each iteration. Every invocation must mint a distinct effect key,
+        // otherwise the durable orchestrator's continuation store replays the
+        // previous iteration's observation against the new input and the run
+        // dies with an input-hash mismatch instead of looping.
+        let definition = definition(
+            json!({
+                "in":{"id":"in","label":"Input","scopeId":"root","kind":"input"},
+                "act":{"id":"act","label":"Act","scopeId":"root","kind":"activity","activity":{"kind":"agent","agentId":"agent-1","agentVersion":"v1","protocol":"simple-v1"}},
+                "out":{"id":"out","label":"Output","scopeId":"root","kind":"output"}
+            }),
+            json!({
+                "start":{"id":"start","mode":"allMatches","noMatch":"fail"},
+                "next":{"id":"next","mode":"firstMatch","noMatch":"fail"},
+                "limit":{"id":"limit","mode":"allMatches","noMatch":"fail"}
+            }),
+            json!({
+                "start":{"id":"start","sourceNodeId":"in","targetNodeId":"act","trigger":"completed","priority":0,"routeGroupId":"start"},
+                "revise":{"id":"revise","sourceNodeId":"act","targetNodeId":"act","trigger":"completed","guard":{"kind":"literal","value":true},"priority":0,"routeGroupId":"next","loop":{"maxIterations":2}},
+                "done":{"id":"done","sourceNodeId":"act","targetNodeId":"out","trigger":"iterationLimit","priority":0,"routeGroupId":"limit"}
+            }),
+        );
+        definition
+            .parsed()
+            .validate_publishable()
+            .expect("definition should be publishable");
+        let mut continuation = ContinuationEnvelope::start(
+            definition.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            definition.definition_hash(),
+            json!("question"),
+        )
+        .expect("continuation should start");
+
+        let mut effect_keys = Vec::new();
+        let final_output = loop {
+            match continuation
+                .run_until_blocked(definition.parsed(), Utc::now())
+                .expect("kernel should drive")
+            {
+                KernelOutcome::Effects(requests) => {
+                    for request in requests {
+                        effect_keys.push(request.effect_key.clone());
+                        continuation
+                            .apply_effect_observation(
+                                observation(
+                                    &request,
+                                    json!({"iteration": effect_keys.len()}),
+                                    "completed",
+                                    Utc::now(),
+                                ),
+                                Utc::now(),
+                            )
+                            .expect("observation should apply");
+                    }
+                }
+                KernelOutcome::Completed(value) => break value,
+                other => panic!("unexpected kernel outcome: {other:?}"),
+            }
+        };
+
+        // maxIterations 2 admits two revise traversals: three invocations.
+        assert_eq!(effect_keys.len(), 3, "three activity invocations expected");
+        let distinct: std::collections::BTreeSet<_> = effect_keys.iter().collect();
+        assert_eq!(
+            distinct.len(),
+            effect_keys.len(),
+            "every cycle iteration must mint a distinct effect key: {effect_keys:?}"
+        );
+        assert_eq!(final_output, json!({"iteration": 3}));
+    }
+
+    #[test]
     fn first_match_and_bounded_cycle_are_deterministic() {
         let definition = definition(
             json!({
@@ -3052,6 +3139,272 @@ mod tests {
         ));
     }
 
+    // The Research Desk demo's gate tail: an owner-quorum-1 approval whose
+    // completed route feeds an activity (the Archivist) before the output.
+    // Approval-into-activity is otherwise uncovered: every other approval test
+    // routes the gate straight to output nodes.
+    fn gate_archive_definition() -> WorkflowDefinition {
+        definition(
+            json!({
+                "in":{"id":"in","label":"Input","scopeId":"root","kind":"input"},
+                "gate":{"id":"gate","label":"Gate","scopeId":"root","kind":"approval","policyId":"owner","quorum":1,"approvers":[]},
+                "archive":{"id":"archive","label":"Archive","scopeId":"root","kind":"activity",
+                    "policy":{"retry":{"maxAttempts":2,"initialDelayMillis":1000,"backoffMultiplierMillis":1000,"maxDelayMillis":1000,"deterministicJitter":false,"retryOn":[]}},
+                    "activity":{"kind":"agent","agentId":"archivist","agentVersion":"v1","protocol":"structured-v1"}},
+                "out":{"id":"out","label":"Answer","scopeId":"root","kind":"output"}
+            }),
+            json!({
+                "start":{"id":"start","mode":"allMatches","noMatch":"fail"},
+                "gate-completed":{"id":"gate-completed","mode":"allMatches","noMatch":"fail"},
+                "archive-completed":{"id":"archive-completed","mode":"allMatches","noMatch":"fail"}
+            }),
+            json!({
+                "start":{"id":"start","sourceNodeId":"in","targetNodeId":"gate","trigger":"completed","priority":0,"routeGroupId":"start"},
+                "approved":{"id":"approved","sourceNodeId":"gate","targetNodeId":"archive","trigger":"completed","priority":0,"routeGroupId":"gate-completed"},
+                "archive-out":{"id":"archive-out","sourceNodeId":"archive","targetNodeId":"out","trigger":"completed","priority":0,"routeGroupId":"archive-completed"}
+            }),
+        )
+    }
+
+    fn suspend_and_approve(
+        workflow: &WorkflowDefinition,
+        payload: Value,
+        now: DateTime<Utc>,
+    ) -> ContinuationEnvelope {
+        let mut continuation = ContinuationEnvelope::start(
+            workflow.parsed(),
+            "run".into(),
+            "rho:id:team".into(),
+            workflow.definition_hash(),
+            json!("request"),
+        )
+        .expect("gate continuation should start");
+        let KernelOutcome::Suspended(waits) = continuation
+            .run_until_blocked(workflow.parsed(), now)
+            .expect("the gate should suspend")
+        else {
+            panic!("expected gate suspension")
+        };
+        let wait_id = waits.first().expect("one gate wait").id.clone();
+        continuation
+            .apply_command(
+                ResumeCommand::Approve {
+                    run_id: "run".into(),
+                    wait_id,
+                    decision_id: "decision-1".into(),
+                    payload,
+                },
+                "owner",
+                now,
+            )
+            .expect("an owner approval should be recorded");
+        continuation
+    }
+
+    #[test]
+    fn approval_payload_replacement_flows_through_downstream_activity_to_output() {
+        let workflow = gate_archive_definition();
+        workflow
+            .parsed()
+            .validate_publishable()
+            .expect("gate-archive workflow should publish");
+        let now = DateTime::<Utc>::UNIX_EPOCH;
+        let replacement = json!({"question":"q?","answer":"human","feedback":"human","score":100});
+        let mut continuation = suspend_and_approve(&workflow, replacement.clone(), now);
+
+        let KernelOutcome::Effects(requests) = continuation
+            .run_until_blocked(workflow.parsed(), now)
+            .expect("the approved token should reach the activity")
+        else {
+            panic!("expected the archive invocation")
+        };
+        let request = requests.first().expect("one archive invocation");
+        assert_eq!(requests.len(), 1);
+        assert_eq!(request.node_id, "archive");
+        assert_eq!(request.attempt, 1);
+        assert_eq!(
+            request.input, replacement,
+            "the approve payload must replace the released value before the activity runs"
+        );
+
+        let archivist_output = json!({
+            "question":"q?","answer":"human","feedback":"human","score":100,
+            "archived":true
+        });
+        continuation
+            .apply_effect_observation(
+                observation(request, archivist_output.clone(), "completed", now),
+                now,
+            )
+            .expect("the archive observation should apply");
+        assert!(matches!(
+            continuation
+                .run_until_blocked(workflow.parsed(), now)
+                .expect("the archived record should reach the output"),
+            KernelOutcome::Completed(value) if value == archivist_output
+        ));
+    }
+
+    #[test]
+    fn downstream_activity_failure_after_approval_schedules_retry_then_completes() {
+        let workflow = gate_archive_definition();
+        workflow
+            .parsed()
+            .validate_publishable()
+            .expect("gate-archive workflow should publish");
+        let now = DateTime::<Utc>::UNIX_EPOCH;
+
+        // Null payload: the token value waiting at the gate flows on unchanged.
+        let mut continuation = suspend_and_approve(&workflow, Value::Null, now);
+        let KernelOutcome::Effects(requests) = continuation
+            .run_until_blocked(workflow.parsed(), now)
+            .expect("the approved token should reach the activity")
+        else {
+            panic!("expected the archive invocation")
+        };
+        let first = requests.first().expect("one archive invocation");
+        assert_eq!(
+            first.input,
+            json!("request"),
+            "a null approve payload must preserve the released value"
+        );
+        continuation
+            .apply_effect_observation(
+                observation(
+                    first,
+                    json!({"error":"activity deploy errored on chain"}),
+                    "failed",
+                    now,
+                ),
+                now,
+            )
+            .expect("the failed observation should schedule a retry");
+
+        let KernelOutcome::Suspended(waits) = continuation
+            .run_until_blocked(workflow.parsed(), now)
+            .expect("the retry should suspend durably")
+        else {
+            panic!("expected a retry suspension")
+        };
+        let retry = waits.first().expect("one retry wait");
+        assert!(
+            retry.id.starts_with("retry:") && retry.id.ends_with(":2"),
+            "the retry wait must carry the bumped attempt: {}",
+            retry.id
+        );
+        let due_at = retry.due_at.expect("the retry must have a deadline");
+        assert_eq!(due_at, now + chrono::Duration::milliseconds(1000));
+        assert!(
+            continuation
+                .events
+                .iter()
+                .any(|event| event.event_type == "retryScheduled"),
+            "the retry must be announced on the public event trail"
+        );
+
+        continuation
+            .apply_command(
+                ResumeCommand::TimerFired {
+                    run_id: "run".into(),
+                    wait_id: retry.id.clone(),
+                    expected_deadline: due_at,
+                },
+                "scheduler",
+                due_at,
+            )
+            .expect("the due retry should resume");
+        let KernelOutcome::Effects(requests) = continuation
+            .run_until_blocked(workflow.parsed(), due_at)
+            .expect("the retry should re-invoke the activity")
+        else {
+            panic!("expected the second archive invocation")
+        };
+        let second = requests.first().expect("one retried invocation");
+        assert_eq!(second.attempt, 2);
+        assert_ne!(
+            second.effect_key, first.effect_key,
+            "the retried invocation must mint a fresh effect key"
+        );
+        continuation
+            .apply_effect_observation(
+                observation(second, json!("request"), "completed", due_at),
+                due_at,
+            )
+            .expect("the retried observation should apply");
+        assert!(matches!(
+            continuation
+                .run_until_blocked(workflow.parsed(), due_at)
+                .expect("the retried token should reach the output"),
+            KernelOutcome::Completed(value) if value == json!("request")
+        ));
+
+        // Exhaustion: with maxAttempts 2, a second failure leaves the token
+        // with disposition failed, and the archive node's completed-only
+        // routing fails the run honestly instead of emitting an error record
+        // as the answer.
+        let mut exhausted = suspend_and_approve(&workflow, Value::Null, now);
+        let KernelOutcome::Effects(requests) = exhausted
+            .run_until_blocked(workflow.parsed(), now)
+            .expect("the approved token should reach the activity")
+        else {
+            panic!("expected the archive invocation")
+        };
+        exhausted
+            .apply_effect_observation(
+                observation(
+                    requests.first().expect("one archive invocation"),
+                    json!({"error":"chroma unreachable"}),
+                    "failed",
+                    now,
+                ),
+                now,
+            )
+            .expect("the failed observation should schedule a retry");
+        let KernelOutcome::Suspended(waits) = exhausted
+            .run_until_blocked(workflow.parsed(), now)
+            .expect("the retry should suspend durably")
+        else {
+            panic!("expected a retry suspension")
+        };
+        let retry = waits.first().expect("one retry wait");
+        let due_at = retry.due_at.expect("the retry must have a deadline");
+        exhausted
+            .apply_command(
+                ResumeCommand::TimerFired {
+                    run_id: "run".into(),
+                    wait_id: retry.id.clone(),
+                    expected_deadline: due_at,
+                },
+                "scheduler",
+                due_at,
+            )
+            .expect("the due retry should resume");
+        let KernelOutcome::Effects(requests) = exhausted
+            .run_until_blocked(workflow.parsed(), due_at)
+            .expect("the retry should re-invoke the activity")
+        else {
+            panic!("expected the second archive invocation")
+        };
+        exhausted
+            .apply_effect_observation(
+                observation(
+                    requests.first().expect("one retried invocation"),
+                    json!({"error":"chroma unreachable"}),
+                    "failed",
+                    due_at,
+                ),
+                due_at,
+            )
+            .expect("the exhausted observation itself applies; routing fails next");
+        assert!(
+            exhausted
+                .run_until_blocked(workflow.parsed(), due_at)
+                .expect_err("exhausted retries must fail the run, not fake an answer")
+                .to_string()
+                .contains("produced disposition failed with no matching route group")
+        );
+    }
+
     #[test]
     fn path_qualified_command_resumes_the_exact_nested_wait() {
         let definition = definition(
@@ -3609,30 +3962,29 @@ mod tests {
         )
         .expect("continuation should start");
 
-        let observe_effects =
-            |continuation: &mut ContinuationEnvelope,
-             definition_ref: &super::super::workflow::Definition,
-             dispositions: &[(&str, &str)]| {
-                let KernelOutcome::Effects(requests) = continuation
-                    .run_until_blocked(definition_ref, now)
-                    .expect("kernel should request the child activities")
-                else {
-                    panic!("expected activity effect requests")
-                };
-                assert_eq!(requests.len(), dispositions.len());
-                for (node, disposition) in dispositions {
-                    let request = requests
-                        .iter()
-                        .find(|request| request.node_id == *node)
-                        .unwrap_or_else(|| panic!("no pending effect for {node}"));
-                    continuation
-                        .apply_effect_observation(
-                            observation(request, json!({"from": node}), disposition, now),
-                            now,
-                        )
-                        .expect("observation should apply");
-                }
+        let observe_effects = |continuation: &mut ContinuationEnvelope,
+                               definition_ref: &super::super::workflow::Definition,
+                               dispositions: &[(&str, &str)]| {
+            let KernelOutcome::Effects(requests) = continuation
+                .run_until_blocked(definition_ref, now)
+                .expect("kernel should request the child activities")
+            else {
+                panic!("expected activity effect requests")
             };
+            assert_eq!(requests.len(), dispositions.len());
+            for (node, disposition) in dispositions {
+                let request = requests
+                    .iter()
+                    .find(|request| request.node_id == *node)
+                    .unwrap_or_else(|| panic!("no pending effect for {node}"));
+                continuation
+                    .apply_effect_observation(
+                        observation(request, json!({"from": node}), disposition, now),
+                        now,
+                    )
+                    .expect("observation should apply");
+            }
+        };
 
         observe_effects(
             &mut continuation,

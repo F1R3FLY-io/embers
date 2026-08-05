@@ -190,6 +190,27 @@ pub struct DeploySignedRunCommandReq {
 }
 
 #[derive(Debug, Clone)]
+pub struct RevealOutputReq {
+    pub run_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RevealOutputResp {
+    pub reveal_id: String,
+    pub contract: PreparedContract,
+    pub issued_at: DateTime<Utc>,
+    pub output_content_hash: String,
+    pub output_capability_hash: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedRevealOutputReq {
+    pub contract: SignedCode,
+    pub prepare_request: RevealOutputReq,
+    pub prepare_response: RevealOutputResp,
+}
+
+#[derive(Debug, Clone)]
 pub struct RunState {
     pub run_id: String,
     pub agents_team: Uri,

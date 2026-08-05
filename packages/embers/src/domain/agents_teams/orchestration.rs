@@ -1008,7 +1008,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         Ok(output)
     }
 
-    async fn read_deploy_result<T: serde::de::DeserializeOwned + Send>(
+    pub(crate) async fn read_deploy_result<T: serde::de::DeserializeOwned + Send>(
         &self,
         deploy_id: DeployId,
     ) -> anyhow::Result<T> {

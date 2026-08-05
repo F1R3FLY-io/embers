@@ -32,7 +32,7 @@ pub struct AgentsApi;
 
 #[OpenApi(prefix_path = "/ai-agents", tag = ApiTags::AIAgents)]
 impl AgentsApi {
-    #[oai(path = "/:address", method = "get")]
+    #[oai(path = "/:address", method = "get", operation_id = "agents_list")]
     async fn list(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -42,7 +42,11 @@ impl AgentsApi {
         Ok(Json(agents.into()))
     }
 
-    #[oai(path = "/:address/:id/versions", method = "get")]
+    #[oai(
+        path = "/:address/:id/versions",
+        method = "get",
+        operation_id = "agents_list_versions"
+    )]
     async fn list_versions(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -52,7 +56,11 @@ impl AgentsApi {
         agents.list_versions(address.0, id).await.into()
     }
 
-    #[oai(path = "/:address/:id/versions/:version", method = "get")]
+    #[oai(
+        path = "/:address/:id/versions/:version",
+        method = "get",
+        operation_id = "agents_get_version"
+    )]
     async fn get(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -63,7 +71,11 @@ impl AgentsApi {
         agents.get(address.0, id, version).await.into()
     }
 
-    #[oai(path = "/create/prepare", method = "post")]
+    #[oai(
+        path = "/create/prepare",
+        method = "post",
+        operation_id = "agents_prepare_create"
+    )]
     async fn prepare_create(
         &self,
         Json(body): Json<CreateAgentReq>,
@@ -80,7 +92,11 @@ impl AgentsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/create/send", method = "post")]
+    #[oai(
+        path = "/create/send",
+        method = "post",
+        operation_id = "agents_send_create"
+    )]
     async fn create(
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateAgentReq, CreateAgentResp>,
@@ -90,7 +106,11 @@ impl AgentsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/deploy/prepare", method = "post")]
+    #[oai(
+        path = "/deploy/prepare",
+        method = "post",
+        operation_id = "agents_prepare_deploy"
+    )]
     async fn prepare_deploy(
         &self,
         Json(body): Json<DeployAgentReq>,
@@ -107,7 +127,11 @@ impl AgentsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/deploy/send", method = "post")]
+    #[oai(
+        path = "/deploy/send",
+        method = "post",
+        operation_id = "agents_send_deploy"
+    )]
     async fn deploy(
         &self,
         SendRequest(body): SendRequest<DeploySignedAgentReq, DeployAgentReq, DeployAgentResp>,
@@ -117,7 +141,11 @@ impl AgentsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/:id/save/prepare", method = "post")]
+    #[oai(
+        path = "/:id/save/prepare",
+        method = "post",
+        operation_id = "agents_prepare_save"
+    )]
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
@@ -135,7 +163,11 @@ impl AgentsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/:id/save/send", method = "post")]
+    #[oai(
+        path = "/:id/save/send",
+        method = "post",
+        operation_id = "agents_send_save"
+    )]
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
@@ -146,7 +178,11 @@ impl AgentsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/:id/delete/prepare", method = "post")]
+    #[oai(
+        path = "/:id/delete/prepare",
+        method = "post",
+        operation_id = "agents_prepare_delete"
+    )]
     async fn prepare_delete(
         &self,
         Path(id): Path<String>,
@@ -156,7 +192,11 @@ impl AgentsApi {
         Ok(Json(contract.into()))
     }
 
-    #[oai(path = "/:id/delete/send", method = "post")]
+    #[oai(
+        path = "/:id/delete/send",
+        method = "post",
+        operation_id = "agents_send_delete"
+    )]
     async fn delete(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,

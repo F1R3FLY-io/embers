@@ -1,0 +1,42 @@
+@startuml
+title GET /api/ai-agents-teams/{address}/{id}/versions/{version} — fetch one full team version
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Team owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.getVersion(id, version)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Owner -> SDK : getVersion(id, version)
+SDK -> API : GET /api/ai-agents-teams/{address}/{id}/versions/{version}
+API -> Domain : get(address, id, version)
+Domain -> Chain : explore-deploy get.rho
+alt the version exists
+  Chain --> Domain : full record
+  Domain --> API : AgentsTeam { ..., graph?, definition? }
+  API --> SDK : 200 AgentsTeam\n(graph parsed to a typed AST by the SDK)
+  SDK --> Owner : team incl. both serializations
+else unknown address, id, or version
+  Chain --> Domain : nothing
+  API <-- Domain : not found
+  SDK <-- API : 404, no body
+end
+
+note over Domain #FFF0C7
+A team version carries up to two serializations
+of one drawing: the legacy graphl graph (TOGL
+term algebra) and the Workflow v2 definition
+(statechart semantics). Deploy prefers the
+definition and falls back to the graph.
+end note
+@enduml

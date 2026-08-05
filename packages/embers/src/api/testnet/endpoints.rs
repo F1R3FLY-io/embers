@@ -17,7 +17,11 @@ pub struct TestnetApi;
 
 #[OpenApi(prefix_path = "/testnet", tag = ApiTags::Testnet)]
 impl TestnetApi {
-    #[oai(path = "/wallet", method = "post")]
+    #[oai(
+        path = "/wallet",
+        method = "post",
+        operation_id = "testnet_create_wallet"
+    )]
     async fn create_wallet(
         &self,
         Data(testnet): Data<&TestnetService>,
@@ -26,7 +30,11 @@ impl TestnetApi {
         Ok(Json(wallet.into()))
     }
 
-    #[oai(path = "/deploy/prepare", method = "post")]
+    #[oai(
+        path = "/deploy/prepare",
+        method = "post",
+        operation_id = "testnet_prepare_deploy"
+    )]
     async fn prepare_deploy(
         &self,
         Json(body): Json<DeployTestReq>,
@@ -43,7 +51,11 @@ impl TestnetApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/deploy/send", method = "post")]
+    #[oai(
+        path = "/deploy/send",
+        method = "post",
+        operation_id = "testnet_send_deploy"
+    )]
     async fn deploy(
         &self,
         SendRequest(body): SendRequest<DeploySignedTestReq, DeployTestReq, DeployTestResp>,

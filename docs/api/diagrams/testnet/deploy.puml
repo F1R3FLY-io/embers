@@ -1,0 +1,73 @@
+@startuml
+title POST /api/testnet/deploy/prepare + /send — deploy a Rholang test and read back its logs
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Test author" as Author #FFD8C2
+participant "TestnetApiSdk\n.deploy(testKey, test, env?)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "TestnetService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Author -> SDK : deploy(testKey, test, env?)
+
+group Phase 1 — prepare (deploys nothing)
+SDK -> API : POST /api/testnet/deploy/prepare\n{ test, env? }
+API -> Domain : prepare_test_contract
+Domain -> Chain : get head block index
+Chain --> Domain : valid-after block number
+Domain --> API : { test_contract, env_contract? }\n(protobuf DeployData bytes)
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign — locally, with the faucet key
+SDK -> SDK : signContract(test_contract, testKey)
+SDK -> SDK : signContract(env_contract, testKey)\nonly when env was supplied
+end
+
+group Phase 2 — send (deploy, await finality, read logs)
+SDK -> API : POST /api/testnet/deploy/send\n{ prepare_request, prepare_response,\n  request: { test, env? }, token }
+API -> API : decode token,\nverify the echo hash binding
+API -> Domain : deploy_test_contract
+alt env deploy fails
+  Domain -> Chain : deploy signed env contract
+  Chain --> Domain : error
+  API <-- Domain : EnvDeployFailed { error }
+  SDK <-- API : 200 { type: "EnvDeployFailed", error }
+else test deploy fails
+  Domain -> Chain : deploy signed env contract (when present: ok)
+  Domain -> Chain : deploy signed test contract
+  Chain --> Domain : error
+  API <-- Domain : TestDeployFailed { error }
+  SDK <-- API : 200 { type: "TestDeployFailed", error }
+else both deploys land
+  Domain -> Chain : deploy env (when present), then test
+  Domain -> Chain : await finalization of the test deploy
+  Chain --> Domain : finalized without on-chain error
+  loop up to 5 attempts, 500 ms apart
+    Domain -> Chain : explore-deploy get_logs.rho\n(registry log channel, deploy id)
+    Chain --> Domain : log entries, possibly not yet visible
+  end
+  API <-- Domain : Ok { logs }
+  SDK <-- API : 200 { type: "Ok",\n  logs: [{ level, message }] }
+end
+SDK --> Author : DeploySignedTestResp
+end
+
+note over Domain #FFF0C7
+Finalization failures are HTTP 500s, not union
+variants: "deploy ... errored on chain" and
+"block is not finalized" (domain/testnet/deploy_test.rs).
+The log readback retries to absorb observer
+read-after-write lag; a test that logs nothing
+yields logs: [].
+end note
+@enduml

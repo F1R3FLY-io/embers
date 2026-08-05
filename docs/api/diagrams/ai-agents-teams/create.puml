@@ -1,0 +1,58 @@
+@startuml
+title POST /api/ai-agents-teams/create/prepare + /send — record a new team on chain
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Team owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.create(req)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Owner -> SDK : create({ name, description?, shard?,\n  logo?, graph?, definition? })
+
+group Phase 1 — prepare (deploys nothing; identities minted here)
+SDK -> API : POST /api/ai-agents-teams/create/prepare
+API -> Domain : prepare_create_contract
+Domain -> Domain : mint id = UUIDv4, version = UUIDv7;\nrender create.rho storing BOTH\nserializations: graphl text and\ndefinition JSON
+Domain -> Chain : get head block index
+Chain --> Domain : valid-after block number
+Domain --> API : CreateAgentsTeamResp\n{ id, version, contract }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign, subscribe, send
+SDK -> SDK : signed = signContract(contract, privateKey)
+SDK -> Events : subscribeForDeploy(\n  hex(signed.sig).toLowerCase(), maxWait)
+SDK -> API : POST /api/ai-agents-teams/create/send\n{ prepare_request, prepare_response,\n  request: signed, token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy signed contract
+Domain -> Chain : deploy
+Chain --> Domain : accepted
+API <-- Domain : deploy id
+SDK <-- API : 200 SendResp { deploy_id }
+SDK --> Owner : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed on the WebSocket
+Chain --> Events : Finalized { deploy_id, ...,\n  node_type: Observer }
+Events --> Owner : waitForFinalization resolves\n(or rejects after maxWait)
+end
+
+note over Domain #FFF0C7
+Creating records the team; it does not compile
+or deploy it as a running workflow. The editor
+saves the same canvas as a graphl term (the
+structural algebra) and a Workflow v2 definition
+(the executable statechart) in one record.
+end note
+@enduml

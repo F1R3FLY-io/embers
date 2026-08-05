@@ -1,0 +1,58 @@
+@startuml
+title POST /api/ai-agents/{id}/save/prepare + /send — append a new version to an agent
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Agent owner" as Owner #FFD8C2
+participant "AgentsApiSdk\n.save(id, req)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "AgentsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Owner -> SDK : save(id, { name, description?,\n  shard?, logo?, code? })
+
+group Phase 1 — prepare (deploys nothing; new version minted here)
+SDK -> API : POST /api/ai-agents/{id}/save/prepare
+API -> Domain : prepare_save_contract(id, req)
+Domain -> Domain : mint version = UUIDv7;\nrender save.rho with the\nfull replacement payload
+Domain -> Chain : get head block index
+Chain --> Domain : valid-after block number
+Domain --> API : SaveAgentResp { version, contract }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign, subscribe, send
+SDK -> SDK : signed = signContract(contract, privateKey)
+SDK -> Events : subscribeForDeploy(\n  hex(signed.sig).toLowerCase(), maxWait)
+SDK -> API : POST /api/ai-agents/{id}/save/send\n{ prepare_request, prepare_response,\n  request: signed, token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy signed contract
+Domain -> Chain : deploy
+Chain --> Domain : accepted
+API <-- Domain : deploy id
+SDK <-- API : 200 SendResp { deploy_id }
+SDK --> Owner : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed on the WebSocket
+Chain --> Events : Finalized { deploy_id, ...,\n  node_type: Observer }
+Events --> Owner : waitForFinalization resolves\n(or rejects after maxWait)
+end
+
+note over Domain #FFF0C7
+A save appends: earlier versions stay readable
+and deployable. The payload is a full
+replacement, not a diff. Teams reference agents
+by pinned (id, version), so saving never moves
+a team off the version it validated.
+end note
+@enduml

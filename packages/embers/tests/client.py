@@ -107,13 +107,14 @@ class TestnetApi:
         assert resp.status == 200, resp.body
         return resp
 
-    def deploy(self, wallet: Wallet, test: str, env: str | None = None) -> Responce:
+    def deploy(self, wallet: Wallet, test: str, env: str | None = None, timeout: int = DEFAULT_TIMEOUT) -> Responce:
         prepare_request = {"test": test, "env": env}
         resp = self._client.post("/testnet/deploy/prepare", json=prepare_request)
         assert resp.status == 200
 
         resp_next = self._client.post(
             "/testnet/deploy/send",
+            timeout=timeout,
             json={
                 "prepare_request": prepare_request,
                 "prepare_response": resp.json["response"],
@@ -274,6 +275,7 @@ class AgentsApi:
         shard: str | None = None,
         logo: str | None = None,
         code: str | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> UpdateResponce:
         prepare_request = {"name": name, "description": description, "shard": shard, "logo": logo, "code": code}
         resp = self._client.post("/ai-agents/create/prepare", json=prepare_request)
@@ -281,6 +283,7 @@ class AgentsApi:
 
         resp_next = self._client.post(
             "/ai-agents/create/send",
+            timeout=timeout,
             json={
                 "prepare_request": prepare_request,
                 "prepare_response": resp.json["response"],
@@ -305,6 +308,7 @@ class AgentsApi:
         shard: str | None = None,
         logo: str | None = None,
         code: str | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> UpdateResponce:
         prepare_request = {"name": name, "description": description, "shard": shard, "logo": logo, "code": code}
         resp = self._client.post(f"/ai-agents/{agent_id}/save/prepare", json=prepare_request)
@@ -312,6 +316,7 @@ class AgentsApi:
 
         resp_next = self._client.post(
             f"/ai-agents/{agent_id}/save/send",
+            timeout=timeout,
             json={
                 "prepare_request": prepare_request,
                 "prepare_response": resp.json["response"],
@@ -378,6 +383,7 @@ class AgentsTeamsApi:
         logo: str | None = None,
         graph: str | None = None,
         definition: dict[str, Any] | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> UpdateResponce:
         prepare_request = {
             "name": name,
@@ -392,6 +398,7 @@ class AgentsTeamsApi:
 
         resp_next = self._client.post(
             "/ai-agents-teams/create/send",
+            timeout=timeout,
             json={
                 "prepare_request": prepare_request,
                 "prepare_response": resp.json["response"],
@@ -407,7 +414,7 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
-    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, deploy: dict) -> UpdateResponce:
+    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, deploy: dict, timeout: int = DEFAULT_TIMEOUT) -> UpdateResponce:
         prepare_request = {
             "type": "AgentsTeam",
             "id": agents_team.id,
@@ -420,6 +427,7 @@ class AgentsTeamsApi:
 
         resp_next = self._client.post(
             "/ai-agents-teams/deploy/send",
+            timeout=timeout,
             json={
                 "prepare_request": prepare_request,
                 "prepare_response": resp.json["response"],
@@ -442,13 +450,16 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
-    def deploy_graph(self, wallet: Wallet, graph: str, deploy: dict) -> UpdateResponce:
+    def deploy_graph(
+        self, wallet: Wallet, graph: str, deploy: dict, timeout: int = DEFAULT_TIMEOUT
+    ) -> UpdateResponce:
         prepare_request = {"type": "Graph", "graph": graph, "deploy": deploy}
         resp = self._client.post("/ai-agents-teams/deploy/prepare", json=prepare_request)
         assert resp.status == 200, resp.body
 
         resp_next = self._client.post(
             "/ai-agents-teams/deploy/send",
+            timeout=timeout,
             json={
                 "prepare_request": prepare_request,
                 "prepare_response": resp.json["response"],
@@ -469,7 +480,7 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
-    def run(self, wallet: Wallet, prompt: str, agents_team: str) -> Responce:
+    def run(self, wallet: Wallet, prompt: str, agents_team: str, timeout: int = DEFAULT_TIMEOUT) -> Responce:
         prepare_request = {"prompt": prompt, "agents_team": agents_team}
         resp = self._client.post("/ai-agents-teams/run/prepare", json=prepare_request)
         assert resp.status == 200, resp.body
@@ -482,6 +493,7 @@ class AgentsTeamsApi:
                 "request": sing_contract(wallet, resp.json["response"]["contract"]),
                 "token": resp.json["token"],
             },
+            timeout=timeout,
         )
         assert resp_next.status == 200, resp_next.body
 
@@ -510,6 +522,7 @@ class AgentsTeamsApi:
         target_team_uri: str | None = None,
         state_patch: list[dict[str, Any]] | None = None,
         expected_status: int = 200,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> Responce:
         prepare_request = {
             "expected_revision": str(expected_revision),
@@ -539,6 +552,36 @@ class AgentsTeamsApi:
                 "request": sing_contract(wallet, resp.json["response"]["contract"]),
                 "token": resp.json["token"],
             },
+            timeout=timeout,
+        )
+        assert resp_next.status == expected_status, resp_next.body
+        return resp_next
+
+    def reveal_output(
+        self,
+        wallet: Wallet,
+        run_id: str,
+        *,
+        expected_prepare_status: int = 200,
+        expected_status: int = 200,
+        timeout: int = DEFAULT_TIMEOUT,
+    ) -> Responce:
+        # The prepare phase takes no body: the run id rides the path and is
+        # bound into the JWT as the hashed prepare request.
+        resp = self._client.post(f"/ai-agents-teams/runs/{run_id}/output/prepare")
+        assert resp.status == expected_prepare_status, resp.body
+        if expected_prepare_status != 200:
+            return resp
+
+        resp_next = self._client.post(
+            f"/ai-agents-teams/runs/{run_id}/output/send",
+            json={
+                "prepare_request": run_id,
+                "prepare_response": resp.json["response"],
+                "request": sing_contract(wallet, resp.json["response"]["contract"]),
+                "token": resp.json["token"],
+            },
+            timeout=timeout,
         )
         assert resp_next.status == expected_status, resp_next.body
         return resp_next

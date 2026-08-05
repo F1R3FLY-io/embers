@@ -147,7 +147,9 @@ def test_at_mention_executes_team_and_posts_bounded_thread_reply(
         ),
     ).wait_for_sync()
     uri = public_key_to_uri(deployment_key.public_key)
-    handle = f"team{funded_wallet.address[-12:].lower()}.test"
+    # Readable purpose prefix + wallet-derived suffix: comprehensible in the
+    # local feed, collision-free across parallel test wallets.
+    handle = f"echo-team-{funded_wallet.address[-8:].lower()}.test"
     client.agents_teams.publish_to_firesky(
         funded_wallet,
         agents_team.id,

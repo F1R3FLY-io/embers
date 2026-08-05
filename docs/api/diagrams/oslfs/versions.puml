@@ -1,0 +1,40 @@
+@startuml
+title GET /api/oslfs/{address}/{id}/versions — every stored version of one document
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Document owner" as Owner #FFD8C2
+participant "OslfsApiSdk\n.getVersions(id)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "OslfsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Owner -> SDK : getVersions(id)
+SDK -> API : GET /api/oslfs/{address}/{id}/versions
+API -> Domain : list_versions(address, id)
+Domain -> Chain : explore-deploy list_versions.rho
+alt document exists
+  Chain --> Domain : OslfHeader[] (one per version)
+  Domain --> API : Oslfs { oslfs }
+  API --> SDK : 200 Oslfs
+  SDK --> Owner : version headers
+else unknown id for this address
+  Chain --> Domain : nothing
+  API <-- Domain : not found
+  SDK <-- API : 404, no body
+end
+
+note over Domain #FFF0C7
+Versions are UUIDv7 identifiers: creation order
+is recoverable by sorting versions, and
+created_at timestamps the write that made each.
+end note
+@enduml

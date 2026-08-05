@@ -1,0 +1,78 @@
+@startuml
+title POST /api/ai-agents/deploy/prepare + /send — deploy agent code as a running contract
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Agent owner" as Owner #FFD8C2
+participant "AgentsApiSdk\n.deploy(id, version) |\n.deployCode(code)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "AgentsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+group Phase 1 — prepare (deploys nothing)
+SDK -> API : POST /api/ai-agents/deploy/prepare\n{ type: "Agent", id, version, address }\nor { type: "Code", code }
+API -> Domain : prepare_deploy_contract
+alt type = "Agent" — deploy a stored version
+  Domain -> Chain : read the stored agent\n(retry 10 x 500 ms for observer lag)
+  Chain --> Domain : Agent { code, ... }
+  Domain -> Domain : reject when absent or empty:\n"agent not found" / "agent has no code"
+  Domain -> Domain : render deploy_agent.rho —\nbind the entry contract to handle\n"agent:{id}:{version}"
+  Domain -> Domain : render record_deploy.rho —\nthe system contract stamping\nlast_deploy on the stored record
+  Domain --> API : DeployAgentResp\n{ contract, system }
+else type = "Code" — deploy raw source
+  Domain -> Domain : pass the source through verbatim
+  Domain --> API : DeployAgentResp { contract }
+end
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign, subscribe, send
+SDK -> SDK : signContract(contract, privateKey)
+SDK -> SDK : signContract(system, privateKey)\nwhen present — same wallet key
+SDK -> Events : subscribeForDeploy(\n  hex(contract.sig).toLowerCase(), maxWait)
+SDK -> API : POST /api/ai-agents/deploy/send\n{ prepare_request, prepare_response,\n  request: { contract, system? }, token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy_signed_deploy
+Domain -> Chain : deploy MAIN contract
+Chain --> Domain : main deploy id
+alt system contract present (type = "Agent")
+  Domain -> Chain : deploy SYSTEM contract
+  Chain --> Domain : system deploy id
+  API <-- Domain : system deploy id\n(the final ordered write)
+else no system contract (type = "Code")
+  API <-- Domain : main deploy id
+end
+SDK <-- API : 200 SendResp { deploy_id }
+SDK --> Owner : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed on the WebSocket
+Chain --> Events : Finalized { deploy_id: hex(contract.sig),\n  ..., node_type: Observer }
+Events --> Owner : waitForFinalization resolves\n(keyed on the MAIN contract)
+end
+
+note over API #FFF6C9
+For type "Agent", two identifiers exist: the
+response's deploy_id names the SYSTEM write
+(the synchronization barrier), while the SDK's
+finalization wait is keyed on the MAIN
+contract's signature. Both deploys finalize;
+they are different deploys.
+end note
+
+note over Domain #FFF0C7
+The stored code is deployed verbatim. An agent
+authored for a team context is rejected: its
+"main" is a free name at the top level of a
+standalone deploy.
+end note
+@enduml

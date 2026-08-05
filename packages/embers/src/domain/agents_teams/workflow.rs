@@ -1764,10 +1764,7 @@ mod tests {
         }
     }
 
-    fn lifecycle_route_document(
-        target: &str,
-        trigger: &str,
-    ) -> serde_json::Value {
+    fn lifecycle_route_document(target: &str, trigger: &str) -> serde_json::Value {
         json!({
             "schemaVersion": "2.0",
             "entryScopeId": "root",

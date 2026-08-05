@@ -46,7 +46,10 @@ def _deploy(client: ApiClient, wallet: Wallet, team: AgentsTeam) -> None:
 def _unique_handle(wallet: Wallet) -> str:
     # The wallet address is fresh per test, so its tail is a handle nobody has taken.
     # Lowercase because atproto normalises handles and the PDS rejects a mismatch.
-    return f"team{wallet.address[-12:].lower()}.test"
+    # A readable purpose prefix plus a wallet-derived suffix: humans browsing the
+    # local feed can tell what the account is, while the suffix keeps parallel
+    # test wallets from colliding on the handle.
+    return f"echo-team-{wallet.address[-8:].lower()}.test"
 
 
 def _publish(client: ApiClient, wallet: Wallet, team: AgentsTeam) -> str:

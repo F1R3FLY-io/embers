@@ -14,10 +14,12 @@ use crate::api::agents_teams::models::{
     DeployAgentsTeamResp,
     DeploySignedAgentsTeamReq,
     DeploySignedRunOnFireskyReq,
+    PrepareRevealOutputResponse,
     PublishToFireskyReq,
     PublishToFireskyResp,
     PublishedState,
     ReferencingTeam,
+    RevealOutputResp,
     RunCommandReq,
     RunCommandResp,
     RunReq,
@@ -25,6 +27,7 @@ use crate::api::agents_teams::models::{
     RunState,
     SaveAgentsTeamReq,
     SaveAgentsTeamResp,
+    SendRevealOutputResponse,
 };
 use crate::api::common::{
     ApiTags,
@@ -43,7 +46,7 @@ pub struct AgentsTeamsApi;
 
 #[OpenApi(prefix_path = "/ai-agents-teams", tag = ApiTags::AIAgentsTeams)]
 impl AgentsTeamsApi {
-    #[oai(path = "/:address", method = "get")]
+    #[oai(path = "/:address", method = "get", operation_id = "agents_teams_list")]
     async fn list(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -53,7 +56,11 @@ impl AgentsTeamsApi {
         Ok(Json(agents_teams.into()))
     }
 
-    #[oai(path = "/:address/:id/versions", method = "get")]
+    #[oai(
+        path = "/:address/:id/versions",
+        method = "get",
+        operation_id = "agents_teams_list_versions"
+    )]
     async fn list_versions(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -63,7 +70,11 @@ impl AgentsTeamsApi {
         agents_teams.list_versions(address.0, id).await.into()
     }
 
-    #[oai(path = "/:address/:id/versions/:version", method = "get")]
+    #[oai(
+        path = "/:address/:id/versions/:version",
+        method = "get",
+        operation_id = "agents_teams_get_version"
+    )]
     async fn get(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -74,7 +85,11 @@ impl AgentsTeamsApi {
         agents_teams.get(address.0, id, version).await.into()
     }
 
-    #[oai(path = "/create/prepare", method = "post")]
+    #[oai(
+        path = "/create/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_create"
+    )]
     async fn prepare_create(
         &self,
         Json(body): Json<CreateAgentsTeamReq>,
@@ -91,7 +106,11 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/create/send", method = "post")]
+    #[oai(
+        path = "/create/send",
+        method = "post",
+        operation_id = "agents_teams_send_create"
+    )]
     async fn create(
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateAgentsTeamReq, CreateAgentsTeamResp>,
@@ -103,7 +122,11 @@ impl AgentsTeamsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/deploy/prepare", method = "post")]
+    #[oai(
+        path = "/deploy/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_deploy"
+    )]
     async fn prepare_deploy(
         &self,
         Json(body): Json<DeployAgentsTeamReq>,
@@ -121,7 +144,11 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/deploy/send", method = "post")]
+    #[oai(
+        path = "/deploy/send",
+        method = "post",
+        operation_id = "agents_teams_send_deploy"
+    )]
     async fn deploy(
         &self,
         SendRequest(body): SendRequest<
@@ -137,7 +164,11 @@ impl AgentsTeamsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/run/prepare", method = "post")]
+    #[oai(
+        path = "/run/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_run"
+    )]
     async fn prepare_run(
         &self,
         Json(body): Json<RunReq>,
@@ -154,7 +185,11 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/run/send", method = "post")]
+    #[oai(
+        path = "/run/send",
+        method = "post",
+        operation_id = "agents_teams_send_run"
+    )]
     async fn run(
         &self,
         SendRequest(body): SendRequest<SignedContract, RunReq, RunResp>,
@@ -171,7 +206,11 @@ impl AgentsTeamsApi {
             .map_err(Into::into)
     }
 
-    #[oai(path = "/run-on-firesky/prepare", method = "post")]
+    #[oai(
+        path = "/run-on-firesky/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_run_on_firesky"
+    )]
     async fn prepare_run_on_firesky(
         &self,
         Json(body): Json<RunReq>,
@@ -188,7 +227,11 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/run-on-firesky/send", method = "post")]
+    #[oai(
+        path = "/run-on-firesky/send",
+        method = "post",
+        operation_id = "agents_teams_send_run_on_firesky"
+    )]
     async fn run_on_firesky(
         &self,
         SendRequest(body): SendRequest<DeploySignedRunOnFireskyReq, RunReq, RunResp>,
@@ -210,7 +253,11 @@ impl AgentsTeamsApi {
         Ok(())
     }
 
-    #[oai(path = "/runs/:run_id", method = "get")]
+    #[oai(
+        path = "/runs/:run_id",
+        method = "get",
+        operation_id = "agents_teams_get_run"
+    )]
     async fn get_run(
         &self,
         Path(run_id): Path<String>,
@@ -219,7 +266,11 @@ impl AgentsTeamsApi {
         agents_teams.get_run(run_id).await.into()
     }
 
-    #[oai(path = "/runs/:run_id/commands/prepare", method = "post")]
+    #[oai(
+        path = "/runs/:run_id/commands/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_run_command"
+    )]
     async fn prepare_run_command(
         &self,
         Path(run_id): Path<String>,
@@ -240,7 +291,11 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/runs/:run_id/commands/send", method = "post")]
+    #[oai(
+        path = "/runs/:run_id/commands/send",
+        method = "post",
+        operation_id = "agents_teams_send_run_command"
+    )]
     async fn send_run_command(
         &self,
         Path(run_id): Path<String>,
@@ -259,7 +314,63 @@ impl AgentsTeamsApi {
             .map_err(Into::into)
     }
 
-    #[oai(path = "/:id/save/prepare", method = "post")]
+    #[oai(
+        path = "/runs/:run_id/output/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_reveal_output"
+    )]
+    async fn prepare_reveal_output(
+        &self,
+        Path(run_id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> PrepareRevealOutputResponse {
+        match PrepareResponse::from_call(
+            run_id,
+            |run_id| agents_teams.prepare_reveal_output(models::RevealOutputReq { run_id }),
+            encoding_key,
+        )
+        .await
+        {
+            Ok(response) => PrepareRevealOutputResponse::Ok(Json(response)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/runs/:run_id/output/send",
+        method = "post",
+        operation_id = "agents_teams_send_reveal_output"
+    )]
+    async fn send_reveal_output(
+        &self,
+        Path(run_id): Path<String>,
+        SendRequest(body): SendRequest<SignedContract, String, RevealOutputResp>,
+        Data(agents_teams): Data<&AgentsTeamsService>,
+    ) -> SendRevealOutputResponse {
+        if body.prepare_request != run_id {
+            return SendRevealOutputResponse::BadRequest(Json(
+                anyhow::anyhow!("output reveal run id differs from the prepared run").into(),
+            ));
+        }
+        match agents_teams
+            .deploy_signed_reveal_output(models::DeploySignedRevealOutputReq {
+                contract: body.request.into(),
+                prepare_request: models::RevealOutputReq { run_id },
+                prepare_response: body.prepare_response.into(),
+            })
+            .await
+        {
+            Ok(value) => SendRevealOutputResponse::Ok(Json(value)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/:id/save/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_save"
+    )]
     async fn prepare_save(
         &self,
         Path(id): Path<String>,
@@ -277,7 +388,11 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/:id/save/send", method = "post")]
+    #[oai(
+        path = "/:id/save/send",
+        method = "post",
+        operation_id = "agents_teams_send_save"
+    )]
     async fn save(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
@@ -288,7 +403,11 @@ impl AgentsTeamsApi {
         Ok(Json(deploy_id.into()))
     }
 
-    #[oai(path = "/:id/delete/prepare", method = "post")]
+    #[oai(
+        path = "/:id/delete/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_delete"
+    )]
     async fn prepare_delete(
         &self,
         Path(id): Path<String>,
@@ -298,7 +417,11 @@ impl AgentsTeamsApi {
         Ok(Json(contract.into()))
     }
 
-    #[oai(path = "/:id/delete/send", method = "post")]
+    #[oai(
+        path = "/:id/delete/send",
+        method = "post",
+        operation_id = "agents_teams_send_delete"
+    )]
     async fn delete(
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
@@ -311,7 +434,11 @@ impl AgentsTeamsApi {
 
     /// Every team whose latest version uses the given agent, so deleting that agent
     /// can name what it would break before doing it. See `referencing_teams`.
-    #[oai(path = "/:address/referencing/:agent_id", method = "get")]
+    #[oai(
+        path = "/:address/referencing/:agent_id",
+        method = "get",
+        operation_id = "agents_teams_referencing_teams"
+    )]
     async fn referencing_teams(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -325,7 +452,11 @@ impl AgentsTeamsApi {
     /// Stops a published team answering mentions, by removing the record that marks
     /// its account as a team. The account and handle are kept, so it is reversible
     /// by publishing again.
-    #[oai(path = "/:address/:id/unpublish", method = "post")]
+    #[oai(
+        path = "/:address/:id/unpublish",
+        method = "post",
+        operation_id = "agents_teams_unpublish"
+    )]
     async fn unpublish(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -339,7 +470,11 @@ impl AgentsTeamsApi {
     /// Reports a team's publication as the chain records it, reconciled against
     /// the PDS. Nothing previously compared the two, so a destroyed account left the
     /// interface presenting a team as published with no way to notice.
-    #[oai(path = "/:address/:id/published", method = "get")]
+    #[oai(
+        path = "/:address/:id/published",
+        method = "get",
+        operation_id = "agents_teams_published_state"
+    )]
     async fn published_state(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -349,7 +484,11 @@ impl AgentsTeamsApi {
         agents_teams.published_state(address.0, id).await.into()
     }
 
-    #[oai(path = "/:address/:id/publish-to-firesky/prepare", method = "post")]
+    #[oai(
+        path = "/:address/:id/publish-to-firesky/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_publish_to_firesky"
+    )]
     async fn prepare_publish_to_firesky(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
@@ -370,7 +509,11 @@ impl AgentsTeamsApi {
         .map_err(Into::into)
     }
 
-    #[oai(path = "/:address/:id/publish-to-firesky/send", method = "post")]
+    #[oai(
+        path = "/:address/:id/publish-to-firesky/send",
+        method = "post",
+        operation_id = "agents_teams_send_publish_to_firesky"
+    )]
     async fn publish_to_firesky(
         &self,
         #[allow(unused_variables)] Path(address): Path<Stringified<WalletAddress>>,
