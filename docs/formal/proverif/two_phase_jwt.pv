@@ -1,0 +1,115 @@
+(* ============================================================================
+   two_phase_jwt.pv — the embers two-phase prepare/send protocol (INV-S1).
+
+   Every mutating API call is two-phase (packages/embers/src/api/common.rs:480-612):
+
+     prepare(request):  server computes  response = f(request),  binds the pair with
+                        a hash, wraps {binding, exp} in a JWT signed by a per-process
+                        HMAC secret, and returns (response, token).
+     send(request, response, signed_deploy, token):
+                        server recomputes the binding, verifies the JWT tag and the
+                        binding match, and only then submits the signed deploy.
+
+   This ProVerif (applied-pi / Dolev-Yao) model discharges the AUTHENTICATION goal:
+   a send is accepted only if it is bound to a genuine prior prepare for the SAME
+   (request, response) pair — the attacker cannot fabricate an accepted send for a
+   pair the server never prepared.
+
+   Four queries:
+     1. binding (non-injective correspondence)  SendAccepted ==> PrepareIssued  -> true
+     2. secrecy of the JWT signing secret                                        -> true
+     3. replay: the INJECTIVE strengthening is FALSE (documented expected-fail —
+        api/common.rs does not consume the token, so two sends may ride one prepare;
+        the chain, not the API layer, is the anti-replay authority)              -> false
+     4. restart invalidation: a post-restart accept corresponds only to a
+        post-restart prepare, never to a token minted before the restart          -> true
+
+   MODEL GAP (declared): the binding hash. The implementation uses a 64-bit
+   *non-cryptographic* DefaultHasher; here hashbind is a free constructor, hence
+   idealized as collision-free. The gap between the two IS the standing hardening
+   recommendation — bind with a 256-bit cryptographic hash of the canonical
+   serialization. Under the idealization the protocol is sound; adopting the
+   recommendation makes the code match the model instead of relying on the
+   non-adversarial nature of the current inputs.
+
+   Validate:  proverif two_phase_jwt.pv
+   Expect:    query 1 true, query 2 true (secret not derivable), query 3 false
+              (replay trace), query 4 true.
+   ============================================================================ *)
+
+free c: channel.
+
+(* Per-process JWT signing secrets. A fresh one is drawn on every process start
+   (main.rs:276); jwtsecret2 models the secret after a restart. Both private. *)
+free jwtsecret:  bitstring [private].
+free jwtsecret2: bitstring [private].
+
+(* HMAC-SHA256 as an unforgeable keyed tag — a constructor with no destructor, so
+   hmac(k, m) is producible only by a holder of k. This is the JWT HS256 signature. *)
+fun hmac(bitstring, bitstring): bitstring.
+
+(* The request->response binding hash (see MODEL GAP above): a free constructor,
+   therefore collision-free in the symbolic model. *)
+fun hashbind(bitstring, bitstring): bitstring.
+
+(* Abstract deterministic server-side response computation. *)
+fun respond(bitstring): bitstring.
+
+event PrepareIssued(bitstring, bitstring).
+event SendAccepted(bitstring, bitstring).
+event PrepareIssuedR(bitstring, bitstring).   (* post-restart *)
+event SendAcceptedR(bitstring, bitstring).
+
+(* 1. Authentication (non-injective: replay is permitted at this layer). *)
+query r: bitstring, s: bitstring;
+  event(SendAccepted(r, s)) ==> event(PrepareIssued(r, s)).
+
+(* 2. The JWT secret is never leaked to the attacker. *)
+query attacker(jwtsecret).
+
+(* 3. Replay observable: the injective correspondence does NOT hold. *)
+query r: bitstring, s: bitstring;
+  inj-event(SendAccepted(r, s)) ==> inj-event(PrepareIssued(r, s)).
+
+(* 4. Restart invalidation. *)
+query r: bitstring, s: bitstring;
+  event(SendAcceptedR(r, s)) ==> event(PrepareIssuedR(r, s)).
+
+let prepareServer(k: bitstring) =
+  in(c, req: bitstring);
+  let resp = respond(req) in
+  let binding = hashbind(req, resp) in
+  let token = (binding, hmac(k, binding)) in
+  event PrepareIssued(req, resp);
+  out(c, (resp, token)).
+
+let sendServer(k: bitstring) =
+  in(c, m: bitstring);
+  let (req: bitstring, resp: bitstring, token: bitstring) = m in
+  let (binding: bitstring, tag: bitstring) = token in
+  if tag = hmac(k, binding) then
+  if binding = hashbind(req, resp) then
+  event SendAccepted(req, resp);
+  out(c, req).
+
+let prepareServerR(k: bitstring) =
+  in(c, req: bitstring);
+  let resp = respond(req) in
+  let binding = hashbind(req, resp) in
+  let token = (binding, hmac(k, binding)) in
+  event PrepareIssuedR(req, resp);
+  out(c, (resp, token)).
+
+let sendServerR(k: bitstring) =
+  in(c, m: bitstring);
+  let (req: bitstring, resp: bitstring, token: bitstring) = m in
+  let (binding: bitstring, tag: bitstring) = token in
+  if tag = hmac(k, binding) then
+  if binding = hashbind(req, resp) then
+  event SendAcceptedR(req, resp);
+  out(c, req).
+
+process
+  ( (! prepareServer(jwtsecret))
+  | (! sendServer(jwtsecret))
+  | phase 1; ( (! prepareServerR(jwtsecret2)) | (! sendServerR(jwtsecret2)) ) )

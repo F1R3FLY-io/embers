@@ -55,8 +55,8 @@ which properties each model discharges.
 | `tla/DeployOnce.tla` | TLC | `tlc -config DeployOnce.cfg DeployOnce.tla` | pass + retry-witness counterexample | ✅ validated (INV-C4) |
 | _frontend_ `RouteGroups.tla`, `JoinEpochs.tla`, `CancelCompensation.tla`, `MigrationPinning.tla`, `CrossScopeTokens.tla`, `DurableMultiCommand.tla`, `DurableRecovery.tla` | TLC (Apalache where state space explodes) | per file | pass | ⏳ planned (INV-K7–K13, D3/D5/D6) |
 | `uppaal/timers_recovery.xml` | UPPAAL `verifyta` | `/opt/uppaal/bin/verifyta -u -q timers_recovery.xml queries.q` | all queries satisfied | ⏳ planned (INV-T1–T4) |
-| `proverif/two_phase_jwt.pv` | ProVerif | `proverif two_phase_jwt.pv` | all queries true | ⏳ planned (INV-S1) |
-| `proverif/reveal_output.pv` | ProVerif | `proverif reveal_output.pv` | all queries true | ⏳ planned (INV-S2, S3) |
+| `proverif/two_phase_jwt.pv` | ProVerif | `proverif two_phase_jwt.pv` | binding + secrecy + restart true; replay inj false (documented) | ✅ validated (INV-S1) |
+| `proverif/reveal_output.pv` | ProVerif | `proverif reveal_output.pv` | secrecy + single-use (inj) + owner-only true | ✅ validated (INV-S2, S3) |
 | `tamarin/run_command_fencing.spthy` | Tamarin | `tamarin-prover --prove run_command_fencing.spthy` | all lemmas verified | ⏳ planned (INV-D4, S7, S8) |
 | `tamarin/continuation_capabilities.spthy` | Tamarin | `tamarin-prover --prove continuation_capabilities.spthy` | all lemmas verified | ⏳ planned (INV-S4–S6) |
 | `mcrl2/red_team_choreography.mcrl2` | mCRL2 + pgmcp `protocol_soundness` | `mcrl22lps … \| lps2pbes -f nodeadlock.mcf \| pbessolve` | deadlock-free + progress | ⏳ planned |

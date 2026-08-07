@@ -80,8 +80,15 @@ workspace = false
 script    = ["bash docs/formal/scripts/verify_tlc.sh"]
 workspace = false
 
+# Formal-verification: run every ProVerif protocol model under docs/formal/proverif/
+# and check each query's true/false verdict against the recorded sequence. Part of
+# the `fv` aggregate.
+[tasks.fv-proverif]
+script    = ["bash docs/formal/scripts/verify_proverif.sh"]
+workspace = false
+
 # Formal-verification aggregate: run every model-checking task. Extended as more
-# tool tracks (uppaal/proverif/tamarin/mcrl2/storm/rocq) land.
+# tool tracks (uppaal/tamarin/mcrl2/storm/rocq) land.
 [tasks.fv]
-dependencies = ["fv-smt", "fv-tlc"]
+dependencies = ["fv-smt", "fv-tlc", "fv-proverif"]
 workspace    = false

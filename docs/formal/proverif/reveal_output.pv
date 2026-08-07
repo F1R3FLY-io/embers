@@ -1,0 +1,85 @@
+(* ============================================================================
+   reveal_output.pv — owner-authenticated single-use output reveal (INV-S2, S3).
+
+   A run's final output rests as an encrypted artifact; the public ledger holds only
+   metadata (reveal_output.rs:1-23). Reading the value back:
+
+     prepare_reveal_output:  mints a FRESH reveal id (UUIDv7), renders a
+                             claimOutputReveal contract, returns {reveal_id, hashes}.
+     deploy_signed_reveal:   deploys the owner-signed claim. The on-chain clause
+                             adjudicates OWNERSHIP (the ledger scrubs `owner`, so no
+                             off-chain check is possible), appends an `outputRevealed`
+                             event, and forwards a positive acknowledgment over the
+                             deploy-id channel. The backend releases the decrypted
+                             value ONLY after reading that ack (reveal_output.rs:199-233).
+
+   Two security invariants, plus secrecy:
+
+     INV-S2 (single use):  each disclosure consumes one FRESH prepare. A replayed
+                           envelope carries the same signature -> same deploy id -> no
+                           new `outputRevealed` event, so the backend refuses without
+                           disclosure. Revealing again requires a new prepare. Formally:
+                           the disclosure->prepare correspondence is INJECTIVE (contrast
+                           two_phase_jwt.pv, where send replay makes it non-injective).
+     INV-S3 (fail closed): disclosure happens only under a positive owner-authorized
+                           acknowledgment; absent it (e.g. an environment predating the
+                           clause, or a non-owner claim) nothing is released.
+
+   Modeling choices. The on-chain ownership adjudication + positive ack is modeled as
+   a signature check against the owner's public identity: only a claim signed by the
+   run owner's key passes, standing in for "the clause emitted the outputRevealed ack".
+   The decrypted value is returned to the owner over an authenticated channel (priv),
+   as the real backend returns it in the authenticated HTTP response, not on chain.
+
+   Validate:  proverif reveal_output.pv
+   Expect:    query 1 true (attacker never learns the output),
+              query 2 true (single-use: injective disclosure<-prepare),
+              query 3 true (owner-only: disclosure implies owner authorization).
+   ============================================================================ *)
+
+free c:    channel.               (* the public network / chain *)
+free priv: channel [private].     (* the authenticated backend -> owner return path *)
+
+free output:  bitstring [private].  (* the run's decrypted output value *)
+free ownersk: bitstring [private].  (* the run owner's signing key *)
+
+fun sign(bitstring, bitstring): bitstring.
+fun pk(bitstring): bitstring.
+fun ok(): bitstring.
+reduc forall sk: bitstring, m: bitstring; checksign(pk(sk), m, sign(sk, m)) = ok().
+
+event PrepareReveal(bitstring).    (* a fresh reveal id was minted *)
+event OwnerAuthorized(bitstring).  (* the run owner signed a claim for this reveal id *)
+event OutputDisclosed(bitstring).  (* the backend released the value for this reveal id *)
+
+(* 1. The attacker never learns the output value. *)
+query attacker(output).
+
+(* 2. Single-use: every disclosure consumes a DISTINCT fresh prepare (injective). *)
+query rid: bitstring;
+  inj-event(OutputDisclosed(rid)) ==> inj-event(PrepareReveal(rid)).
+
+(* 3. Owner-only / fail-closed: a disclosure implies the run owner authorized it. *)
+query rid: bitstring;
+  event(OutputDisclosed(rid)) ==> event(OwnerAuthorized(rid)).
+
+(* The backend: prepare mints a fresh reveal id; send releases only under a valid
+   owner-authorized acknowledgment (here, a signature that checks against pk(ownersk)). *)
+let backend =
+  new rid: bitstring;
+  event PrepareReveal(rid);
+  out(c, rid);
+  in(c, sig: bitstring);
+  if checksign(pk(ownersk), rid, sig) = ok() then
+  event OutputDisclosed(rid);
+  out(priv, output).
+
+(* The honest run owner: signs a reveal id with the owner key (only the owner can). *)
+let owner =
+  in(c, rid: bitstring);
+  event OwnerAuthorized(rid);
+  out(c, sign(ownersk, rid)).
+
+process
+  out(c, pk(ownersk));              (* the owner's on-chain identity is public *)
+  ( (! backend) | (! owner) )
