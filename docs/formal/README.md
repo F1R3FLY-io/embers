@@ -64,7 +64,7 @@ which properties each model discharges.
 | `storm/observer_retry.pm` | Storm | `storm --prism observer_retry.pm --prop observer_retry.props` | flake $`= 0.5^{10} \approx 9.77\times10^{-4} < 10^{-3}`$ at pessimistic defaults | ✅ validated (INV-C1–C3 evidence) |
 | `rocq/MergeJournal.v` | Rocq | `bash scripts/verify_rocq.sh` (no admits; Print Assumptions closed) | both inputs subsequence of the merge | ✅ validated (INV-D8) |
 | `rocq/ProgressBoundary.v` | Rocq | `bash scripts/verify_rocq.sh` | every cycle crosses progress ⟺ residual acyclic | ✅ validated (INV-K6) |
-| `rocq/KernelTermination.v` | Rocq | `bash scripts/verify_rocq.sh` | clean compile | ⏳ planned (INV-K14) |
+| `rocq/KernelTermination.v` | Rocq | `bash scripts/verify_rocq.sh` | hot segment ≤ \|nodes\|; explicit step budget | ✅ validated (INV-K14) |
 
 ## Installed tools (verified on this machine)
 

@@ -18,6 +18,7 @@ command -v systemd-run >/dev/null 2>&1 || CAP=(env)
 declare -A THEOREMS=(
   ["MergeJournal.v"]="durable_is_subseq on_chain_is_subseq"
   ["ProgressBoundary.v"]="progress_boundary_iff_residual_acyclic"
+  ["KernelTermination.v"]="hot_segment_bounded kernel_step_bound"
 )
 
 status=0
