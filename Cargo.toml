@@ -1,3 +1,6 @@
 [workspace]
 members  = ["packages/embers", "packages/events-sync", "packages/firefly-client", "packages/firefly-client-macros", "packages/state-sync"]
+# oracle/ is a separate workspace (it depends on a local rholang-rs checkout that
+# must not enter this workspace's graph); exclude it so cargo never folds it in.
+exclude  = ["oracle"]
 resolver = "2"

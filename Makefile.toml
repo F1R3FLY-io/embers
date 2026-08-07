@@ -56,3 +56,13 @@ cd packages/embers
 cargo make ${1}
 '''
 workspace = false
+
+# Regenerate the rendered-Rholang corpus, then feed it through the real rholang-rs
+# parser (the detached oracle crate). Fails loudly if any template renders Rholang
+# the current grammar rejects.
+[tasks.oracle-test]
+script = '''
+cargo test -p embers render_corpus
+cargo test --manifest-path oracle/Cargo.toml
+'''
+workspace = false
