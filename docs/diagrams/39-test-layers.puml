@@ -1,0 +1,34 @@
+@startuml 39-test-layers
+' The three embers test layers and what each stubs.
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+skinparam rectangle {
+  BorderColor #294C60
+}
+
+title embers test layers — L1 hermetic, L2 loopback dev-net, L3 remote (gated)
+
+rectangle "L1 — hermetic (cargo make test)" #FFF9C4 {
+  rectangle "trait mocks + in-process app harness\n(poem TestClient)" as l1a
+  rectangle "property tests (proptest)\n+ kernel model tests" as l1b
+  rectangle "oracle: rendered corpus\nparsed by the real grammar" as l1c
+  rectangle "ephemeral loopback servers\n(fake node / stub / PDS)" as l1d
+}
+rectangle "L2 — local dev-net (loopback only)" #D5E8D4 {
+  rectangle "embers-local-stack: real node +\nF1r3drive + PDS on loopback" as l2a
+  rectangle "OpenAI stub via node's\nOPENAI_API_BASE" as l2b
+  rectangle "marker-selected pytest\n(devnet / gpt / recovery)" as l2c
+}
+rectangle "L3 — remote (implemented, NEVER run here)" #F8CECC {
+  rectangle "real remote infra + real GPT\n(double-gated: EMBERS_L3_CONFIRM\n+ non-loopback URL)" as l3a
+}
+
+l1d ..> l2a : same trait contracts,\nhigher fidelity
+l2b ..> l3a : stub -> real model
+note bottom of l3a
+  All L1/L2 traffic is loopback-only (hard mandate).
+  L3 fails fast on a loopback URL, so it is structurally unrunnable here.
+end note
+@enduml
