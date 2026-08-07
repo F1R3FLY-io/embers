@@ -1,0 +1,1 @@
+[true*](mu X . (<true>true && [!done]X))

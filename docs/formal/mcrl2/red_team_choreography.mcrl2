@@ -1,0 +1,39 @@
+% red_team_choreography.mcrl2 — deadlock-freedom & join-progress of the compiled
+% broadcast/fan-in agent-team choreography (test_red_team.py):
+%
+%   Input ─┬─▶ Hypothesize ─┬─▶ LogicCritic ───────┐
+%          │                ├─▶ EvidenceCritic ────┼─▶ Refine ─▶ Condense ─▶ Output
+%          │                └─▶ FeasibilityCritic ─┘     ▲          ▲
+%          │                └────── hypothesis ──────────┘          │
+%          └──── input ──▶ (critics, Refine, Condense) ─────────────┘
+%
+% Each agent fires exactly once, and only after ALL of its producers have fired (a
+% join waits for every inbound edge; a broadcast feeds every outbound edge). This is
+% the happens-before skeleton the render pass emits; per-agent Rholang bodies and phlo
+% are abstracted away (out of scope — see formal/README). Refine is a 5-input join,
+% Condense a 2-input join. Once Output fires the run is complete; the `done` self-loop
+% keeps the terminal state live so that genuine (premature) deadlocks are the only
+% deadlocks the nodeadlock check can find.
+
+sort Node = struct Input | Hypothesize | LogicCritic | EvidenceCritic
+                 | FeasibilityCritic | Refine | Condense | Output;
+
+map  preds : Node -> Set(Node);
+eqn  preds(Input)              = {};
+     preds(Hypothesize)        = {Input};
+     preds(LogicCritic)        = {Input, Hypothesize};
+     preds(EvidenceCritic)     = {Input, Hypothesize};
+     preds(FeasibilityCritic)  = {Input, Hypothesize};
+     preds(Refine)             = {Input, Hypothesize, LogicCritic, EvidenceCritic, FeasibilityCritic};
+     preds(Condense)           = {Input, Refine};
+     preds(Output)             = {Condense};
+
+act  fire : Node;
+     done;
+
+proc RedTeam(fired : Set(Node)) =
+       (sum n : Node . ((preds(n) <= fired) && !(n in fired))
+                       -> fire(n) . RedTeam(fired + {n}))
+     + ((Output in fired) -> done . RedTeam(fired));
+
+init RedTeam({});

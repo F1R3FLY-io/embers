@@ -93,8 +93,15 @@ workspace = false
 script    = ["bash docs/formal/scripts/verify_storm.sh"]
 workspace = false
 
+# Formal-verification: linearize the mCRL2 choreography models under
+# docs/formal/mcrl2/ and solve their modal-mu formulas (deadlock-freedom +
+# join-progress). Part of the `fv` aggregate.
+[tasks.fv-mcrl2]
+script    = ["bash docs/formal/scripts/verify_mcrl2.sh"]
+workspace = false
+
 # Formal-verification aggregate: run every model-checking task. Extended as more
-# tool tracks (uppaal/tamarin/mcrl2/rocq) land.
+# tool tracks (uppaal/tamarin/rocq) land.
 [tasks.fv]
-dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm"]
+dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2"]
 workspace    = false
