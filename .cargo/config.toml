@@ -1,2 +1,12 @@
 [target.aarch64-unknown-linux-gnu]
 linker = "aarch64-linux-gnu-gcc"
+
+# gxhash — pulled in transitively through the f1r3node model crates — hard-requires
+# the AES and SSE2 target features on x86_64 and refuses to compile without them.
+# CI supplies these through RUSTFLAGS; declaring them here (target-scoped, so
+# non-x86_64 builds are unaffected) makes every local build and every nested build
+# — including trybuild's inner compilation of the UI cases — pick them up without
+# anyone remembering the env var. An explicit RUSTFLAGS still takes precedence, so
+# CI's existing setting is unaffected.
+[target.'cfg(target_arch = "x86_64")']
+rustflags = ["-C", "target-feature=+aes,+sse2"]
