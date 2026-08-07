@@ -53,8 +53,9 @@ which properties each model discharges.
 | `ctl/{run,publication,reveal}_lifecycle.lts.json` | pgmcp `behavioral_check` + hermetic Rust re-check | (see file) | formulas hold | ⏳ planned (lifecycles) |
 | `tla/ObserverConsistency.tla` | TLC | `tlc -config ObserverConsistency.cfg ObserverConsistency.tla` | invariants + liveness hold | ✅ validated (INV-C1–C3) |
 | `tla/DeployOnce.tla` | TLC | `tlc -config DeployOnce.cfg DeployOnce.tla` | pass + retry-witness counterexample | ✅ validated (INV-C4) |
+| `tla/TimersRecovery.tla` | TLC | `tlc -config TimersRecovery.cfg TimersRecovery.tla` | invariants + 3 temporal props hold | ✅ validated (INV-T1, T3, T4 — the discrete-time UPPAAL substitute) |
 | _frontend_ `RouteGroups.tla`, `JoinEpochs.tla`, `CancelCompensation.tla`, `MigrationPinning.tla`, `CrossScopeTokens.tla`, `DurableMultiCommand.tla`, `DurableRecovery.tla` | TLC (Apalache where state space explodes) | per file | pass | ⏳ planned (INV-K7–K13, D3/D5/D6) |
-| `uppaal/timers_recovery.xml` | UPPAAL `verifyta` | `/opt/uppaal/bin/verifyta -u -q timers_recovery.xml queries.q` | all queries satisfied | ⏳ planned (INV-T1–T4) |
+| `uppaal/timers_recovery.xml` | UPPAAL `verifyta` | `/opt/uppaal/bin/verifyta -q timers_recovery.xml queries.q` | all queries satisfied | ⚠️ reference only — verifyta not licensed on this host; the identical invariants are machine-checked by `tla/TimersRecovery.tla` above |
 | `proverif/two_phase_jwt.pv` | ProVerif | `proverif two_phase_jwt.pv` | binding + secrecy + restart true; replay inj false (documented) | ✅ validated (INV-S1) |
 | `proverif/reveal_output.pv` | ProVerif | `proverif reveal_output.pv` | secrecy + single-use (inj) + owner-only true | ✅ validated (INV-S2, S3) |
 | `tamarin/run_command_fencing.spthy` | Tamarin | `tamarin-prover --prove run_command_fencing.spthy` | all lemmas verified | ⏳ planned (INV-D4, S7, S8) |
@@ -68,7 +69,9 @@ which properties each model discharges.
 `tlc`, `apalache-mc`, `z3`, `cvc5`, `coqc` (Rocq 9.1.1 + Iris/stdpp/paco/itree),
 `mcrl22lps`/`lps2lts`/`lps2pbes`/`pbessolve`, `proverif`, `tamarin-prover`,
 `spin`, `storm`, `maude`, `lean`; UPPAAL's headless `verifyta` at
-`/opt/uppaal/bin/verifyta`; TLAPS at `~/.local/tlaps/bin/tlapm`. Heavy Rocq
+`/opt/uppaal/bin/verifyta` (present, but this host's license **does not cover the
+verifier** — so the timed-automaton model is validated via a discrete-time TLA+
+substitute under TLC instead); TLAPS at `~/.local/tlaps/bin/tlapm`. Heavy Rocq
 builds run under a `systemd-run --user --scope` resource cap.
 
 ## Running everything

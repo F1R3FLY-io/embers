@@ -28,6 +28,7 @@ check DeployOnce          DeployOnce.cfg               "No error has been found"
 check DeployOnce          DeployOnceRetry.cfg          "Invariant AtMostOnceLanding is violated"    "retry: duplicate-landing witness"
 check ObserverConsistency ObserverConsistency.cfg      "No error has been found"                    "budget covers lag"
 check ObserverConsistency ObserverConsistencyFlake.cfg "Invariant BudgetCoversLag is violated"      "flake witness"
+check TimersRecovery      TimersRecovery.cfg           "No error has been found"                    "timer: no-early + resume-bound + late-decision (UPPAAL substitute)"
 
 rm -rf states   # TLC scratch metadir (gitignored anyway)
 
