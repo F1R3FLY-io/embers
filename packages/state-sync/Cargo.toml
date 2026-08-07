@@ -15,6 +15,9 @@ serde_json     = { version = "1.0" }
 tokio          = { version = "1.49", features = ["macros", "rt-multi-thread", "signal"] }
 uuid           = { version = "1.20", features = ["serde", "v4"] }
 
+[dev-dependencies]
+proptest = { version = "1.10" }
+
 [lints.clippy]
 cast_possible_wrap    = "allow"
 cast_sign_loss        = "allow"

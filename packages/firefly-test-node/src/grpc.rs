@@ -132,6 +132,7 @@ impl DeployService for FakeDeployService {
         request: Request<casper::DataAtNameByBlockQuery>,
     ) -> Result<Response<RhoDataResponse>, Status> {
         let query = request.into_inner();
+        self.deploy.record_read_block_hash(query.block_hash.clone());
         let channel = channel_name(&query);
         let message = self.deploy.channel_par(channel.as_deref()).map_or_else(
             || {

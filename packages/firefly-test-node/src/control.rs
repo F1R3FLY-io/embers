@@ -93,6 +93,7 @@ struct DeployInner {
     channel_values: Mutex<HashMap<String, ChannelValue>>,
     default_channel_value: Mutex<Option<ChannelValue>>,
     deploy_terms: Mutex<Vec<String>>,
+    read_block_hashes: Mutex<Vec<String>>,
 }
 
 /// Handle to the fake validator's behaviour: deploy outcome, head-block index,
@@ -111,6 +112,7 @@ impl DeployControl {
                 channel_values: Mutex::new(HashMap::new()),
                 default_channel_value: Mutex::new(None),
                 deploy_terms: Mutex::new(Vec::new()),
+                read_block_hashes: Mutex::new(Vec::new()),
             }),
         }
     }
@@ -138,6 +140,18 @@ impl DeployControl {
     /// The terms of every `doDeploy` the fake has received, in order.
     pub fn recorded_deploy_terms(&self) -> Vec<String> {
         guard(&self.inner.deploy_terms).clone()
+    }
+
+    /// The `block_hash` of every `getDataAtName` read the fake has received, in
+    /// order. Lets a test assert *which* block a client read a channel at — e.g.
+    /// to pin the events-sync KNOWN-DEFECT where a deploy id is reused verbatim
+    /// as a block hash.
+    pub fn recorded_read_block_hashes(&self) -> Vec<String> {
+        guard(&self.inner.read_block_hashes).clone()
+    }
+
+    pub(crate) fn record_read_block_hash(&self, block_hash: String) {
+        guard(&self.inner.read_block_hashes).push(block_hash);
     }
 
     pub(crate) fn deploy_outcome(&self) -> DeployOutcome {
