@@ -1,0 +1,44 @@
+@startuml 27-local-stack-topology
+' embers-local-stack loopback topology (stack.sh). All endpoints bind loopback.
+' Palette per docs/diagrams/README.md.
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam componentStyle rectangle
+skinparam rectangle {
+  BorderColor #294C60
+}
+skinparam ArrowColor #294C60
+
+title embers-local-stack — loopback dev-net topology (systemd --user managed)
+
+rectangle "F1r3fly node (native binary)" as node {
+  component "validator\ngRPC :40401\nHTTP :40403" as validator #A9D0F5
+  component "read-node / observer\nHTTP :40413" as observer #FFF1CC
+}
+rectangle "F1r3drive\nFUSE mount" as drive #E8DACB
+rectangle "embers\n[::1]:8080" as embers #D5E8D4
+rectangle "web frontend" as web #D5E8D4
+rectangle "PDS (bluesky)\n:2583" as pds #E1D5E7
+database "postgres\n:5432" as pg #CFE2F3
+queue "valkey\n:6379" as valkey #CFE2F3
+rectangle "chroma (optional)\n:8000" as chroma #FFF9C4
+cloud "OpenAI\n(L2: local stub :8571)" as openai #F8CECC
+
+embers -down-> validator : deploy (gRPC)
+embers -down-> observer  : explore-deploy (HTTP)\n+ /ws/events
+embers -right-> drive    : continuation store\n(mount contract)
+embers -down-> pds       : app-passwords,\nputRecord (XRPC)
+web -left-> embers       : REST /api
+validator ..> openai     : rho:ai:gpt4/dalle3/tts
+validator -down-> pg
+validator -down-> valkey
+validator ..> chroma     : vector upserts
+pds -down-> pg
+
+note bottom of openai
+  The node — not embers — holds the OpenAI key.
+  In L2 the node's OPENAI_API_BASE points at the
+  local stub, so no external traffic leaves loopback.
+end note
+@enduml
