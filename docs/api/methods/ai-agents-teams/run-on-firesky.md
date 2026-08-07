@@ -9,7 +9,7 @@ HTTP.
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPrepareRunOnFiresky`, `AIAgentsTeamsApi.agentsTeamsSendRunOnFiresky` |
 | SDK wrapper | `AgentsTeamsApiSdk.runOnFiresky` (`sdk.agentsTeams.runOnFiresky(uri, prompt, replyTo?)`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:174` → `domain/agents_teams/run_on_firesky.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

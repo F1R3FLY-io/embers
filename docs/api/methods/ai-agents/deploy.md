@@ -9,7 +9,7 @@ raw source.
 | Generated client | `AIAgentsApi.agentsPrepareDeploy`, `AIAgentsApi.agentsSendDeploy` |
 | SDK wrappers | `AgentsApiSdk.deploy(id, version)` (type `Agent`) and `AgentsApiSdk.deployCode(code)` (type `Code`) |
 | Backend | `packages/embers/src/api/agents/endpoints.rs` → `domain/agents/deploy.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

@@ -8,7 +8,7 @@ Lists the headers of a wallet's OSLF documents (latest versions).
 | Generated client | `OslfsApi.oslfsList` |
 | SDK wrapper | `OslfsApiSdk.get` (`sdk.oslfs.get()`) |
 | Backend | `packages/embers/src/api/oslfs/endpoints.rs` → `domain/oslfs/list.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

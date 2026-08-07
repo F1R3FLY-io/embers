@@ -8,7 +8,7 @@ Reports that the Embers HTTP tier is up and serving requests.
 | Generated client | `ServiceApi.serviceReady` |
 | SDK wrapper | none — generated client only |
 | Backend | `packages/embers/src/api/service/endpoints.rs:11` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

@@ -8,7 +8,7 @@ Records a new agent team on chain, minting its identity and first version.
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPrepareCreate`, `AIAgentsTeamsApi.agentsTeamsSendCreate` |
 | SDK wrapper | `AgentsTeamsApiSdk.create` (`sdk.agentsTeams.create(req)`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:77` → `domain/agents_teams/create.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

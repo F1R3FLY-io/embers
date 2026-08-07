@@ -10,7 +10,7 @@ metadata-only; this pair is the one content read on the surface, and the on-chai
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPrepareRevealOutput`, `AIAgentsTeamsApi.agentsTeamsSendRevealOutput` |
 | SDK wrapper | `AgentsTeamsApiSdk.revealOutput` (`sdk.agentsTeams.revealOutput(runId)`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:317` → `domain/agents_teams/reveal_output.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

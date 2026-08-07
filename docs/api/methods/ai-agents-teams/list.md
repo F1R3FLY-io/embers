@@ -8,7 +8,7 @@ Lists the headers of a wallet's agent teams (latest versions).
 | Generated client | `AIAgentsTeamsApi.agentsTeamsList` |
 | SDK wrapper | `AgentsTeamsApiSdk.get` (`sdk.agentsTeams.get()`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:46` → `domain/agents_teams/list.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

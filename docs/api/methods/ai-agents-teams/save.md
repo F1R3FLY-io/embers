@@ -8,7 +8,7 @@ Appends a new version to an existing team.
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPrepareSave`, `AIAgentsTeamsApi.agentsTeamsSendSave` |
 | SDK wrapper | `AgentsTeamsApiSdk.save` (`sdk.agentsTeams.save(id, req)`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:262` → `domain/agents_teams/save.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

@@ -9,7 +9,7 @@ every fire-and-forget mutation.
 | Generated client | `WalletsApi.walletsSubscribeDeploys` — **not usable**: the generated method is `fetch`-based and cannot perform a WebSocket upgrade. |
 | SDK client | `EmbersEvents` — a raw `WebSocket` client, reachable as `sdk.events`. |
 | Backend | `packages/embers/src/api/wallets/endpoints.rs:102` → `domain/wallets/subscribe_to_deploys.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

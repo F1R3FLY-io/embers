@@ -8,7 +8,7 @@ Deletes an agent from the caller's collection.
 | Generated client | `AIAgentsApi.agentsPrepareDelete`, `AIAgentsApi.agentsSendDelete` |
 | SDK wrapper | `AgentsApiSdk.delete` (`sdk.agents.delete(id)`) |
 | Backend | `packages/embers/src/api/agents/endpoints.rs` → `domain/agents/delete.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

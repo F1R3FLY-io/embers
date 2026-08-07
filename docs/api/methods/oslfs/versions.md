@@ -8,7 +8,7 @@ Lists every stored version of one OSLF document.
 | Generated client | `OslfsApi.oslfsListVersions` |
 | SDK wrapper | `OslfsApiSdk.getVersions` (`sdk.oslfs.getVersions(id)`) |
 | Backend | `packages/embers/src/api/oslfs/endpoints.rs` → `domain/oslfs/list_versions.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

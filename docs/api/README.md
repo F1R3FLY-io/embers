@@ -158,7 +158,7 @@ framing sentence above every quoted TypeScript declaration in `methods/` — ref
 **embers-frontend**; paths of the form `packages/embers/…` refer to this repository.
 
 - **Schema pin.** Every method document's header table carries a row
-  `| Schema pin | packages/client/schema.json @ 01e8ea0 (Embers API 0.1.0) |` naming the
+  `| Schema pin | packages/client/schema.json @ 69012a4 (Embers API 0.1.0) |` naming the
   last embers-frontend commit that touched the snapshot when the document was written.
   `pnpm docs:check` (run in embers-frontend) enforces freshness against
   `git log -1 --format=%h -- packages/client/schema.json` in the embers-frontend history;

@@ -9,7 +9,7 @@ post.
 | Generated client | `WalletsApi.walletsPrepareBoost`, `WalletsApi.walletsSendBoost` |
 | SDK wrapper | `WalletsApiSdk.boost` (`sdk.wallets.boost(to, amount, postAuthorDid, description?, postId?)`) |
 | Backend | `packages/embers/src/api/wallets/endpoints.rs:74` → `domain/wallets/boost.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

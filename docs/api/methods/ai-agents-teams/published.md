@@ -8,7 +8,7 @@ Reports a team's publication as the chain records it, reconciled against the PDS
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPublishedState` |
 | SDK wrapper | none — generated client only |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:342` → `domain/agents_teams/published_state.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

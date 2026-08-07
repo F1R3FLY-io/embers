@@ -8,7 +8,7 @@ Fetches one full version of an OSLF document, including its query body.
 | Generated client | `OslfsApi.oslfsGetVersion` |
 | SDK wrapper | `OslfsApiSdk.getVersion` (`sdk.oslfs.getVersion(id, version)`) |
 | Backend | `packages/embers/src/api/oslfs/endpoints.rs` → `domain/oslfs/get.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

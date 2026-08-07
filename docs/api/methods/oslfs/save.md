@@ -8,7 +8,7 @@ Appends a new version to an existing OSLF document.
 | Generated client | `OslfsApi.oslfsPrepareSave`, `OslfsApi.oslfsSendSave` |
 | SDK wrapper | `OslfsApiSdk.save` (`sdk.oslfs.save(id, req)`) |
 | Backend | `packages/embers/src/api/oslfs/endpoints.rs` → `domain/oslfs/save.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

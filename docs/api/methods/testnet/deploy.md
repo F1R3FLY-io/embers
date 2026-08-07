@@ -9,7 +9,7 @@ network, awaits finality, and returns the log entries the test produced.
 | Generated client | `TestnetApi.testnetPrepareDeploy`, `TestnetApi.testnetSendDeploy` |
 | SDK wrapper | `TestnetApiSdk.deploy(testKey, test, env?)` (`sdk.testnet.deploy(...)`) |
 | Backend | `packages/embers/src/api/testnet/endpoints.rs:29` → `domain/testnet/deploy_test.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

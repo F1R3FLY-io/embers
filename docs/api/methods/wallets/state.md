@@ -8,7 +8,7 @@ Reads a wallet's balance and transaction history from the chain.
 | Generated client | `WalletsApi.walletsStateAndHistory` |
 | SDK wrapper | `WalletsApiSdk.getState` (`sdk.wallets.getState()`) |
 | Backend | `packages/embers/src/api/wallets/endpoints.rs:33` → `domain/wallets/get_wallet_state_and_history.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

@@ -8,7 +8,7 @@ Gives a deployed team a social account so it can answer mentions and post replie
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPreparePublishToFiresky`, `...SendPost` |
 | SDK wrapper | `AgentsTeamsApiSdk.publishToFiresky` (`sdk.agentsTeams.publishToFiresky(id, req)`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:352` → `domain/agents_teams/publish_to_firesky.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

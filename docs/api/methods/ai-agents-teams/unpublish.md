@@ -9,7 +9,7 @@ its account as a team.
 | Generated client | `AIAgentsTeamsApi.agentsTeamsUnpublish` |
 | SDK wrapper | none — generated client only |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:328` → `domain/agents_teams/unpublish.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

@@ -9,7 +9,7 @@ approve, reject, retry, cancel, timerFired, or migrate.
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPrepareRunCommand`, `AIAgentsTeamsApi.agentsTeamsSendRunCommand` |
 | SDK wrapper | `AgentsTeamsApiSdk.command` (`sdk.agentsTeams.command(runId, req)`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:222` → `domain/agents_teams/run_commands.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

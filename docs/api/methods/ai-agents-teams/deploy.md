@@ -9,7 +9,7 @@ in every referenced agent's code, and deploys it behind a deterministic registry
 | Generated client | `AIAgentsTeamsApi.agentsTeamsPrepareDeploy`, `AIAgentsTeamsApi.agentsTeamsSendDeploy` |
 | SDK wrappers | `AgentsTeamsApiSdk.deploy(id, version, registryVersion, registryKey)` (type `AgentsTeam`) and `AgentsTeamsApiSdk.deployGraph(graph, registryVersion, registryKey)` (type `Graph`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:106` → `domain/agents_teams/deploy.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

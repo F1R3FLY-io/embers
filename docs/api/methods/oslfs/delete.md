@@ -8,7 +8,7 @@ Deletes an OSLF document from the caller's collection.
 | Generated client | `OslfsApi.oslfsPrepareDelete`, `OslfsApi.oslfsSendDelete` |
 | SDK wrapper | `OslfsApiSdk.delete` (`sdk.oslfs.delete(id)`) |
 | Backend | `packages/embers/src/api/oslfs/endpoints.rs` → `domain/oslfs/delete.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

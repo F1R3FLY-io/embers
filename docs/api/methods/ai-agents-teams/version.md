@@ -8,7 +8,7 @@ Fetches one full version of a team, including both workflow serializations.
 | Generated client | `AIAgentsTeamsApi.agentsTeamsGetVersion` |
 | SDK wrapper | `AgentsTeamsApiSdk.getVersion` (`sdk.agentsTeams.getVersion(id, version)`) |
 | Backend | `packages/embers/src/api/agents_teams/endpoints.rs:66` → `domain/agents_teams/get.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

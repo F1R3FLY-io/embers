@@ -8,7 +8,7 @@ Records a new OSLF document on chain, minting its identity and first version.
 | Generated client | `OslfsApi.oslfsPrepareCreate`, `OslfsApi.oslfsSendCreate` |
 | SDK wrapper | `OslfsApiSdk.create` (`sdk.oslfs.create(req)`) |
 | Backend | `packages/embers/src/api/oslfs/endpoints.rs` → `domain/oslfs/create.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 

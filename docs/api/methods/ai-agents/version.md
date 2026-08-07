@@ -8,7 +8,7 @@ Fetches one full version of an agent, including its Rholang source.
 | Generated client | `AIAgentsApi.agentsGetVersion` |
 | SDK wrapper | `AgentsApiSdk.getVersion` (`sdk.agents.getVersion(id, version)`) |
 | Backend | `packages/embers/src/api/agents/endpoints.rs` → `domain/agents/get.rs` |
-| Schema pin | `packages/client/schema.json` @ `01e8ea0` (Embers API 0.1.0) |
+| Schema pin | `packages/client/schema.json` @ `69012a4` (Embers API 0.1.0) |
 
 ## Semantics
 
