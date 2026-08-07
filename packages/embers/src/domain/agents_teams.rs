@@ -48,6 +48,12 @@ mod run_commands;
 mod run_on_firesky;
 pub mod runtime;
 mod save;
+#[cfg(test)]
+#[allow(
+    clippy::redundant_pub_crate,
+    reason = "the testing tree is deliberately pub(crate): the annotation documents the crate-wide sharing intent and stays correct if the domain module ever becomes public"
+)]
+pub(crate) mod testing;
 mod unpublish;
 pub mod workflow;
 
