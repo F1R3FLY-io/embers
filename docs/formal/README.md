@@ -58,8 +58,8 @@ which properties each model discharges.
 | `uppaal/timers_recovery.xml` | UPPAAL `verifyta` | `/opt/uppaal/bin/verifyta -q timers_recovery.xml queries.q` | all queries satisfied | ⚠️ reference only — verifyta not licensed on this host; the identical invariants are machine-checked by `tla/TimersRecovery.tla` above |
 | `proverif/two_phase_jwt.pv` | ProVerif | `proverif two_phase_jwt.pv` | binding + secrecy + restart true; replay inj false (documented) | ✅ validated (INV-S1) |
 | `proverif/reveal_output.pv` | ProVerif | `proverif reveal_output.pv` | secrecy + single-use (inj) + owner-only true | ✅ validated (INV-S2, S3) |
-| `tamarin/run_command_fencing.spthy` | Tamarin | `tamarin-prover --prove run_command_fencing.spthy` | all lemmas verified | ⏳ planned (INV-D4, S7, S8) |
-| `tamarin/continuation_capabilities.spthy` | Tamarin | `tamarin-prover --prove continuation_capabilities.spthy` | all lemmas verified | ⏳ planned (INV-S4–S6) |
+| `tamarin/run_command_fencing.spthy` | Tamarin | `tamarin-prover --prove run_command_fencing.spthy` | claim_unique + advance_requires_claim verified | ✅ validated (INV-D4, S7, S8) |
+| `tamarin/continuation_capabilities.spthy` | Tamarin | `tamarin-prover --prove continuation_capabilities.spthy` | keys secret + capability unforgeable + plaintext secret verified | ✅ validated (INV-S4–S6) |
 | `mcrl2/red_team_choreography.mcrl2` | mCRL2 | `mcrl22lps … \| lps2pbes -f nodeadlock.mcf \| pbessolve` | `[true*]<true>true` and done-inevitability both `true` | ✅ validated (deadlock-free + join-progress) |
 | `storm/observer_retry.pm` | Storm | `storm --prism observer_retry.pm --prop observer_retry.props` | flake $`= 0.5^{10} \approx 9.77\times10^{-4} < 10^{-3}`$ at pessimistic defaults | ✅ validated (INV-C1–C3 evidence) |
 | `rocq/MergeJournal.v` | Rocq | `bash scripts/verify_rocq.sh` (no admits; Print Assumptions closed) | both inputs subsequence of the merge | ✅ validated (INV-D8) |

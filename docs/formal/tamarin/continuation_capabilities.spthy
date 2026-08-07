@@ -1,0 +1,47 @@
+/*
+ * continuation_capabilities.spthy — INV-S4/S5/S6: continuation-store capabilities.
+ *
+ * The store holds two secret keys: the capability key (HMAC) and the encryption key
+ * (AEAD). An object's capability is hmac(capkey, identity) — it addresses the object
+ * and is never published; the object's ciphertext senc(plaintext, enckey) sits on the
+ * (public) F1r3drive. Under a Dolev-Yao adversary who sees every ciphertext, this
+ * proves the keys stay secret, capabilities are unforgeable (never learnable), and
+ * plaintexts stay confidential — the protocol-level counterpart to the SMT
+ * encoding-injectivity result in smt/capability_encoding.smt2.
+ *
+ * Lemmas (auto-proved by tamarin-prover --prove):
+ *   cap_key_secret / enc_key_secret — the store keys never leak      [INV-S6 basis]
+ *   capability_unforgeable          — no capability is ever learnable [INV-S4]
+ *   plaintext_secret                — sealed plaintexts stay secret   [INV-S5/S6]
+ */
+theory ContinuationCapabilities
+begin
+
+builtins: symmetric-encryption
+functions: hmac/2
+
+rule Setup:
+  [ Fr(~capkey), Fr(~enckey) ]
+  --[ Keys(~capkey, ~enckey) ]->
+  [ !CapKey(~capkey), !EncKey(~enckey) ]
+
+// Seal an object under an adversary-chosen identity: publish only the ciphertext
+// (the drive is public); the capability hmac(capkey, id) is derived but never sent.
+rule Seal:
+  [ !CapKey(capkey), !EncKey(enckey), Fr(~pt), In(id) ]
+  --[ Sealed(id, ~pt), UsesCap(hmac(capkey, id)) ]->
+  [ Out(senc(~pt, enckey)) ]
+
+lemma cap_key_secret:
+  "All ck ek #i. Keys(ck, ek) @ #i ==> not (Ex #j. K(ck) @ #j)"
+
+lemma enc_key_secret:
+  "All ck ek #i. Keys(ck, ek) @ #i ==> not (Ex #j. K(ek) @ #j)"
+
+lemma capability_unforgeable:
+  "All c #i. UsesCap(c) @ #i ==> not (Ex #j. K(c) @ #j)"
+
+lemma plaintext_secret:
+  "All id pt #i. Sealed(id, pt) @ #i ==> not (Ex #j. K(pt) @ #j)"
+
+end

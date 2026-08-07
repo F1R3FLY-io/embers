@@ -107,6 +107,13 @@ workspace = false
 script    = ["bash docs/formal/scripts/verify_rocq.sh"]
 workspace = false
 
+# Formal-verification: prove every Tamarin model under docs/formal/tamarin/
+# (run-command fencing, continuation capabilities) and require all lemmas verified.
+# Part of the `fv` aggregate.
+[tasks.fv-tamarin]
+script    = ["bash docs/formal/scripts/verify_tamarin.sh"]
+workspace = false
+
 # Formal-verification: explicit-state check of the lifecycle FSMs under
 # docs/formal/ctl/ (run / publication / reveal). Dependency-free (python3). Part of
 # the `fv` aggregate.
@@ -123,5 +130,5 @@ workspace = false
 # Formal-verification aggregate: run every model-checking task. Extended as more
 # tool tracks (uppaal/tamarin) land.
 [tasks.fv]
-dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2", "fv-rocq", "fv-ctl"]
+dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2", "fv-rocq", "fv-ctl", "fv-tamarin"]
 workspace    = false
