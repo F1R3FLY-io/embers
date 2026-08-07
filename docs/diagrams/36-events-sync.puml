@@ -1,0 +1,25 @@
+@startuml 36-events-sync
+' events-sync bidirectional ATProto <-> Firefly bridge.
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+skinparam rectangle { BorderColor #294C60 }
+
+title events-sync — ATProto firehose <-> Firefly bridge
+
+rectangle "F1r3fly node" as node #A9D0F5
+rectangle "events-sync\n(init: registry contract)" as sync #D0E0E3
+rectangle "ATProto consumers" as consumers #E1D5E7
+rectangle "external PDS firehose" as pds #E1D5E7
+
+node -down-> sync : listen: gRPC comm service\n(node notifies of updates)
+sync -down-> consumers : listen: com.atproto.sync.subscribeRepos\n(+ merge --extra-sources)
+pds -up-> sync : push: subscribe to a\nsubscribeRepos URL
+sync -up-> node : push: deploy events in windows\n(flush on time OR size)
+
+note bottom of sync
+  push flush condition (Docker defaults time=3 s, size=16):
+  flush <=> (now - t_start >= theta_t) OR (|W| >= theta_n)
+end note
+@enduml
