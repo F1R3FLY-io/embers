@@ -1,5 +1,10 @@
 # bsky architecture
 
+> **Superseded — historical reference.** The current F1r3sky / AT Protocol
+> integration primer is
+> [integrations/f1r3sky-and-atproto.md](integrations/f1r3sky-and-atproto.md). This
+> document is retained as background on the Bluesky component model.
+
 Bsky is based on 4 main components:
 
 1. `PDS` - holds all information about users it serves such as posts, likes, replies, etc.

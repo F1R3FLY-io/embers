@@ -1,0 +1,28 @@
+@startuml 35-publication-lifecycle
+' Agent-team F1r3sky publication lifecycle.
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+skinparam state {
+  BackgroundColor #E1D5E7
+  BorderColor #294C60
+}
+
+title F1r3sky publication lifecycle
+
+[*] --> Draft
+Draft --> Published : publish\n(create app-password + putRecord)
+Published --> PublishedStale : underlying content changes
+PublishedStale --> Published : reconcile (re-putRecord)
+Published --> Unpublished : unpublish\n(remove the record, KEEP the account)
+PublishedStale --> Unpublished : unpublish
+Unpublished --> Published : re-publish
+Unpublished --> [*]
+
+note bottom
+  Unpublish removes the PDS record but keeps the account, so re-publishing
+  is always possible. The full state set is model-checked in the reveal/
+  publication lifecycle CTL model (formal T10).
+end note
+@enduml
