@@ -8,6 +8,10 @@ Storm) that check them abstractly. Every invariant has a stable identifier. A
 test that checks it is named `fv_inv_<id>_<slug>`; a formal model that checks it
 cites the same id. Grep the id and you find all three faces of one property.
 
+> For the current validated/landed status of each formal home and the invariant →
+> model → tool traceability, see [verification-targets.md](verification-targets.md)
+> and the [verdict table](README.md#verdict-table).
+
 ## How to read a row
 
 | Column | Meaning |
@@ -41,7 +45,7 @@ Home for the abstract models: the frozen frontend specs `StatechartScopes.tla`
 | INV-K3 | Entry/exit ordering: an entry activity strictly precedes any token in the scope; an exit activity runs only on a drained scope. | `runtime.rs:624-656` | (K1 driver, scoped generators) | `StatechartScopes.tla` |
 | INV-K4 | History correctness: history exists only after a completion captured it, carries the scope's declared mode, and is never captured by a `none`-mode scope. | `runtime.rs:1052-1082` | (K1 driver) | `StatechartScopes.tla` |
 | INV-K5 | Bounded counters: each token's per-transition traversal count never exceeds the declared bound. | `runtime.rs` `iterations` map | `fv_inv_k14_bounded_cycles_exhaust` | `AgentTeamsWorkflow.tla` |
-| INV-K6 | Hot-segment safety: a hot segment (no wait/bound/yield crossing) is bounded by the residual-graph node count. | `workflow.rs` Tarjan check | `fv_inv_w4_hot_cycle_rejected_boundary_accepted` | `AgentTeamsWorkflow.tla`; proof in frontend `operational-semantics.md` |
+| INV-K6 | Hot-segment safety: a hot segment (no wait/bound/yield crossing) is bounded by the residual-graph node count. | `workflow.rs` Tarjan check | `fv_inv_w4_hot_cycle_rejected_boundary_accepted` | ✅ Rocq `ProgressBoundary.v`; `AgentTeamsWorkflow.tla`; proof in frontend `operational-semantics.md` |
 | INV-K7 | First-match exclusivity: at most one edge fires per first-match activation, the highest-priority true one. | `workflow.rs:416, 1200-1202` | (planned `fv_inv_k7_*`) | planned `RouteGroups.tla` |
 | INV-K8 | All-match completeness: every true edge fires exactly once; the `noMatch` disposition iff no edge is true. | `workflow.rs:1200-1202` | (planned `fv_inv_k8_*`) | planned `RouteGroups.tla` |
 | INV-K9 | Join epoch isolation: a join fires only from arrivals of a single correlation epoch. | `runtime.rs:1156-1264, 1368-1393` | `fv_inv_k11_*` (epoch-scoped) | planned `JoinEpochs.tla` |
@@ -49,7 +53,7 @@ Home for the abstract models: the frozen frontend specs `StatechartScopes.tla`
 | INV-K11 | Quorum fires at k: a `quorum(k)` join fires exactly when the k-th distinct decision arrives and never re-fires; `race` closes on the first arrival and applies its declared late policy; `all`/`each`/`reduce` complete correctly. | `runtime.rs:1156-1264` | `fv_inv_k11_quorum_fires_at_k`, `fv_inv_k11_race_first_arrival_wins`, `fv_inv_k11_all_each_reduce_complete` | planned `JoinEpochs.tla` |
 | INV-K12 | Compensation LIFO: after cancellation only compensations dispatch, in reverse completion order, each at most once. | `runtime.rs:476-481, 1599` | (planned `fv_inv_k12_*`) | planned `CancelCompensation.tla` |
 | INV-K13 | Migration hash-fencing: `Migrate(from, to)` applies iff the current definition hash equals `from`; afterward every step reads `to`. | `runtime.rs:490-507` | (planned `fv_inv_k13_*`) | planned `MigrationPinning.tla` |
-| INV-K14 | Termination / step budget: a valid definition's run either completes or stops at the $`10^6`$-microstep budget error — it never diverges and never panics. | `runtime.rs:721-733` | `fv_inv_k14_no_divergence`, `fv_inv_k14_step_budget_stops_hot_loops` | planned Rocq `KernelTermination.v` |
+| INV-K14 | Termination / step budget: a valid definition's run either completes or stops at the $`10^6`$-microstep budget error — it never diverges and never panics. | `runtime.rs:721-733` | `fv_inv_k14_no_divergence`, `fv_inv_k14_step_budget_stops_hot_loops` | ✅ Rocq `KernelTermination.v` (hot-segment bound) |
 
 ## Durable-protocol invariants (INV-D)
 
