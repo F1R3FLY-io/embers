@@ -16,13 +16,22 @@ on a divergent behavior belongs at a higher layer (L2/L3), not against the doubl
 
 ## Fake node (`packages/firefly-test-node`)
 
-- **Mirrors:** the validator gRPC deploy service, the observer `explore-deploy` HTTP
-  envelope (`{expr, block}`) with scriptable empty→populated lag, and the WebSocket
-  event stream (`started`, injectable kebab-case `block-finalised` with
-  `deploys[{id,cost,deployer,errored}]`). Runs on `127.0.0.1:0`, so `firefly-client`
-  is exercised against a real socket and codec.
-- **Diverges:** it does **not** evaluate Rholang, compute real phlo costs, build a
-  block DAG, or verify signatures; channel reads are matched, not executed.
+- **Mirrors:** the validator gRPC service — reusing the **exact** generated
+  `casper.v1.DeployService` trait (`do_deploy`, `show_main_chain`, `get_data_at_name`
+  are behavioral) — the observer `explore-deploy` HTTP endpoint (which accepts the
+  client's `{"term": …}` JSON and records the term) with scriptable empty→populated
+  lag, and the WebSocket event stream (`started`, injectable kebab-case
+  `block-finalised` with `deploys[{id,cost,deployer,errored}]`). Runs on
+  `127.0.0.1:0`, so `firefly-client` is exercised against a real socket and codec;
+  `EventControl` exposes deterministic `wait_for_connections` so tests need no sleeps.
+- **Diverges:** it does **not** evaluate Rholang, compute real phlo/cost, build a
+  block DAG, or verify signatures/`valid_after_block_number`. Matching is structural,
+  not semantic — channel reads are keyed by **exact channel name** and explore
+  responses are selected by **call position** (`responses[min(i, len-1)]`), not by
+  parsing the submitted term (this is the network-level counterpart to the embers
+  `MockReadNode`'s substring matching). Every gRPC RPC outside the three behavioral
+  ones returns a truthful `Status::unimplemented`. `show_main_chain` returns a single
+  depth-1 canned block.
 
 ## OpenAI stub
 
