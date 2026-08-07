@@ -66,3 +66,9 @@ cargo test -p embers render_corpus
 cargo test --manifest-path oracle/Cargo.toml
 '''
 workspace = false
+
+# Formal-verification: check every SMT model under docs/formal/smt/ against its
+# recorded verdict sequence with both z3 and cvc5. Part of the `fv` aggregate.
+[tasks.fv-smt]
+script    = ["bash docs/formal/scripts/verify_smt.sh"]
+workspace = false
