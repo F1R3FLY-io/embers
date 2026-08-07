@@ -33,22 +33,37 @@ on a divergent behavior belongs at a higher layer (L2/L3), not against the doubl
   ones returns a truthful `Status::unimplemented`. `show_main_chain` returns a single
   depth-1 canned block.
 
-## OpenAI stub
+## OpenAI stub (`packages/openai-stub`)
 
 - **Mirrors:** the four OpenAI endpoints the node calls (`/v1/models`,
   `/v1/chat/completions`, `/v1/images/generations`, `/v1/audio/speech`) at the
-  contract level — contract-tested with the node's own `openai-api-rs` client version
-  so responses deserialize (fidelity by construction). Image URLs and audio are served
-  from loopback. The node reaches it via `OPENAI_API_BASE`; embers never calls OpenAI.
-- **Diverges:** chat content is a deterministic echo, not a model completion; no rate
-  limits (429s), no auth, no streaming; latency is ~0.
+  contract level — **contract-tested with the node's own `openai-api-rs` 6.0.13** so
+  every response deserializes through that client (fidelity by construction). Image
+  URLs and audio (a first-principles valid PNG/WAV) are served from loopback. A lib
+  (`OpenAiStub::start()` on `127.0.0.1:0`, `base_url()` = the `/v1`-suffixed
+  `OPENAI_API_BASE` value) and a bin (`openai-stub`, `OPENAI_STUB_ADDR` default
+  `127.0.0.1:8571`); `start_on` refuses a non-loopback bind. The node reaches it via
+  `OPENAI_API_BASE`; embers never calls OpenAI.
+- **Diverges:** no model actually runs — chat content is a deterministic echo, image
+  and audio are canned/derived; `Authorization` is accepted but ignored (no auth); no
+  429/quota/error statuses; no streaming/SSE; `usage` is always zero; `list_models`
+  returns only `id/object/created/owned_by`. `GET /models` is nonetheless required —
+  the node's startup validation calls it and cannot be disabled by env (a documented
+  f1r3node quirk).
 
-## Fake PDS
+## Fake PDS (embers `#[cfg(test)] testing/fake_pds.rs`)
 
-- **Mirrors:** the ATProto XRPC calls the F1r3sky publish path makes (create session,
-  app-passwords, `uploadBlob`, `putRecord`) plus a served blob asset, on loopback.
-- **Diverges:** no DID resolution, no lexicon validation, no firehose; sessions are
-  immortal.
+- **Mirrors:** the ATProto XRPC the F1r3sky publish path calls, with responses shaped
+  to atrium's generated types (valid `Did`/`Handle`/`Cid`/`Datetime`):
+  `com.atproto.server.{createAccount,createSession}`, app-password list/create,
+  `com.atproto.repo.{uploadBlob,putRecord,deleteRecord}`, plus a served `GET
+  /logo.png` — all on loopback. `createAccount` returns 400 so the publish path takes
+  the sign-in branch. The happy-path test asserts the exact XRPC sequence.
+- **Diverges:** no credential/app-password auth verification; no DID/handle
+  resolution; no Lexicon record or blob-byte validation; sessions are immortal (no
+  expiry/refresh); nothing persists across calls beyond test-armed counters;
+  `/logo.png` is opaque bytes, not a decodable image; `createAccount` always refuses
+  (only the sign-in / publish-again path is modeled).
 
 ## JWT replay (accepted by design)
 
