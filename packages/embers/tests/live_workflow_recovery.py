@@ -4,6 +4,11 @@ Run ``start`` while Embers is up, restart only the Embers process while keeping
 F1r3node and F1r3drive alive, and then run ``resume`` with the same state file.
 The file contains public run metadata only; the local test wallet is the same
 documented development wallet used by the pytest fixtures.
+
+For the automated, single-process pytest counterpart (graceful restart + SIGKILL
+chaos, skip-guarded on EMBERS_SERVICE_UNIT), see
+``tests/api/agents_teams/test_durable_recovery.py``; run it via ``scripts/l2.sh
+recovery``. This harness is kept for interactive debugging across two shells.
 """
 
 from __future__ import annotations

@@ -67,6 +67,59 @@ cargo test --manifest-path oracle/Cargo.toml
 '''
 workspace = false
 
+# L2 (loopback dev-net) orchestration — build embers + the OpenAI stub, arm the
+# stack's secrets.env, bring the stack up, and run the marker-selected suite against
+# it. See scripts/l2.sh and docs/testing/test-architecture.md. Every endpoint is
+# loopback; nothing reaches an external host.
+[tasks.l2-up]
+script    = ["bash scripts/l2.sh up"]
+workspace = false
+
+[tasks.l2-test]
+script    = ["bash scripts/l2.sh test"]
+workspace = false
+
+[tasks.l2-recovery]
+script    = ["bash scripts/l2.sh recovery"]
+workspace = false
+
+[tasks.l2-rust]
+script    = ["bash scripts/l2.sh rust"]
+workspace = false
+
+[tasks.l2-down]
+script    = ["bash scripts/l2.sh down"]
+workspace = false
+
+# Run the local OpenAI stub in the foreground (Ctrl-C to stop). Binds OPENAI_STUB_ADDR
+# (default 127.0.0.1:8571); point a node's OPENAI_API_BASE at http://127.0.0.1:8571/v1.
+[tasks.openai-stub-run]
+command = "cargo"
+args    = ["run", "-p", "openai-stub"]
+workspace = false
+
+# Deep property run: far more proptest cases than the default (the gxhash target
+# features come from .cargo/config.toml).
+[tasks.test-deep]
+command = "cargo"
+args    = ["test", "--workspace"]
+env     = { PROPTEST_CASES = "1024" }
+workspace = false
+
+# Egress guard: run the hermetic L1 suite in a loopback-only network namespace so any
+# accidental non-loopback traffic fails instead of escaping. Needs rootless unshare;
+# falls back to a plain run with a warning if unavailable.
+[tasks.test-sandboxed]
+script = '''
+if unshare -rn true 2>/dev/null; then
+  unshare -rn bash -c "ip link set lo up 2>/dev/null || true; cargo test --workspace"
+else
+  echo "warn: unshare -rn unavailable; running cargo test without the egress namespace" >&2
+  cargo test --workspace
+fi
+'''
+workspace = false
+
 # Formal-verification: check every SMT model under docs/formal/smt/ against its
 # recorded verdict sequence with both z3 and cvc5. Part of the `fv` aggregate.
 [tasks.fv-smt]
