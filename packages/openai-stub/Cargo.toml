@@ -1,0 +1,53 @@
+[package]
+description = "Loopback-only, OpenAI-compatible HTTP stub for hermetic offline tests."
+edition     = "2024"
+name        = "openai-stub"
+publish     = false
+version     = "0.1.0"
+
+[[bin]]
+name = "openai-stub"
+path = "src/bin/openai_stub.rs"
+
+[dependencies]
+anyhow     = { version = "1.0" }
+hex        = { version = "0.4" }
+poem       = { version = "3.1" }
+serde      = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0" }
+sha2       = { version = "0.10" }
+tokio      = { version = "1.49", features = ["macros", "net", "rt-multi-thread", "signal", "sync"] }
+tracing    = { version = "0.1" }
+
+[dev-dependencies]
+# The real client f1r3node's interpreter uses (rholang/Cargo.toml resolves 6.0.3
+# to 6.0.13). Driving the stub with it makes response fidelity structural: every
+# contract test asserts the canned JSON deserializes through this exact client.
+# No TLS backend: all traffic is loopback HTTP, so `default-features = false`
+# keeps native-tls/rustls out of the test build.
+openai-api-rs = { version = "6.0.13", default-features = false }
+reqwest       = { version = "0.12", default-features = false, features = ["json"] }
+tokio         = { version = "1.49", features = ["macros", "rt-multi-thread", "time"] }
+
+[lints.clippy]
+cast_possible_wrap    = "allow"
+cast_sign_loss        = "allow"
+default_trait_access  = "allow"
+# Brand names in prose ("OpenAI", "f1r3node") are not code identifiers and read
+# wrong in backticks; doc_markdown flags them as false positives.
+doc_markdown          = "allow"
+ignored_unit_patterns = "allow"
+implicit_hasher       = "allow"
+match_same_arms       = "allow"
+missing_errors_doc    = "allow"
+must_use_candidate    = "allow"
+needless_for_each     = "allow"
+too_many_lines        = "allow"
+
+[lints.clippy.pedantic]
+level    = "warn"
+priority = -1
+
+[lints.clippy.nursery]
+level    = "warn"
+priority = -1

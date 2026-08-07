@@ -22,7 +22,11 @@
 //! - `render_corpus` — renders every Rholang template in the crate with
 //!   representative fixtures into `target/rendered-corpus/` for the
 //!   Rholang-parser oracle step.
+//! - `fake_pds` — a loopback, in-process fake `ATProto` PDS answering the exact
+//!   XRPC the `publish_to_firesky` / `unpublish` clients call, so those flows can
+//!   be driven end to end offline.
 
+pub(crate) mod fake_pds;
 pub(crate) mod generators;
 pub(crate) mod kernel_model;
 

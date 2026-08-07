@@ -340,3 +340,202 @@ impl Collection for AgentsTeamConfig {
     const NSID: &'static str = "com.f1r3sky.agentsteam.config";
     type Record = Self;
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    use dashmap::DashMap;
+    use firefly_client::models::WalletAddress;
+    use serde_json::json;
+
+    use crate::domain::agents_teams::AgentsTeamsService;
+    use crate::domain::agents_teams::models::PublishToFireskyReq;
+    use crate::domain::agents_teams::testing::fake_pds::FakePds;
+    use crate::domain::test_helpers::{
+        MockNodeEventSource,
+        MockReadNode,
+        MockWriteNode,
+        test_public_key,
+        test_secret_key,
+        test_uri,
+    };
+
+    /// The handle every test publishes under. The fake PDS is started to return
+    /// this same handle, so the client's post-login handle check passes.
+    const TEST_HANDLE: &str = "embers-team.test";
+
+    /// Build a hermetic service backed by the mock nodes and a real temp-backed
+    /// continuation store, with a read node that answers the deployed-team read.
+    fn service_with(
+        read: MockReadNode,
+    ) -> AgentsTeamsService<MockReadNode, MockWriteNode, MockNodeEventSource> {
+        AgentsTeamsService {
+            uri: test_uri(),
+            write_client: MockWriteNode::new(),
+            read_client: read,
+            observer_node_events: MockNodeEventSource::new(),
+            service_key: test_secret_key(),
+            aes_encryption_key: [42u8; 32].into(),
+            continuation_store:
+                crate::domain::agents_teams::continuation_store::F1r3driveContinuationStore::open_for_test(
+                    tempfile::tempdir().expect("temporary store").path(),
+                    [7u8; 32],
+                    [9u8; 32],
+                )
+                .expect("test continuation store"),
+            deploy_finalization_timeout: Duration::from_secs(5),
+            run_locks: Arc::new(DashMap::new()),
+            firesky_accounts: Arc::new(DashMap::new()),
+        }
+    }
+
+    /// The blockchain-layer team projection a `get` read deserializes.
+    fn team_json(uri: &str, logo: Option<&str>, description: Option<&str>) -> serde_json::Value {
+        json!({
+            "id": "team-id",
+            "version": "team-version",
+            "created_at": 0,
+            "last_deploy": null,
+            "uri": uri,
+            "name": "Team",
+            "description": description,
+            "shard": null,
+            "logo": logo,
+            "graph": null,
+            "definition": null,
+        })
+    }
+
+    fn request(pds: &FakePds) -> PublishToFireskyReq {
+        PublishToFireskyReq {
+            pds_url: pds.origin().to_owned(),
+            email: "publisher@example.com".to_owned(),
+            handle: TEST_HANDLE.to_owned(),
+            password: "primary-password".to_owned(),
+            invite_code: None,
+        }
+    }
+
+    // A published team's URI: reuse the service's env URI so it is a valid `Uri`.
+    fn deployed_uri() -> firefly_client::models::Uri {
+        test_uri()
+    }
+
+    #[tokio::test]
+    async fn publish_happy_path_succeeds_against_fake_pds() {
+        let pds = FakePds::start(TEST_HANDLE).await.expect("start fake PDS");
+        let uri = deployed_uri();
+        let read = MockReadNode::new().on_code_containing(
+            "team-id",
+            team_json(
+                AsRef::<String>::as_ref(&uri),
+                Some(&pds.logo_url()),
+                Some("A hermetic test team"),
+            ),
+        );
+        let service = service_with(read);
+
+        let response = service
+            .prepare_publish_to_firesky_contract(
+                WalletAddress::from(test_public_key()),
+                "team-id".to_owned(),
+                request(&pds),
+            )
+            .await
+            .expect("publish should succeed against the fake PDS");
+
+        // A signed-deployable contract was produced.
+        assert!(!response.contract.0.is_empty());
+        // The credential was recorded in memory for the deployed URI.
+        assert!(service.firesky_accounts.contains_key(&uri));
+
+        // The client made exactly the XRPC calls the flow prescribes.
+        let calls = pds.calls();
+        assert!(calls.contains(&"com.atproto.server.createSession".to_owned()));
+        assert!(calls.contains(&"com.atproto.repo.uploadBlob".to_owned()));
+        assert!(calls.contains(&"com.atproto.server.listAppPasswords".to_owned()));
+        assert!(calls.contains(&"com.atproto.server.createAppPassword".to_owned()));
+        // Two putRecord calls: the profile record, then the config record.
+        assert_eq!(
+            calls
+                .iter()
+                .filter(|nsid| nsid.as_str() == "com.atproto.repo.putRecord")
+                .count(),
+            2,
+        );
+
+        pds.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn publish_fails_when_app_password_cap_reached() {
+        let pds = FakePds::start(TEST_HANDLE).await.expect("start fake PDS");
+        // Every Embers app-password name is already taken, so no free name exists.
+        let mut taken = vec!["Embers".to_owned()];
+        taken.extend((2..=100).map(|n| format!("Embers {n}")));
+        pds.set_existing_app_passwords(taken);
+
+        let uri = deployed_uri();
+        let read = MockReadNode::new().on_code_containing(
+            "team-id",
+            team_json(AsRef::<String>::as_ref(&uri), None, Some("A hermetic test team")),
+        );
+        let service = service_with(read);
+
+        let error = service
+            .prepare_publish_to_firesky_contract(
+                WalletAddress::from(test_public_key()),
+                "team-id".to_owned(),
+                request(&pds),
+            )
+            .await
+            .expect_err("publish should fail once the app-password cap is reached");
+
+        assert!(
+            error.to_string().contains("app passwords"),
+            "unexpected error: {error}"
+        );
+        // No credential recorded on the failure path.
+        assert!(!service.firesky_accounts.contains_key(&uri));
+
+        pds.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn publish_fails_when_put_record_rejected() {
+        let pds = FakePds::start(TEST_HANDLE).await.expect("start fake PDS");
+        pds.set_reject_put_record(true);
+
+        let uri = deployed_uri();
+        let read = MockReadNode::new().on_code_containing(
+            "team-id",
+            team_json(AsRef::<String>::as_ref(&uri), None, Some("A hermetic test team")),
+        );
+        let service = service_with(read);
+
+        let error = service
+            .prepare_publish_to_firesky_contract(
+                WalletAddress::from(test_public_key()),
+                "team-id".to_owned(),
+                request(&pds),
+            )
+            .await
+            .expect_err("publish should surface a rejected putRecord");
+
+        // atrium surfaces the PDS's 400 as an XRPC response error.
+        assert!(
+            error.to_string().contains("400") || error.to_string().contains("InvalidRecord"),
+            "unexpected error: {error}"
+        );
+        assert!(!service.firesky_accounts.contains_key(&uri));
+
+        // The putRecord was attempted, and creation was never reached.
+        let calls = pds.calls();
+        assert!(calls.contains(&"com.atproto.repo.putRecord".to_owned()));
+        assert!(!calls.contains(&"com.atproto.server.createAppPassword".to_owned()));
+
+        pds.shutdown().await;
+    }
+}
