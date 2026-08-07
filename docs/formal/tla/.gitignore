@@ -1,0 +1,5 @@
+states/
+*.old
+*_TTrace_*.tla
+*_TTrace_*.bin
+MC.out
