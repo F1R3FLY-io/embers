@@ -100,8 +100,15 @@ workspace = false
 script    = ["bash docs/formal/scripts/verify_mcrl2.sh"]
 workspace = false
 
+# Formal-verification: compile the Rocq proofs under docs/formal/rocq/ and gate on
+# them being fully constructive (no admits; Print Assumptions closed under the global
+# context). Compiles under a systemd-run resource cap. Part of the `fv` aggregate.
+[tasks.fv-rocq]
+script    = ["bash docs/formal/scripts/verify_rocq.sh"]
+workspace = false
+
 # Formal-verification aggregate: run every model-checking task. Extended as more
-# tool tracks (uppaal/tamarin/rocq) land.
+# tool tracks (uppaal/tamarin) land.
 [tasks.fv]
-dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2"]
+dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2", "fv-rocq"]
 workspace    = false
