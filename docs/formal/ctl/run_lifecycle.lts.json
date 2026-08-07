@@ -1,0 +1,29 @@
+{
+  "name": "run_lifecycle",
+  "doc": "Durable run status x claim. Terminals are absorbing; a command may be claimed only from a running/suspended, currently-unclaimed run (INV-D4 fencing shape).",
+  "states": ["running_unclaimed", "running_claimed", "suspended_unclaimed", "suspended_claimed", "completed", "failed", "cancelled"],
+  "initial": "running_unclaimed",
+  "transitions": [
+    {"from": "running_unclaimed", "to": "running_claimed", "label": "claim"},
+    {"from": "running_claimed", "to": "running_unclaimed", "label": "clear"},
+    {"from": "running_unclaimed", "to": "suspended_unclaimed", "label": "suspend"},
+    {"from": "suspended_unclaimed", "to": "running_unclaimed", "label": "resume"},
+    {"from": "suspended_unclaimed", "to": "suspended_claimed", "label": "claim"},
+    {"from": "suspended_claimed", "to": "suspended_unclaimed", "label": "clear"},
+    {"from": "running_unclaimed", "to": "completed", "label": "complete"},
+    {"from": "running_unclaimed", "to": "failed", "label": "fail"},
+    {"from": "running_unclaimed", "to": "cancelled", "label": "cancel"},
+    {"from": "suspended_unclaimed", "to": "cancelled", "label": "cancel"},
+    {"from": "completed", "to": "completed", "label": "stay"},
+    {"from": "failed", "to": "failed", "label": "stay"},
+    {"from": "cancelled", "to": "cancelled", "label": "stay"}
+  ],
+  "properties": [
+    {"id": "completed_reachable", "kind": "reachable", "state": "completed"},
+    {"id": "failed_reachable", "kind": "reachable", "state": "failed"},
+    {"id": "cancelled_reachable", "kind": "reachable", "state": "cancelled"},
+    {"id": "terminals_absorbing", "kind": "absorbing", "states": ["completed", "failed", "cancelled"]},
+    {"id": "no_dead_states", "kind": "no_dead_states"},
+    {"id": "claim_only_from_running_or_suspended_unclaimed", "kind": "from_only", "label": "claim", "allowed": ["running_unclaimed", "suspended_unclaimed"]}
+  ]
+}

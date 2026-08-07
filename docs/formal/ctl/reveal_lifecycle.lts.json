@@ -1,0 +1,21 @@
+{
+  "name": "reveal_lifecycle",
+  "doc": "Output reveal: no disclosure before an ack (INV-S3 fail-closed), consumed is absorbing (INV-S2 single-use), and refusal without ack is always available.",
+  "states": ["no_output", "revealable_fresh", "acked", "consumed"],
+  "initial": "no_output",
+  "transitions": [
+    {"from": "no_output", "to": "revealable_fresh", "label": "output_produced"},
+    {"from": "no_output", "to": "no_output", "label": "refuse_no_output"},
+    {"from": "revealable_fresh", "to": "acked", "label": "owner_claim_acked"},
+    {"from": "revealable_fresh", "to": "revealable_fresh", "label": "refuse_no_ack"},
+    {"from": "acked", "to": "consumed", "label": "disclose"},
+    {"from": "consumed", "to": "consumed", "label": "stay"}
+  ],
+  "properties": [
+    {"id": "consumed_reachable", "kind": "reachable", "state": "consumed"},
+    {"id": "consumed_absorbing_single_use", "kind": "absorbing", "states": ["consumed"]},
+    {"id": "no_disclosure_before_ack", "kind": "into_only_from", "target": "consumed", "allowed": ["acked"]},
+    {"id": "disclose_only_from_acked", "kind": "from_only", "label": "disclose", "allowed": ["acked"]},
+    {"id": "no_dead_states", "kind": "no_dead_states"}
+  ]
+}

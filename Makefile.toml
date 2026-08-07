@@ -107,6 +107,13 @@ workspace = false
 script    = ["bash docs/formal/scripts/verify_rocq.sh"]
 workspace = false
 
+# Formal-verification: explicit-state check of the lifecycle FSMs under
+# docs/formal/ctl/ (run / publication / reveal). Dependency-free (python3). Part of
+# the `fv` aggregate.
+[tasks.fv-ctl]
+script    = ["bash docs/formal/scripts/verify_ctl.sh"]
+workspace = false
+
 # Documentation checks: internal Markdown links resolve; every diagram .puml has a
 # committed .svg that re-renders byte-identically and is not an error image.
 [tasks.docs-check]
@@ -116,5 +123,5 @@ workspace = false
 # Formal-verification aggregate: run every model-checking task. Extended as more
 # tool tracks (uppaal/tamarin) land.
 [tasks.fv]
-dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2", "fv-rocq"]
+dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2", "fv-rocq", "fv-ctl"]
 workspace    = false

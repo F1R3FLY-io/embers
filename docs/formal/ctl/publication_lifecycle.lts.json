@@ -1,0 +1,21 @@
+{
+  "name": "publication_lifecycle",
+  "doc": "F1r3sky publication: draft -> published -> published_stale -> unpublished, with reconciliation always having an exit and re-publish always possible.",
+  "states": ["draft", "published", "published_stale", "unpublished"],
+  "initial": "draft",
+  "transitions": [
+    {"from": "draft", "to": "published", "label": "publish"},
+    {"from": "published", "to": "published_stale", "label": "content_changes"},
+    {"from": "published_stale", "to": "published", "label": "reconcile"},
+    {"from": "published", "to": "unpublished", "label": "unpublish"},
+    {"from": "published_stale", "to": "unpublished", "label": "unpublish"},
+    {"from": "unpublished", "to": "published", "label": "republish"}
+  ],
+  "properties": [
+    {"id": "published_reachable", "kind": "reachable", "state": "published"},
+    {"id": "unpublished_reachable", "kind": "reachable", "state": "unpublished"},
+    {"id": "reconciliation_has_an_exit", "kind": "reach_from", "source": "published_stale", "targets": ["published", "unpublished"]},
+    {"id": "republish_always_possible", "kind": "reach_from", "source": "unpublished", "targets": ["published"]},
+    {"id": "no_dead_states", "kind": "no_dead_states"}
+  ]
+}

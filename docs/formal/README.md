@@ -50,7 +50,7 @@ which properties each model discharges.
 | `smt/overflow_bv.smt2` | Z3 + cvc5 | `z3 -smt2 overflow_bv.smt2` | `unsat sat` | ✅ validated (INV-A4) |
 | `smt/capability_encoding.smt2` | cvc5 (z3 incomplete on the word equations) | `cvc5 --incremental capability_encoding.smt2` | `unsat unsat sat` | ✅ validated (INV-S4, S6) |
 | `smt/nonce_collision_bound.smt2` | Z3 + cvc5 | `z3 -smt2 nonce_collision_bound.smt2` | `unsat sat sat` | ✅ validated (INV-S6) |
-| `ctl/{run,publication,reveal}_lifecycle.lts.json` | pgmcp `behavioral_check` + hermetic Rust re-check | (see file) | formulas hold | ⏳ planned (lifecycles) |
+| `ctl/{run,publication,reveal}_lifecycle.lts.json` | explicit-state checker (`check_lifecycles.py`; dependency-free, pgmcp-independent) | `bash scripts/verify_ctl.sh` | all 16 lifecycle properties hold | ✅ validated (run/publication/reveal FSMs) |
 | `tla/ObserverConsistency.tla` | TLC | `tlc -config ObserverConsistency.cfg ObserverConsistency.tla` | invariants + liveness hold | ✅ validated (INV-C1–C3) |
 | `tla/DeployOnce.tla` | TLC | `tlc -config DeployOnce.cfg DeployOnce.tla` | pass + retry-witness counterexample | ✅ validated (INV-C4) |
 | `tla/TimersRecovery.tla` | TLC | `tlc -config TimersRecovery.cfg TimersRecovery.tla` | invariants + 3 temporal props hold | ✅ validated (INV-T1, T3, T4 — the discrete-time UPPAAL substitute) |
