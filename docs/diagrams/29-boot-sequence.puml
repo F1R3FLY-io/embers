@@ -1,0 +1,45 @@
+@startuml 29-boot-sequence
+' embers boot sequence (main.rs). Fail-fast ordering.
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+skinparam activity {
+  BackgroundColor #D5E8D4
+  BorderColor #294C60
+  DiamondBackgroundColor #FFF1CC
+  DiamondBorderColor #294C60
+}
+
+title embers boot sequence (main.rs) — fail fast, then serve
+
+start
+:open F1r3drive continuation store\n(verify_f1r3drive_mount);
+note right: FIRST — no mount, no boot #E8DACB
+:construct read / write / event clients\n(mainnet + testnet);
+partition "Bootstrap 5 domains in parallel (try_join!)" {
+  fork
+    :agents.bootstrap;
+  fork again
+    :agents_teams.bootstrap;
+  fork again
+    :oslfs.bootstrap;
+  fork again
+    :wallets.bootstrap;
+  fork again
+    :testnet.bootstrap;
+  end fork
+  :each: deploy init, await WS finality,\nverify env observer-readable\n(get_data_with_retry 10 x 500ms);
+}
+if (every env readable?) then (yes)
+else (no — Nil / unreadable)
+  #F8CECC:bail — boot fails;
+  stop
+endif
+:spawn registry health check\n(every 60s: treeHashMap OK; each env Nil/OK/LOST);
+:spawn durable recovery scheduler\n(run_recovery_loop, recovery_poll_millis);
+:generate per-process random JWT secret\n(20-char alphanumeric);
+:build_app + bind (address, port);
+:serve with graceful shutdown (ctrl_c);
+stop
+@enduml
