@@ -51,8 +51,13 @@ if command -v plantuml >/dev/null 2>&1; then
       echo "  MISSING SVG: $svg"; status=1; continue
     fi
     cp "$puml" "$tmp/"
-    plantuml -tsvg "$tmp/$(basename "$puml")" >/dev/null 2>&1
+    # Capture stderr: PlantUML can emit a soft "Error line N" yet still write an SVG,
+    # so an error-free SVG alone is not enough — the render must also be clean.
+    render_err=$(plantuml -tsvg "$tmp/$(basename "$puml")" 2>&1 >/dev/null)
     rendered="$tmp/$(basename "$svg")"
+    if [[ -n "$render_err" ]] && grep -qiE 'error|contains errors' <<<"$render_err"; then
+      echo "  RENDER ERROR: $puml -> ${render_err%%$'\n'*}"; status=1; continue
+    fi
     if [[ ! -f "$rendered" ]] || grep -qi 'contains errors\|syntax error' "$rendered"; then
       echo "  RENDER ERROR: $puml"; status=1; continue
     fi

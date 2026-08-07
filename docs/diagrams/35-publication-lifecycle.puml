@@ -20,7 +20,7 @@ PublishedStale --> Unpublished : unpublish
 Unpublished --> Published : re-publish
 Unpublished --> [*]
 
-note bottom
+note as N1
   Unpublish removes the PDS record but keeps the account, so re-publishing
   is always possible. The full state set is model-checked in the reveal/
   publication lifecycle CTL model (formal T10).
