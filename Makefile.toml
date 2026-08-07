@@ -87,8 +87,14 @@ workspace = false
 script    = ["bash docs/formal/scripts/verify_proverif.sh"]
 workspace = false
 
+# Formal-verification: run the Storm probabilistic models under docs/formal/storm/
+# and enforce each acceptance threshold (observer-retry flake < 1e-3). Part of `fv`.
+[tasks.fv-storm]
+script    = ["bash docs/formal/scripts/verify_storm.sh"]
+workspace = false
+
 # Formal-verification aggregate: run every model-checking task. Extended as more
-# tool tracks (uppaal/tamarin/mcrl2/storm/rocq) land.
+# tool tracks (uppaal/tamarin/mcrl2/rocq) land.
 [tasks.fv]
-dependencies = ["fv-smt", "fv-tlc", "fv-proverif"]
+dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm"]
 workspace    = false

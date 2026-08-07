@@ -60,7 +60,7 @@ which properties each model discharges.
 | `tamarin/run_command_fencing.spthy` | Tamarin | `tamarin-prover --prove run_command_fencing.spthy` | all lemmas verified | ⏳ planned (INV-D4, S7, S8) |
 | `tamarin/continuation_capabilities.spthy` | Tamarin | `tamarin-prover --prove continuation_capabilities.spthy` | all lemmas verified | ⏳ planned (INV-S4–S6) |
 | `mcrl2/red_team_choreography.mcrl2` | mCRL2 + pgmcp `protocol_soundness` | `mcrl22lps … \| lps2pbes -f nodeadlock.mcf \| pbessolve` | deadlock-free + progress | ⏳ planned |
-| `storm/observer_retry.pm` | Storm | `storm --prism observer_retry.pm --prop observer_retry.props` | flake $`< 10^{-3}`$ at defaults | ⏳ planned (INV-C1–C3 evidence) |
+| `storm/observer_retry.pm` | Storm | `storm --prism observer_retry.pm --prop observer_retry.props` | flake $`= 0.5^{10} \approx 9.77\times10^{-4} < 10^{-3}`$ at pessimistic defaults | ✅ validated (INV-C1–C3 evidence) |
 | `rocq/MergeJournal.v`, `ProgressBoundary.v`, `KernelTermination.v` | Rocq | `make -f Makefile.rocq` (no admits) | clean compile | ⏳ planned (INV-D8, K6, K14) |
 
 ## Installed tools (verified on this machine)
