@@ -69,7 +69,7 @@ Properties worth relying on, and their limits:
 - **Signing locality.** The private key is used only inside the client; the server sees the public key and signature. The chain independently verifies the signature at deploy time, so the HTTP layer is not the trust root for authorship.
 - **Exchange binding.** The token's hash covers the prepare request and prepare response. The signed contract is bound transitively: it must verify against the deployer signature over exactly the prepared bytes the response carried.
 - **Expiry and process scope.** Tokens expire after one day, and the signing secret is a random per-process value generated at startup (`main.rs:276`), so a backend restart invalidates outstanding prepare exchanges. Clients recover by preparing again; nothing durable is lost, because prepare deploys nothing.
-- **One asymmetry.** The delete flow predates the token discipline: its prepare returns the contract directly and its send accepts the signed contract alone, without the echoed exchange (`endpoints.rs:291-310`). The deletion contract is still signature-verified on chain; what the flow lacks is only the parity check that the other mutations perform at the HTTP boundary.
+- **One asymmetry.** The delete flow predates the token discipline: its prepare returns the contract directly (`endpoints.rs:406-418`) and its send accepts the signed contract alone, without the echoed exchange (`endpoints.rs:420-433`). The deletion contract is still signature-verified on chain; what the flow lacks is only the parity check that the other mutations perform at the HTTP boundary.
 
 ## Agent Teams endpoint reference
 

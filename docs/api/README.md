@@ -179,7 +179,7 @@ framing sentence above every quoted TypeScript declaration in `methods/` — ref
   [conformance evidence table](../../../embers-frontend/docs/agent-teams/engineering/conformance-and-testing.md) checks
   the snapshot against the served specification (backend-to-snapshot drift); the schema pins
   check the snapshot against this reference (snapshot-to-docs drift).
-- **Operation identifiers.** All 53 operations declare an `operation_id` on their backend
+- **Operation identifiers.** All 55 operations declare an `operation_id` on their backend
   endpoint (`#[oai(...)]` attributes in `packages/embers/src/api/*/endpoints.rs`), so the
   generated method names are stable under path refactoring. The offline
   `cargo run --bin generate_schema` in this repository's `packages/embers` regenerates the
