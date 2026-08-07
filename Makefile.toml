@@ -72,3 +72,16 @@ workspace = false
 [tasks.fv-smt]
 script    = ["bash docs/formal/scripts/verify_smt.sh"]
 workspace = false
+
+# Formal-verification: run every TLA+ model under docs/formal/tla/ with TLC and
+# check each config's outcome (positive configs pass; witness configs falsify as
+# expected). Part of the `fv` aggregate.
+[tasks.fv-tlc]
+script    = ["bash docs/formal/scripts/verify_tlc.sh"]
+workspace = false
+
+# Formal-verification aggregate: run every model-checking task. Extended as more
+# tool tracks (uppaal/proverif/tamarin/mcrl2/storm/rocq) land.
+[tasks.fv]
+dependencies = ["fv-smt", "fv-tlc"]
+workspace    = false
