@@ -155,4 +155,4 @@ names the figure, its type, and the document(s) that embed it.
 
 | # | File | Type | Embedded in |
 | - | ---- | ---- | ----------- |
-| _(populated as diagrams are added)_ | | | |
+| 30 | `30-deploy-lifecycle.puml` | Sequence | [architecture/deploy-lifecycle-and-consistency.md](../architecture/deploy-lifecycle-and-consistency.md) |

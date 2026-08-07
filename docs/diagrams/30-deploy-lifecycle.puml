@@ -1,0 +1,45 @@
+@startuml
+title Deploy lifecycle — write to the validator, read back from the lagging observer
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+participant "Client (SDK)" as Client #D5EAF7
+participant "Embers domain service" as Domain #CDEACC
+participant "Validator\n(gRPC + WS)" as Val #FFE4A6
+participant "Observer\n(HTTP explore-deploy)" as Obs #FFF1CC
+
+Client -> Domain : signed deploy (send)
+
+group Write path — deploy once, never retry
+  Domain -> Val : do_deploy (gRPC, 30s deadline)
+  Val --> Domain : deploy id
+  Domain -> Val : wait_for_deploy (WS subscription)
+  Val --> Domain : BlockFinalised\nSome(false)=ok / Some(true)=errored / None=timeout
+end
+
+group Read path — postcondition, retry only on empty
+  Domain -> Obs : explore-deploy (read the postcondition)
+  alt observer still lagging: visibility < finality
+    Obs --> Domain : empty (ReturnValueMissing)
+    Domain -> Domain : backoff <latex>w_i</latex>, retry\nbudget <latex>T \geq 2\,t_{req}</latex> = 150s
+    Domain -> Obs : explore-deploy (retry)
+  end
+  Obs --> Domain : value (now visible)
+end
+
+Domain --> Client : SendResp / readback
+
+note over Val, Obs #FFF0C7
+Finality (validator) and visibility (observer) are separate events;
+visibility lag <latex>L(d) = t_{vis}(d) - t_{fin}(d) \geq 0</latex>.
+A read observes d iff <latex>L(d) \leq T</latex>. See ObserverConsistency.tla.
+end note
+@enduml
