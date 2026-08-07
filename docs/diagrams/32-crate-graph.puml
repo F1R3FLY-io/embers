@@ -1,0 +1,41 @@
+@startuml
+title Embers crate dependency graph
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam component {
+  BorderColor #294C60
+  ArrowColor #294C60
+}
+skinparam package {
+  BackgroundColor #F8FBFF
+  BorderColor #6A92AA
+}
+
+package "embers workspace" {
+  [embers\n(bin: embers, generate_schema)] as embers #FFC9A8
+  [events-sync\n(bin)] as events #D0E0E3
+  [state-sync\n(bin)] as state #D0E0E3
+  [firefly-client\n(lib)] as fc #CDEACC
+  [firefly-client-macros\n(proc-macro)] as macros #D5EAF7
+}
+
+[f1r3node-models\n(git @ c95595aa)] as models #FFE4A6
+[oracle\n(detached, excluded)] as oracle #FFF9C4
+[rholang-rs parser\n(local path)] as parser #E8DACB
+
+embers  --> fc
+events  --> fc
+state   --> fc
+fc      --> macros
+fc      --> models
+macros  ..> fc     : dev-only (tests)
+oracle  ..> parser
+oracle  ..> fc     : dev
+
+note bottom of models #FFF0C7
+Re-exported as firefly_client::models (casper / rhoapi /
+servicemodelapi). Its build emits the tonic SERVER stubs
+(build_server = true), enabling an in-process fake node.
+end note
+@enduml

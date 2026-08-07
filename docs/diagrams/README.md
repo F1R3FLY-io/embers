@@ -156,3 +156,4 @@ names the figure, its type, and the document(s) that embed it.
 | # | File | Type | Embedded in |
 | - | ---- | ---- | ----------- |
 | 30 | `30-deploy-lifecycle.puml` | Sequence | [architecture/deploy-lifecycle-and-consistency.md](../architecture/deploy-lifecycle-and-consistency.md) |
+| 32 | `32-crate-graph.puml` | Component | [architecture/crate-architecture.md](../architecture/crate-architecture.md) |
