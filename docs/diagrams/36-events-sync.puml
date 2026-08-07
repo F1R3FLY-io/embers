@@ -4,7 +4,9 @@ skinparam backgroundColor #F8FBFF
 skinparam shadowing false
 skinparam ArrowColor #294C60
 skinparam defaultFontName "DejaVu Sans"
-skinparam rectangle { BorderColor #294C60 }
+skinparam rectangle {
+  BorderColor #294C60
+}
 
 title events-sync — ATProto firehose <-> Firefly bridge
 
