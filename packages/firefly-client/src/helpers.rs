@@ -226,3 +226,46 @@ fn prepared_contract_signing_is_stable_and_rejects_signed_input() {
     already_signed.sig = vec![1].into();
     assert!(sign_prepared_contract(already_signed.encode_to_vec(), &key).is_err());
 }
+
+#[cfg(test)]
+mod property_tests {
+    use proptest::prelude::*;
+    use secp256k1::ecdsa::Signature;
+
+    use super::*;
+
+    /// Any 32-byte value in the valid secp256k1 range.
+    fn arb_secret_key() -> impl Strategy<Value = SecretKey> {
+        any::<[u8; 32]>()
+            .prop_filter_map("valid secp256k1 secret key", |bytes| SecretKey::from_byte_array(bytes).ok())
+    }
+
+    proptest! {
+        /// A signed deploy is self-consistent for every key and term: the DER
+        /// signature it carries verifies against the deployer public key it
+        /// records, over the blake2b-256 digest of the prepared bytes.
+        #[test]
+        fn signed_contract_verifies(key in arb_secret_key(), term in any::<String>()) {
+            let bytes = DeployDataProto { term, ..Default::default() }.encode_to_vec();
+            let signed = sign_prepared_contract(bytes.clone(), &key)
+                .expect("a freshly prepared contract signs");
+
+            let secp = Secp256k1::new();
+            let digest = Blake2b::<U32>::new().chain_update(&bytes).finalize();
+            let message = Message::from_digest(digest.into());
+            let signature = Signature::from_der(&signed.sig).expect("the DER signature parses");
+            let deployer = PublicKey::from_slice(&signed.deployer).expect("the deployer key parses");
+            prop_assert!(secp.verify_ecdsa(message, &signature, &deployer).is_ok());
+        }
+
+        /// Signing is deterministic (RFC 6979) for every key and term, so an
+        /// outboxed deploy can be resubmitted byte-identically after a crash.
+        #[test]
+        fn signing_is_deterministic(key in arb_secret_key(), term in any::<String>()) {
+            let bytes = DeployDataProto { term, ..Default::default() }.encode_to_vec();
+            let first = sign_prepared_contract(bytes.clone(), &key).expect("signs");
+            let second = sign_prepared_contract(bytes, &key).expect("signs");
+            prop_assert_eq!(first.sig, second.sig);
+        }
+    }
+}

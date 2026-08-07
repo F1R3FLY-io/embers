@@ -1257,3 +1257,100 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+mod property_tests {
+    use proptest::prelude::*;
+
+    use super::*;
+
+    /// Any 32-byte value in the valid secp256k1 range, mapped to its public key.
+    /// Almost every 32-byte value is a valid scalar, so `prop_filter_map` rejects
+    /// the vanishingly rare out-of-range draws without meaningfully shrinking the
+    /// space.
+    fn arb_public_key() -> impl Strategy<Value = PublicKey> {
+        any::<[u8; 32]>().prop_filter_map("valid secp256k1 secret key", |bytes| {
+            let secp = secp256k1::Secp256k1::new();
+            secp256k1::SecretKey::from_byte_array(bytes)
+                .ok()
+                .map(|sk| PublicKey::from_secret_key(&secp, &sk))
+        })
+    }
+
+    proptest! {
+        /// Encoding a public key to a wallet address and parsing it back is the
+        /// identity — the checksum accepts every address the encoder produces.
+        #[test]
+        fn wallet_address_roundtrips(pk in arb_public_key()) {
+            let addr = WalletAddress::from(pk);
+            let encoded: String = addr.clone().into();
+            let parsed = WalletAddress::try_from(encoded)
+                .expect("an address produced by From<PublicKey> must parse");
+            prop_assert_eq!(parsed, addr);
+        }
+
+        /// `TryFrom` is total: no arbitrary string makes it panic; it returns Ok
+        /// or a typed error.
+        #[test]
+        fn wallet_address_try_from_is_total(s in any::<String>()) {
+            let _ = WalletAddress::try_from(s);
+        }
+
+        /// The 32-bit blake2b checksum rejects any single-byte corruption of the
+        /// payload. blake2b is collision-resistant, so a one-byte flip always
+        /// changes the recomputed checksum — this never flakes.
+        #[test]
+        fn wallet_address_rejects_payload_tampering(
+            pk in arb_public_key(),
+            byte_index in 0usize..25,
+            xor in 1u8..=255,
+        ) {
+            let addr: String = WalletAddress::from(pk).into();
+            let mut decoded = bs58::decode(&addr).into_vec().expect("valid address decodes");
+            // Keep the flip inside the payload (everything but the last 4 checksum bytes).
+            let payload_len = decoded.len() - 4;
+            let index = byte_index % payload_len;
+            decoded[index] ^= xor;
+            let tampered = bs58::encode(decoded).into_string();
+            prop_assert!(
+                WalletAddress::try_from(tampered).is_err(),
+                "a corrupted payload must fail the checksum",
+            );
+        }
+
+        /// Encoding a public key to a `rho:id:` URI and parsing it back is the
+        /// identity.
+        #[test]
+        fn uri_roundtrips(pk in arb_public_key()) {
+            let uri = Uri::from(pk);
+            let encoded: String = uri.clone().into();
+            let parsed = Uri::try_from(encoded).expect("a URI produced by From<PublicKey> must parse");
+            prop_assert_eq!(parsed, uri);
+        }
+
+        /// `TryFrom` is total over arbitrary strings.
+        #[test]
+        fn uri_try_from_is_total(s in any::<String>()) {
+            let _ = Uri::try_from(s);
+        }
+
+        /// Corrupting the hash region of a URI never silently yields the original
+        /// URI. (The CRC-14 checksum is only 14 bits, so a corrupted hash can pass
+        /// the checksum ~1/16384 of the time; when it does, the parsed URI still
+        /// carries the tampered string, so it is never equal to the original.)
+        #[test]
+        fn uri_tampering_never_yields_the_original(
+            pk in arb_public_key(),
+            byte_index in 0usize..32,
+            xor in 1u8..=255,
+        ) {
+            let uri = Uri::from(pk);
+            let encoded: String = uri.clone().into();
+            let body = encoded.strip_prefix("rho:id:").expect("URI carries its prefix");
+            let mut bytes = zbase32::decode_str(body, 270).expect("a produced URI decodes");
+            bytes[byte_index] ^= xor; // byte_index < 32 stays within the hash, not the CRC.
+            let tampered = format!("rho:id:{}", zbase32::encode(&bytes, 270));
+            prop_assert_ne!(Uri::try_from(tampered).ok(), Some(uri));
+        }
+    }
+}

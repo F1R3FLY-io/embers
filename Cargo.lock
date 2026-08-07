@@ -1674,6 +1674,7 @@ dependencies = [
  "futures",
  "hex",
  "models",
+ "proptest",
  "prost",
  "reqwest 0.13.2",
  "scopeguard",

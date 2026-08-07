@@ -246,3 +246,34 @@ pub trait Render: Sized {
 pub mod _dependencies {
     pub use askama;
 }
+
+#[cfg(test)]
+mod property_tests {
+    use proptest::prelude::*;
+
+    use super::escape_rho_string;
+
+    /// Reverse of `escape_rho_string`: undo the quote escape, then the backslash
+    /// escape — the opposite order to the forward pass.
+    fn unescape(s: &str) -> String {
+        s.replace("\\\"", "\"").replace("\\\\", "\\")
+    }
+
+    proptest! {
+        /// Escaping is invertible: `unescape ∘ escape` is the identity for every
+        /// string, so a value embedded in a Rholang double-quoted literal loses
+        /// nothing and no sequence is mis-escaped.
+        #[test]
+        fn escape_roundtrips(s in any::<String>()) {
+            prop_assert_eq!(unescape(&escape_rho_string(&s)), s);
+        }
+
+        /// Escaping is injective: distinct inputs never collide, so a rendered
+        /// literal is unambiguous.
+        #[test]
+        fn escape_is_injective(a in any::<String>(), b in any::<String>()) {
+            prop_assume!(a != b);
+            prop_assert_ne!(escape_rho_string(&a), escape_rho_string(&b));
+        }
+    }
+}

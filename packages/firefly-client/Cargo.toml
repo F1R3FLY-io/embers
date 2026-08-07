@@ -43,6 +43,7 @@ zbase32               = { version = "0.1" }
 [dev-dependencies]
 tokio   = { version = "1.49", features = ["rt-multi-thread", "macros", "time", "test-util", "net"] }
 wiremock = { version = "0.6" }
+proptest = { version = "1.10" }
 
 [lints.clippy]
 cast_possible_wrap    = "allow"
