@@ -1,3 +1,18 @@
+//! The embers backend binary: the HTTP API service fronting the F1r3fly stack.
+//!
+//! `main` is the boot sequence — open the F1r3drive-backed continuation store
+//! (which fails fast unless it is on a `fsname=f1r3drive` FUSE mount), construct the
+//! mainnet and testnet node clients, bootstrap all five API domains in parallel
+//! (each deploying its init contract, awaiting finality, and verifying its
+//! environment is observer-readable), spawn the registry health check and the
+//! durable-recovery scheduler, mint a per-process JWT secret, and serve the app
+//! assembled by [`app::build_app`]. It refuses to serve traffic it could not durably
+//! recover.
+//!
+//! See `docs/architecture/boot-and-runtime.md` for the full sequence and
+//! `docs/architecture/crate-architecture.md` for how the API structs are generic
+//! over the `ReadNode`/`WriteNode`/`NodeEventSource` trait seams.
+
 use std::time::Duration;
 
 use anyhow::Context;
