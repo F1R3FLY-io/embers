@@ -557,4 +557,140 @@ mod tests {
         wrong_hash.content_hash = "ff".repeat(32);
         assert!(store.get::<Value>(&wrong_hash, "run", "effect").is_err());
     }
+
+    use proptest::prelude::*;
+
+    /// A bounded JSON value. Numbers are restricted to `i64` so serialization is
+    /// exact (floats would let NaN and precision loss break round-trip equality).
+    fn arb_json() -> impl Strategy<Value = Value> {
+        let leaf = prop_oneof![
+            Just(Value::Null),
+            any::<bool>().prop_map(Value::from),
+            any::<i64>().prop_map(Value::from),
+            any::<String>().prop_map(Value::from),
+        ];
+        leaf.prop_recursive(3, 32, 8, |inner| {
+            prop_oneof![
+                prop::collection::vec(inner.clone(), 0..6).prop_map(Value::Array),
+                prop::collection::vec(("[a-z]{1,8}", inner), 0..6)
+                    .prop_map(|entries| Value::Object(entries.into_iter().collect())),
+            ]
+        })
+    }
+
+    /// A run or object identifier accepted by `validate_identity` (non-empty,
+    /// printable, no NUL or control characters).
+    fn arb_identity() -> impl Strategy<Value = String> {
+        "[a-zA-Z0-9_-]{1,32}".prop_map(String::from)
+    }
+
+    proptest! {
+        /// put ∘ get is the identity for any JSON value under any identity — every
+        /// value the store accepts decrypts back to exactly itself.
+        #[test]
+        fn encrypted_objects_round_trip_for_any_json(
+            value in arb_json(),
+            run_id in arb_identity(),
+            object_id in arb_identity(),
+        ) {
+            let directory = tempfile::tempdir().expect("temporary directory");
+            let store = F1r3driveContinuationStore::open_for_test(directory.path(), [7u8; 32], [9u8; 32])
+                .expect("test store opens");
+            let pointer = store
+                .put(ArtifactKind::Continuation, &run_id, &object_id, &value)
+                .expect("write succeeds");
+            let restored: Value = store.get(&pointer, &run_id, &object_id).expect("read succeeds");
+            prop_assert_eq!(restored, value);
+        }
+
+        /// Writing different bytes to an identity that already holds a value is
+        /// always rejected (the store is content-addressed and immutable).
+        #[test]
+        fn reusing_an_identity_with_different_bytes_is_rejected(
+            first in arb_json(),
+            second in arb_json(),
+            run_id in arb_identity(),
+            object_id in arb_identity(),
+        ) {
+            prop_assume!(first != second);
+            let directory = tempfile::tempdir().expect("temporary directory");
+            let store = F1r3driveContinuationStore::open_for_test(directory.path(), [1u8; 32], [2u8; 32])
+                .expect("test store opens");
+            store
+                .put(ArtifactKind::Command, &run_id, &object_id, &first)
+                .expect("first write succeeds");
+            prop_assert!(
+                store
+                    .put(ArtifactKind::Command, &run_id, &object_id, &second)
+                    .is_err()
+            );
+        }
+
+        /// Without the capability key you cannot even address the object: a reader
+        /// with a different capability key rejects the pointer on the capability
+        /// hash, before any decryption.
+        #[test]
+        fn a_different_capability_key_cannot_address_the_object(
+            value in arb_json(),
+            run_id in arb_identity(),
+            object_id in arb_identity(),
+        ) {
+            let directory = tempfile::tempdir().expect("temporary directory");
+            let writer = F1r3driveContinuationStore::open_for_test(directory.path(), [3u8; 32], [4u8; 32])
+                .expect("writer opens");
+            let reader = F1r3driveContinuationStore::open_for_test(directory.path(), [3u8; 32], [5u8; 32])
+                .expect("reader opens");
+            let pointer = writer
+                .put(ArtifactKind::Output, &run_id, &object_id, &value)
+                .expect("write succeeds");
+            prop_assert!(reader.get::<Value>(&pointer, &run_id, &object_id).is_err());
+        }
+
+        /// Without the encryption key you cannot read the object: a reader sharing
+        /// the capability key (so the pointer resolves) but holding a different
+        /// encryption key fails AEAD decryption.
+        #[test]
+        fn a_different_encryption_key_cannot_decrypt_the_object(
+            value in arb_json(),
+            run_id in arb_identity(),
+            object_id in arb_identity(),
+        ) {
+            let directory = tempfile::tempdir().expect("temporary directory");
+            let writer = F1r3driveContinuationStore::open_for_test(directory.path(), [3u8; 32], [8u8; 32])
+                .expect("writer opens");
+            let reader = F1r3driveContinuationStore::open_for_test(directory.path(), [6u8; 32], [8u8; 32])
+                .expect("reader opens");
+            let pointer = writer
+                .put(ArtifactKind::Output, &run_id, &object_id, &value)
+                .expect("write succeeds");
+            prop_assert!(reader.get::<Value>(&pointer, &run_id, &object_id).is_err());
+        }
+
+        /// Any single-byte corruption of the stored object is detected on read.
+        #[test]
+        fn any_single_byte_of_tampering_is_detected(
+            value in arb_json(),
+            run_id in arb_identity(),
+            object_id in arb_identity(),
+            byte_index in any::<usize>(),
+            xor in 1u8..=255,
+        ) {
+            let directory = tempfile::tempdir().expect("temporary directory");
+            let store = F1r3driveContinuationStore::open_for_test(directory.path(), [7u8; 32], [9u8; 32])
+                .expect("test store opens");
+            let pointer = store
+                .put(ArtifactKind::Observation, &run_id, &object_id, &value)
+                .expect("write succeeds");
+            let capability = store.derive_capability(ArtifactKind::Observation, &run_id, &object_id);
+            let path = store
+                .object_path(ArtifactKind::Observation, &capability)
+                .expect("object path");
+            let mut bytes = std::fs::read(&path).expect("read ciphertext");
+            // The stored object is always at least MAGIC + nonce bytes, so it is non-empty.
+            let index = byte_index % bytes.len();
+            bytes[index] ^= xor;
+            std::fs::write(&path, &bytes).expect("write tampered ciphertext");
+            prop_assert!(store.get::<Value>(&pointer, &run_id, &object_id).is_err());
+        }
+    }
 }

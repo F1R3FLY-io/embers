@@ -46,6 +46,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid               = { version = "1.20", features = ["serde", "v7"] }
 
 [dev-dependencies]
+figment      = { version = "0.10", features = ["env", "test"] }
+proptest     = { version = "1.10" }
 tempfile     = { version = "3.23" }
 tokio        = { version = "1.49", features = ["macros", "rt-multi-thread", "time", "test-util"] }
 tracing-test = { version = "0.2" }

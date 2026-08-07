@@ -117,6 +117,13 @@ where
 
 #[cfg(test)]
 mod tests {
+    // `figment::Jail::expect_with` fixes the closure's return type to
+    // `Result<(), figment::Error>`, and figment's error is large; the Err is
+    // never constructed here (every closure returns Ok), so the size is moot.
+    #![allow(clippy::result_large_err)]
+
+    use figment::Jail;
+
     use super::*;
 
     #[test]
@@ -124,5 +131,93 @@ mod tests {
         let policy = Finalization::default();
 
         assert_eq!(policy.deploy_timeout(), Duration::from_mins(2));
+    }
+
+    /// Populate a jail with a complete, internally-consistent environment so each
+    /// test below can flip exactly one variable and observe its effect. Each
+    /// `*_KEY` is a distinct valid secp256k1 scalar; the two continuation-store
+    /// keys and the AES key are 32-byte hex.
+    fn set_full_valid_env(jail: &mut Jail) {
+        jail.set_env("EMBERS__ADDRESS", "::1");
+        jail.set_env("EMBERS__PORT", "8080");
+        jail.set_env("EMBERS__LOG_LEVEL", "info");
+        jail.set_env("EMBERS__AES_ENCRYPTION_KEY", "aa".repeat(32));
+        jail.set_env("EMBERS__MAINNET__DEPLOY_SERVICE_URL", "http://localhost:40401");
+        jail.set_env("EMBERS__MAINNET__VALIDATOR_WS_API_URL", "ws://localhost:40403");
+        jail.set_env("EMBERS__MAINNET__OBSERVER_URL", "http://localhost:40413");
+        jail.set_env("EMBERS__MAINNET__OBSERVER_WS_API_URL", "ws://localhost:40413");
+        jail.set_env("EMBERS__MAINNET__SERVICE_KEY", "01".repeat(32));
+        jail.set_env("EMBERS__MAINNET__WALLETS_ENV_KEY", "02".repeat(32));
+        jail.set_env("EMBERS__MAINNET__AGENTS_ENV_KEY", "03".repeat(32));
+        jail.set_env("EMBERS__MAINNET__AGENTS_TEAMS_ENV_KEY", "04".repeat(32));
+        jail.set_env("EMBERS__MAINNET__OSLFS_ENV_KEY", "05".repeat(32));
+        jail.set_env("EMBERS__TESTNET__DEPLOY_SERVICE_URL", "http://localhost:50401");
+        jail.set_env("EMBERS__TESTNET__VALIDATOR_WS_API_URL", "ws://localhost:50403");
+        jail.set_env("EMBERS__TESTNET__OBSERVER_URL", "http://localhost:50413");
+        jail.set_env("EMBERS__TESTNET__OBSERVER_WS_API_URL", "ws://localhost:50413");
+        jail.set_env("EMBERS__TESTNET__SERVICE_KEY", "06".repeat(32));
+        jail.set_env("EMBERS__TESTNET__ENV_KEY", "07".repeat(32));
+        jail.set_env("EMBERS__CONTINUATION_STORE__MOUNT_PATH", "/tmp/embers-continuation");
+        jail.set_env("EMBERS__CONTINUATION_STORE__ENCRYPTION_KEY", "11".repeat(32));
+        jail.set_env("EMBERS__CONTINUATION_STORE__CAPABILITY_KEY", "22".repeat(32));
+    }
+
+    #[test]
+    fn full_valid_environment_loads() {
+        Jail::expect_with(|jail| {
+            set_full_valid_env(jail);
+            let config = collect_config().expect("a complete valid environment must load");
+            // Defaults fill in where the environment is silent.
+            assert_eq!(config.continuation_store.recovery_poll_millis, 1_000);
+            assert_eq!(config.finalization.deploy_timeout_millis, 120_000);
+            assert_eq!(config.continuation_store.max_object_bytes, None);
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn equal_continuation_keys_are_rejected() {
+        Jail::expect_with(|jail| {
+            set_full_valid_env(jail);
+            jail.set_env("EMBERS__CONTINUATION_STORE__CAPABILITY_KEY", "11".repeat(32));
+            let error = collect_config().expect_err("equal encryption and capability keys must fail");
+            assert!(error.to_string().contains("independent"), "{error}");
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn zero_recovery_poll_is_rejected() {
+        Jail::expect_with(|jail| {
+            set_full_valid_env(jail);
+            jail.set_env("EMBERS__CONTINUATION_STORE__RECOVERY_POLL_MILLIS", "0");
+            let error = collect_config().expect_err("a zero recovery poll interval must fail");
+            assert!(error.to_string().contains("positive"), "{error}");
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn zero_deploy_timeout_is_rejected() {
+        Jail::expect_with(|jail| {
+            set_full_valid_env(jail);
+            jail.set_env("EMBERS__FINALIZATION__DEPLOY_TIMEOUT_MILLIS", "0");
+            let error = collect_config().expect_err("a zero deploy timeout must fail");
+            assert!(error.to_string().contains("positive"), "{error}");
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn malformed_hex_key_is_rejected() {
+        Jail::expect_with(|jail| {
+            set_full_valid_env(jail);
+            jail.set_env("EMBERS__AES_ENCRYPTION_KEY", "not-valid-hex");
+            assert!(
+                collect_config().is_err(),
+                "a non-hex AES key must fail to deserialize",
+            );
+            Ok(())
+        });
     }
 }
