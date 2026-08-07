@@ -17,6 +17,21 @@ declare -A EXPECTED=(
   ["smt/quorum_thresholds.smt2"]="sat unsat"
   ["smt/retry_budget.smt2"]="unsat unsat unsat"
   ["smt/overflow_bv.smt2"]="unsat sat"
+  ["smt/capability_encoding.smt2"]="unsat unsat sat"
+  ["smt/nonce_collision_bound.smt2"]="unsat sat sat"
+)
+
+# model  ->  solvers to run it under (default: both). capability_encoding is cvc5-only:
+# z3's word-equation solver is incomplete on the unbounded str.contains-negation
+# equations there (it times out where cvc5 decides unsat). See that model's header.
+declare -A SOLVERS=(
+  ["smt/capability_encoding.smt2"]="cvc5"
+)
+
+# how to invoke each solver in batch, verdict-printing mode
+declare -A INVOKE=(
+  ["z3"]="z3 -smt2"
+  ["cvc5"]="cvc5 --incremental"
 )
 
 for solver in z3 cvc5; do
@@ -26,9 +41,9 @@ done
 status=0
 for model in "${!EXPECTED[@]}"; do
   expected="${EXPECTED[$model]}"
-  for invocation in "z3 -smt2" "cvc5 --incremental"; do
-    got=$($invocation "$model" 2>/dev/null | grep -E '^(sat|unsat)$' | tr '\n' ' ' | sed 's/ *$//')
-    solver=${invocation%% *}
+  solvers="${SOLVERS[$model]:-z3 cvc5}"
+  for solver in $solvers; do
+    got=$(${INVOKE[$solver]} "$model" 2>/dev/null | grep -E '^(sat|unsat)$' | tr '\n' ' ' | sed 's/ *$//')
     if [[ "$got" == "$expected" ]]; then
       printf 'ok:   %-40s %-5s -> %s\n' "$model" "$solver" "$got"
     else

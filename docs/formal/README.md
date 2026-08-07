@@ -44,13 +44,15 @@ which properties each model discharges.
 | _(frontend)_ `StatechartScopes.tla` | TLC | `tlc -config StatechartScopes.cfg StatechartScopes.tla` | 231 distinct states, all invariants hold | ✅ validated (frontend) |
 | _(frontend)_ `AgentTeamsWorkflow.tla` | TLC | `tlc -config AgentTeamsWorkflow.cfg AgentTeamsWorkflow.tla` | all invariants hold | ✅ validated (frontend) |
 | _(frontend)_ `DurableHierarchy.tla` | TLC | `tlc -config DurableHierarchy.cfg DurableHierarchy.tla` | all invariants hold | ✅ validated (frontend) |
-| `smt/history_restore_conservation.smt2` | Z3 + cvc5 | `z3 -smt2 history_restore_conservation.smt2` | `unsat` (+ pre-fix `sat` witness) | ⏳ planned (INV-A1) |
-| `smt/quorum_thresholds.smt2` | Z3 + cvc5 | `z3 -smt2 quorum_thresholds.smt2` | `unsat` | ⏳ planned (INV-A2) |
-| `smt/retry_budget.smt2` | Z3 + cvc5 | `z3 -smt2 retry_budget.smt2` | `unsat` | ⏳ planned (INV-A3, C5) |
-| `smt/overflow_bv.smt2` | Z3 + cvc5 | `z3 -smt2 overflow_bv.smt2` | `unsat` | ⏳ planned (INV-A4) |
+| `smt/history_restore_conservation.smt2` | Z3 + cvc5 | `z3 -smt2 history_restore_conservation.smt2` | `unsat sat` (+ pre-fix `sat` witness) | ✅ validated (INV-A1) |
+| `smt/quorum_thresholds.smt2` | Z3 + cvc5 | `z3 -smt2 quorum_thresholds.smt2` | `sat unsat` | ✅ validated (INV-A2) |
+| `smt/retry_budget.smt2` | Z3 + cvc5 | `z3 -smt2 retry_budget.smt2` | `unsat unsat unsat` | ✅ validated (INV-A3, C5) |
+| `smt/overflow_bv.smt2` | Z3 + cvc5 | `z3 -smt2 overflow_bv.smt2` | `unsat sat` | ✅ validated (INV-A4) |
+| `smt/capability_encoding.smt2` | cvc5 (z3 incomplete on the word equations) | `cvc5 --incremental capability_encoding.smt2` | `unsat unsat sat` | ✅ validated (INV-S4, S6) |
+| `smt/nonce_collision_bound.smt2` | Z3 + cvc5 | `z3 -smt2 nonce_collision_bound.smt2` | `unsat sat sat` | ✅ validated (INV-S6) |
 | `ctl/{run,publication,reveal}_lifecycle.lts.json` | pgmcp `behavioral_check` + hermetic Rust re-check | (see file) | formulas hold | ⏳ planned (lifecycles) |
-| `tla/ObserverConsistency.tla` | TLC | `tlc -config ObserverConsistency.cfg ObserverConsistency.tla` | invariants + liveness hold | ⏳ planned (INV-C1–C3) |
-| `tla/DeployOnce.tla` | TLC | `tlc -config DeployOnce.cfg DeployOnce.tla` | pass + retry-witness counterexample | ⏳ planned (INV-C4) |
+| `tla/ObserverConsistency.tla` | TLC | `tlc -config ObserverConsistency.cfg ObserverConsistency.tla` | invariants + liveness hold | ✅ validated (INV-C1–C3) |
+| `tla/DeployOnce.tla` | TLC | `tlc -config DeployOnce.cfg DeployOnce.tla` | pass + retry-witness counterexample | ✅ validated (INV-C4) |
 | _frontend_ `RouteGroups.tla`, `JoinEpochs.tla`, `CancelCompensation.tla`, `MigrationPinning.tla`, `CrossScopeTokens.tla`, `DurableMultiCommand.tla`, `DurableRecovery.tla` | TLC (Apalache where state space explodes) | per file | pass | ⏳ planned (INV-K7–K13, D3/D5/D6) |
 | `uppaal/timers_recovery.xml` | UPPAAL `verifyta` | `/opt/uppaal/bin/verifyta -u -q timers_recovery.xml queries.q` | all queries satisfied | ⏳ planned (INV-T1–T4) |
 | `proverif/two_phase_jwt.pv` | ProVerif | `proverif two_phase_jwt.pv` | all queries true | ⏳ planned (INV-S1) |
