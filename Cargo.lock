@@ -1674,6 +1674,7 @@ dependencies = [
  "derive_more",
  "digest",
  "firefly-client-macros",
+ "firefly-test-node",
  "futures",
  "hex",
  "models",
@@ -1708,6 +1709,24 @@ dependencies = [
  "quote",
  "syn 2.0.116",
  "trybuild",
+]
+
+[[package]]
+name = "firefly-test-node"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "firefly-client",
+ "futures",
+ "poem",
+ "reqwest 0.13.2",
+ "secp256k1",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-stream",
+ "tonic",
+ "tracing",
 ]
 
 [[package]]
