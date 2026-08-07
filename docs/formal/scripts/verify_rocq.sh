@@ -17,6 +17,7 @@ command -v systemd-run >/dev/null 2>&1 || CAP=(env)
 # file  ->  space-separated theorem names to assumption-check
 declare -A THEOREMS=(
   ["MergeJournal.v"]="durable_is_subseq on_chain_is_subseq"
+  ["ProgressBoundary.v"]="progress_boundary_iff_residual_acyclic"
 )
 
 status=0
