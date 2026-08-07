@@ -1,0 +1,43 @@
+@startuml 28-docker-supervise
+' Co-located F1r3drive + embers container supervisor (embers-entrypoint.sh).
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+skinparam activity {
+  BackgroundColor #E8DACB
+  BorderColor #A67C52
+  DiamondBackgroundColor #FFF1CC
+  DiamondBorderColor #294C60
+}
+
+title Co-located F1r3drive + embers container (embers-entrypoint.sh)
+
+start
+if (F1R3DRIVE_ENABLED == true?) then (no)
+  #D5E8D4:exec embers directly;
+  stop
+else (yes)
+endif
+if (/dev/fuse present?) then (no)
+  #F8CECC:FATAL (exit 70): needs devices:[/dev/fuse],\ncap_add:[SYS_ADMIN];
+  stop
+else (yes)
+endif
+:phase 0 — wait for the node HTTP API\n(NODE_HTTP_WAIT_URL, timeout);
+:phase 1 — start f1r3drive (java),\nmounting the FUSE filesystem;
+:phase 2 — wait for fsname=f1r3drive mount\n+ unlocked wallet dir;
+if (mounted & unlocked in time?) then (no)
+  #F8CECC:FATAL (exit 72/73): drive did not mount;
+  stop
+else (yes)
+endif
+#D5E8D4:phase 3 — start embers;
+note right: embers' verify_f1r3drive_mount\nre-checks the same mount facts
+:supervise both (wait -n);
+if (which exited?) then (either process)
+  :take the other down (BindsTo coupling);
+  :fusermount3 -u the mount;
+  stop
+endif
+@enduml
