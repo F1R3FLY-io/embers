@@ -348,6 +348,71 @@ class AgentsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
+    def deploy(self, wallet: Wallet, agent: Agent, timeout: int = DEFAULT_TIMEOUT) -> UpdateResponce:
+        prepare_request = {
+            "type": "Agent",
+            "id": agent.id,
+            "version": agent.version,
+            "address": wallet.address,
+        }
+        resp = self._client.post("/ai-agents/deploy/prepare", json=prepare_request)
+        assert resp.status == 200, resp.body
+
+        resp_next = self._client.post(
+            "/ai-agents/deploy/send",
+            timeout=timeout,
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": {
+                    "contract": sing_contract(wallet, resp.json["response"]["contract"]),
+                    "system": sing_contract(wallet, resp.json["response"]["system"])
+                    if resp.json["response"].get("system") is not None
+                    else None,
+                },
+                "token": resp.json["token"],
+            },
+        )
+        assert resp_next.status == 200, (
+            f"{resp_next.body}\nprepared Rholang:\n{numbered_prepared_contract(resp.json['response']['contract'])}"
+        )
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
+        )
+
+    def deploy_code(self, wallet: Wallet, code: str, timeout: int = DEFAULT_TIMEOUT) -> UpdateResponce:
+        prepare_request = {"type": "Code", "code": code}
+        resp = self._client.post("/ai-agents/deploy/prepare", json=prepare_request)
+        assert resp.status == 200, resp.body
+
+        resp_next = self._client.post(
+            "/ai-agents/deploy/send",
+            timeout=timeout,
+            json={
+                "prepare_request": prepare_request,
+                "prepare_response": resp.json["response"],
+                "request": {
+                    "contract": sing_contract(wallet, resp.json["response"]["contract"]),
+                    "system": sing_contract(wallet, resp.json["response"]["system"])
+                    if resp.json["response"].get("system") is not None
+                    else None,
+                },
+                "token": resp.json["token"],
+            },
+        )
+        assert resp_next.status == 200, (
+            f"{resp_next.body}\nprepared Rholang:\n{numbered_prepared_contract(resp.json['response']['contract'])}"
+        )
+
+        return UpdateResponce(
+            first=resp,
+            second=resp_next,
+            accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
+        )
+
 
 @dataclass
 class AgentsTeam:
@@ -414,7 +479,9 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
-    def deploy(self, wallet: Wallet, agents_team: AgentsTeam, deploy: dict, timeout: int = DEFAULT_TIMEOUT) -> UpdateResponce:
+    def deploy(
+        self, wallet: Wallet, agents_team: AgentsTeam, deploy: dict, timeout: int = DEFAULT_TIMEOUT
+    ) -> UpdateResponce:
         prepare_request = {
             "type": "AgentsTeam",
             "id": agents_team.id,
@@ -450,9 +517,7 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
-    def deploy_graph(
-        self, wallet: Wallet, graph: str, deploy: dict, timeout: int = DEFAULT_TIMEOUT
-    ) -> UpdateResponce:
+    def deploy_graph(self, wallet: Wallet, graph: str, deploy: dict, timeout: int = DEFAULT_TIMEOUT) -> UpdateResponce:
         prepare_request = {"type": "Graph", "graph": graph, "deploy": deploy}
         resp = self._client.post("/ai-agents-teams/deploy/prepare", json=prepare_request)
         assert resp.status == 200, resp.body

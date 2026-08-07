@@ -30,6 +30,11 @@ from tests.client import AgentsTeam, ApiClient, Wallet
 from tests.conftest import insert_signed_deploy
 from tests.key import SECP256k1
 
+# A full broadcast/fan-in choreography run through the durable kernel; chain-
+# hermetic (every agent body is canned Rholang, never rho:ai:gpt4) but long.
+# `devnet` is applied to every tests/api/** case by conftest.
+pytestmark = pytest.mark.slow
+
 # Canned bodies. Single-input agents receive the value; multi-input agents
 # receive a map keyed by the producing node's name, so the two shapes read their
 # input differently -- which is itself part of what these assertions pin down.

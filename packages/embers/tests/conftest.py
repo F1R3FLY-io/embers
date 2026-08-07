@@ -1,8 +1,12 @@
 import base64
+import os
+import shutil
+import subprocess
 from datetime import datetime
 from hashlib import blake2b
 
 import pytest
+import requests
 import zbase32
 from crc import Calculator, Configuration
 from ecdsa import VerifyingKey
@@ -11,6 +15,132 @@ from tests.client import Agent, AgentsTeam, ApiClient, Oslf, Wallet
 from tests.key import SECP256k1
 from tests.protobuf.rhoapi import ETuple, Expr, Par
 
+# Where the Embers backend under test listens. The suite drives a *running*
+# server (it is the L2 dev-net acceptance layer), so the target is configurable:
+# locally it defaults to the IPv6 loopback the stack binds; L2 orchestration and
+# L3 runs override it via the environment. All L1/L2 targets must stay on
+# loopback (the campaign's hard no-egress constraint); the remote guard below
+# enforces that L3 does not.
+EMBERS_API_URL = os.environ.get("EMBERS_API_URL", "[::1]:8080")
+
+_LOOPBACK_HOSTS = frozenset({"[::1]", "::1", "127.0.0.1", "localhost"})
+
+# Markers whose availability is probed before a test runs. `slow` carries no
+# probe; `remote` is handled by its own stronger guard in pytest_runtest_setup.
+_SERVICE_MARKERS = ("devnet", "pds", "chroma", "gpt", "recovery")
+
+# One probe result per service per session — services do not appear or vanish
+# mid-run, and re-probing per test would add a network round trip to every case.
+_PROBE_CACHE: dict[str, tuple[bool, str]] = {}
+
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--strict-services",
+        action="store_true",
+        default=False,
+        help="Fail (instead of skip) when a service a marked test needs is unavailable.",
+    )
+
+
+def _http_ok(url: str) -> tuple[bool, str]:
+    try:
+        response = requests.get(url, timeout=2)
+    except requests.RequestException as exc:
+        return False, f"{url}: {exc}"
+    # Any non-5xx answer proves the service is listening and handling requests;
+    # a readiness path may legitimately return 200, 404, or 401.
+    if response.status_code >= 500:
+        return False, f"{url}: HTTP {response.status_code}"
+    return True, ""
+
+
+def _host_of(api_url: str) -> str:
+    # api_url is "host:port"; the host may be a bracketed IPv6 literal.
+    if api_url.startswith("["):
+        return api_url[: api_url.index("]") + 1]
+    return api_url.rsplit(":", 1)[0]
+
+
+def _probe_recovery() -> tuple[bool, str]:
+    unit = os.environ.get("EMBERS_SERVICE_UNIT")
+    if not unit:
+        return False, "EMBERS_SERVICE_UNIT is not set"
+    systemctl = shutil.which("systemctl")
+    if systemctl is None:
+        return False, "systemctl is not available"
+    # Fixed argv (no shell), absolute path from shutil.which, and `unit` is
+    # operator-provided dev configuration rather than untrusted input.
+    completed = subprocess.run(  # noqa: S603
+        [systemctl, "--user", "is-active", "--quiet", unit],
+        check=False,
+    )
+    if completed.returncode == 0:
+        return True, ""
+    return False, f"systemd unit {unit} is not active"
+
+
+def _run_probe(name: str) -> tuple[bool, str]:
+    http_probes = {
+        "devnet": f"http://{EMBERS_API_URL}/swagger-ui/index.html",
+        "pds": "http://localhost:2583/xrpc/_health",
+        "chroma": "http://localhost:8000/api/v2/heartbeat",
+        "gpt": "http://127.0.0.1:8571/v1/models",
+    }
+    if name in http_probes:
+        return _http_ok(http_probes[name])
+    if name == "recovery":
+        return _probe_recovery()
+    return True, ""
+
+
+def _probe(name: str) -> tuple[bool, str]:
+    if name not in _PROBE_CACHE:
+        _PROBE_CACHE[name] = _run_probe(name)
+    return _PROBE_CACHE[name]
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    # Every acceptance test under tests/api/** drives the running backend, so it
+    # uniformly needs the dev-net stack. Applying `devnet` here keeps that one
+    # invariant in a single place; the sharper needs (pds/chroma/gpt/recovery/slow)
+    # stay as explicit pytestmark in the modules that have them.
+    for item in items:
+        if "/api/" in item.nodeid or item.nodeid.startswith("api/"):
+            item.add_marker("devnet")
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    markers = {marker.name for marker in item.iter_markers()}
+
+    if "remote" in markers:
+        # L3: never run against loopback, and never without explicit opt-in.
+        if os.environ.get("EMBERS_L3_CONFIRM") != "1":
+            pytest.fail(
+                "remote (L3) tests call real external services and must never run by "
+                "default; set EMBERS_L3_CONFIRM=1 to acknowledge before running them",
+            )
+        if _host_of(EMBERS_API_URL) in _LOOPBACK_HOSTS:
+            pytest.fail(
+                f"remote (L3) tests must not target loopback (EMBERS_API_URL={EMBERS_API_URL}); "
+                "point them at a real remote deployment",
+            )
+        # Remote services are assumed present; do not run the local-service probes.
+        return
+
+    strict = item.config.getoption("--strict-services")
+    for marker in _SERVICE_MARKERS:
+        if marker not in markers:
+            continue
+        available, reason = _probe(marker)
+        if available:
+            continue
+        message = f"service '{marker}' unavailable: {reason}"
+        if strict:
+            pytest.fail(message)
+        pytest.skip(message)
+
+
 ECHO_TEAM = 'context "{}" for A8f132a6a0f9340b59053b2689b8e040b in let A8f132a6a0f9340b59053b2689b8e040b = context "{\\"type\\":\\"input-node\\"}" for a7e2c4e97cb7145aea7ae4af15ba6789f in let a7e2c4e97cb7145aea7ae4af15ba6789f = < a7e2c4e97cb7145aea7ae4af15ba6789f > in < a7e2c4e97cb7145aea7ae4af15ba6789f > | {context "{\\"type\\":\\"output-node\\"}" for a02b50756f24f45f793b84b3d33e965c7 in let a02b50756f24f45f793b84b3d33e965c7 = < a02b50756f24f45f793b84b3d33e965c7 > in < a02b50756f24f45f793b84b3d33e965c7 > | 0} in 0 * {(let a7e2c4e97cb7145aea7ae4af15ba6789f = < a7e2c4e97cb7145aea7ae4af15ba6789f > in 0, let a02b50756f24f45f793b84b3d33e965c7 = < a02b50756f24f45f793b84b3d33e965c7 > in 0) * 0} '  # noqa: E501
 COMPRESS_TEAM = 'context "{}" for A0fe7f81a4a71433c9b708d8c8484f9b2 in let A0fe7f81a4a71433c9b708d8c8484f9b2 = context "{\\"type\\":\\"input-node\\"}" for a8f6d37c2166f4aa3936a2df6c65dd9af in let a8f6d37c2166f4aa3936a2df6c65dd9af = < a8f6d37c2166f4aa3936a2df6c65dd9af > in < a8f6d37c2166f4aa3936a2df6c65dd9af > | {context "{\\"type\\":\\"output-node\\"}" for a72f0d65ffc19427c823558d0224cc964 in let a72f0d65ffc19427c823558d0224cc964 = < a72f0d65ffc19427c823558d0224cc964 > in < a72f0d65ffc19427c823558d0224cc964 > | {context "{\\"type\\":\\"compress\\"}" for a5653f99668994404a9a6ae4bf6889b0e in let a5653f99668994404a9a6ae4bf6889b0e = < a5653f99668994404a9a6ae4bf6889b0e > in < a5653f99668994404a9a6ae4bf6889b0e > | 0}} in 0 * {(let a8f6d37c2166f4aa3936a2df6c65dd9af = < a8f6d37c2166f4aa3936a2df6c65dd9af > in 0, let a5653f99668994404a9a6ae4bf6889b0e = < a5653f99668994404a9a6ae4bf6889b0e > in 0) * {(let a5653f99668994404a9a6ae4bf6889b0e = < a5653f99668994404a9a6ae4bf6889b0e > in 0, let a72f0d65ffc19427c823558d0224cc964 = < a72f0d65ffc19427c823558d0224cc964 > in 0) * 0}} '  # noqa: E501
 GPT_COMPRESS_TEAM = 'context "{}" for A005ef27270144757997243d5c7892749 in let A005ef27270144757997243d5c7892749 = context "{\\"type\\":\\"input-node\\"}" for a2210aecc94d849e38d623251b158a3dd in let a2210aecc94d849e38d623251b158a3dd = < a2210aecc94d849e38d623251b158a3dd > in < a2210aecc94d849e38d623251b158a3dd > | {context "{\\"type\\":\\"output-node\\"}" for a5822ec2e8030498296ecb192cffc759d in let a5822ec2e8030498296ecb192cffc759d = < a5822ec2e8030498296ecb192cffc759d > in < a5822ec2e8030498296ecb192cffc759d > | {context "{\\"type\\":\\"text-model\\"}" for ad0d3b3ff43b34655807f61eafade165b in let ad0d3b3ff43b34655807f61eafade165b = < ad0d3b3ff43b34655807f61eafade165b > in < ad0d3b3ff43b34655807f61eafade165b > | {context "{\\"type\\":\\"compress\\"}" for a820a9e638bf24771ae6317cf4a9b7d18 in let a820a9e638bf24771ae6317cf4a9b7d18 = < a820a9e638bf24771ae6317cf4a9b7d18 > in < a820a9e638bf24771ae6317cf4a9b7d18 > | 0}}} in 0 * {(let a2210aecc94d849e38d623251b158a3dd = < a2210aecc94d849e38d623251b158a3dd > in 0, let ad0d3b3ff43b34655807f61eafade165b = < ad0d3b3ff43b34655807f61eafade165b > in 0) * {(let ad0d3b3ff43b34655807f61eafade165b = < ad0d3b3ff43b34655807f61eafade165b > in 0, let a820a9e638bf24771ae6317cf4a9b7d18 = < a820a9e638bf24771ae6317cf4a9b7d18 > in 0) * {(let a820a9e638bf24771ae6317cf4a9b7d18 = < a820a9e638bf24771ae6317cf4a9b7d18 > in 0, let a5822ec2e8030498296ecb192cffc759d = < a5822ec2e8030498296ecb192cffc759d > in 0) * 0}}} '  # noqa: E501
@@ -18,7 +148,7 @@ GPT_COMPRESS_TEAM = 'context "{}" for A005ef27270144757997243d5c7892749 in let A
 
 @pytest.fixture
 def client() -> ApiClient:
-    return ApiClient("[::1]:8080")
+    return ApiClient(EMBERS_API_URL)
 
 
 @pytest.fixture

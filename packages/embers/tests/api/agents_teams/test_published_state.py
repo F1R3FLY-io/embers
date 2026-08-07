@@ -19,6 +19,11 @@ from tests.client import AgentsTeam, ApiClient, Wallet
 from tests.conftest import ECHO_TEAM, insert_signed_deploy
 from tests.key import SECP256k1
 
+# Publishing creates a real account on the local f1r3sky PDS, and reconciliation
+# reads it back (marker registry in pyproject.toml); `devnet` is applied to every
+# tests/api/** case by conftest.
+pytestmark = pytest.mark.pds
+
 
 def _deploy(client: ApiClient, wallet: Wallet, team: AgentsTeam) -> None:
     client.agents_teams.deploy(

@@ -31,6 +31,10 @@ from tests.client import AgentsTeam, ApiClient, Wallet
 from tests.conftest import ECHO_TEAM, insert_signed_deploy
 from tests.key import SECP256k1
 
+# Publishes to and reconciles against the local f1r3sky PDS (marker registry in
+# pyproject.toml); `devnet` is applied to every tests/api/** case by conftest.
+pytestmark = pytest.mark.pds
+
 PDS_URL = "http://localhost:2583"
 CONFIG_COLLECTION = "com.f1r3sky.agentsteam.config"
 

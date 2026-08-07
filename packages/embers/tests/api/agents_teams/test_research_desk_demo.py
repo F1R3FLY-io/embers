@@ -43,7 +43,6 @@ through node-side SBERT -- the re-ask IS the upsert verification.
 """
 
 import json
-import urllib.request
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -203,17 +202,14 @@ def _archivist_code() -> str:
     return (DEMO_DIR / "agents" / "archivist.rho").read_text()
 
 
-def _chroma_reachable() -> bool:
-    try:
-        with urllib.request.urlopen("http://localhost:8000/api/v2/heartbeat", timeout=3):
-            return True
-    except OSError:
-        return False
-
-
-pytestmark = pytest.mark.skipif(
-    not DEMO_DIR.is_dir(), reason=f"demo assets not found at {DEMO_DIR}"
-)
+# Both cases drive the durable kernel end to end (RUN_TIMEOUT 600), so the module
+# is `slow`; the RAG demo additionally needs Chroma (marked per-test below). The
+# demo assets live in the sibling embers-frontend repo, hence the skip when absent.
+# `devnet` is applied to every tests/api/** case by conftest.
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(not DEMO_DIR.is_dir(), reason=f"demo assets not found at {DEMO_DIR}"),
+]
 
 
 def _demo_definition(
@@ -362,9 +358,7 @@ def test_research_desk_demo_choreography(client: ApiClient, funded_wallet: Walle
     assert client.agents_teams.get_run(suspended["runId"]).json["status"] == "completed"
 
 
-@pytest.mark.skipif(
-    not _chroma_reachable(), reason="Chroma server is not answering on localhost:8000"
-)
+@pytest.mark.chroma
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_research_desk_demo_local_rag(client: ApiClient, funded_wallet: Wallet):
     """embers ⇄ f1r3node ⇄ ChromaDB end to end, entirely on localhost."""

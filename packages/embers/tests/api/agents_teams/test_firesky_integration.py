@@ -14,6 +14,10 @@ from tests.client import AgentsTeam, ApiClient, Wallet
 from tests.conftest import insert_signed_deploy, public_key_to_uri
 from tests.key import SECP256k1
 
+# Publishes to and reads from the local f1r3sky PDS (see the marker registry in
+# pyproject.toml); `devnet` is applied to every tests/api/** case by conftest.
+pytestmark = pytest.mark.pds
+
 PDS_URL = "http://localhost:2583"
 POST_COLLECTION = "app.bsky.feed.post"
 TERMINAL_REPLY_LIMIT = 280
