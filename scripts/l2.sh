@@ -144,6 +144,14 @@ cmd_down() {
   systemctl --user stop "$STUB_UNIT" 2>/dev/null || true
   systemctl --user reset-failed "$STUB_UNIT" 2>/dev/null || true
   if [[ -x "$STACK" ]]; then log "stopping the stack"; "$STACK" stop || true; fi
+  # Leave no trace: remove the managed OPENAI_API_BASE marker so a later non-L2 node
+  # start does not point at a stopped stub.
+  if [[ -f "$SECRETS" ]] && grep -qF "$MARKER_BEGIN" "$SECRETS"; then
+    log "removing the managed OpenAI-stub marker from secrets.env"
+    awk -v b="$MARKER_BEGIN" -v e="$MARKER_END" '
+      $0==b{skip=1} !skip{print} $0==e{skip=0}' "$SECRETS" > "$SECRETS.l2tmp" \
+      && mv "$SECRETS.l2tmp" "$SECRETS"
+  fi
 }
 
 case "${1:-}" in
