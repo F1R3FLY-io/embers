@@ -1,5 +1,6 @@
 @startuml 27-local-stack-topology
-' embers-local-stack loopback topology (stack.sh). All endpoints bind loopback.
+' F1r3fly dev-net loopback topology (the L2 substrate). All endpoints bind loopback.
+' Brought up by a local launcher external to this repo; embers only needs these endpoints.
 ' Palette per docs/diagrams/README.md.
 skinparam backgroundColor #F8FBFF
 skinparam shadowing false
@@ -10,7 +11,7 @@ skinparam rectangle {
 }
 skinparam ArrowColor #294C60
 
-title embers-local-stack — loopback dev-net topology (systemd --user managed)
+title F1r3fly dev-net — loopback topology (the L2 substrate)
 
 rectangle "F1r3fly node (native binary)" as node {
   component "validator\ngRPC :40401\nHTTP :40403" as validator #A9D0F5

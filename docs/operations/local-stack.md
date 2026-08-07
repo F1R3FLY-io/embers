@@ -1,86 +1,64 @@
-# Local stack (dev-net)
+# Local dev-net (L2 substrate)
 
-`embers-local-stack` is a sibling repository whose `stack.sh` brings up a complete
-**loopback** F1r3fly dev-net — a native F1r3fly node, a F1r3drive mount, PDS,
-Postgres/valkey, and embers itself — so the backend can be exercised end to end
-without any remote infrastructure. This is the substrate the **L2** test layer runs
-against (see [test architecture](../testing/test-architecture.md)); everything binds
-loopback, so no traffic leaves the machine.
+The **L2** test layer runs the backend against a complete **loopback** F1r3fly dev-net
+(see [test architecture](../testing/test-architecture.md)). This document describes
+that dev-net as a **contract** — the services embers needs and the loopback endpoints
+it expects — not a specific launcher. Bringing the services up is done by a **local
+launcher external to this repository** (the maintainer runs one locally; any
+equivalent — a script, Docker, or hand-run processes — works as long as it satisfies
+the contract). embers is not coupled to any particular launcher; it only needs the
+endpoints below and a F1r3drive mount.
 
-This document is the `stack.sh` runbook. The stack lives outside this repository
-(`../embers-local-stack/`); embers only needs to know how to talk to it.
+## What the dev-net must provide
 
-## Topology
+![local dev-net topology](../diagrams/27-local-stack-topology.svg)
 
-![local stack topology](../diagrams/27-local-stack-topology.svg)
+| Service | Endpoint (loopback) | Why embers needs it |
+| ------- | ------------------- | ------------------- |
+| Validator node | gRPC `:40401`, HTTP `:40403` | Submit deploys; read the head block; WS finality events. |
+| Read-node / observer | HTTP `:40413` | `explore-deploy` reads. |
+| F1r3drive | a `fsname=f1r3drive` FUSE mount | The continuation store must live on it, or embers refuses to boot ([F1r3drive integration](../integrations/f1r3drive.md)). |
+| PDS | `:2583` | F1r3sky publish/unpublish/reveal paths (the `pds`-marked tests). |
+| Postgres / valkey | `:5432` / `:6379` | Backing services the node/PDS use. |
+| Chroma (optional) | `:8000` | The research-desk RAG demo (the `chroma`-marked tests). |
 
-| Component | Endpoint (loopback) | Managed as |
-| --------- | ------------------- | ---------- |
-| Validator node | gRPC `:40401`, HTTP `:40403` | systemd `--user` unit |
-| Read-node / observer | HTTP `:40413` | systemd `--user` unit |
-| F1r3drive | FUSE mount | systemd `--user` unit |
-| embers | `[::1]:8080` | systemd `--user` unit |
-| PDS | `:2583` | process |
-| Postgres | `:5432` | systemd-managed |
-| valkey | `:6379` | systemd-managed |
-| Chroma (optional) | `:8000` | process |
+The native node is a `f1r3node` build; embers is built from this repository with the
+`gxhash` target features (`RUSTFLAGS="-C target-feature=+aes,+sse2"`, already set in
+`.cargo/config.toml`). embers binds `[::1]:8080` by default (`EMBERS_API_URL`).
 
-The native node binary is built out of the sibling `../f1r3node-rust/` checkout.
-embers is built from this repository with the `gxhash` target features
-(`RUSTFLAGS="-C target-feature=+aes,+sse2"`).
+## The OpenAI stub (hermetic model calls)
 
-## Subcommands
+The one L2 piece embers *does* own is the local OpenAI stub, so model calls stay on
+loopback (the machine can't run GPT-4). The **node**, not embers, calls OpenAI, so
+point the node's `OPENAI_API_BASE` at the stub:
 
-`stack.sh <subcommand>`:
+```sh
+cargo make l2-stub          # build + start the stub on 127.0.0.1:8571 (user unit)
+# then set, in your launcher's node environment:
+#   OPENAI_API_BASE=http://127.0.0.1:8571/v1
+```
 
-| Subcommand | Does |
-| ---------- | ---- |
-| `wallet` | Set up / inspect the demo wallet. |
-| `nodes` / `repair-nodes` | Bring up (or repair) the validator + read-node units. |
-| `serve-validator` / `serve-read-node` | The unit entrypoints (re-exec'd by systemd; not run by hand). |
-| `drive` / `serve-drive` | Mount F1r3drive (and its unit entrypoint). |
-| `embers` / `start-embers` | Build and run embers against the local node + drive. |
-| `backend` | Bring up the backend services together. |
-| `web` / `stop-web` | Run / stop the web frontend. |
-| `up` | Bring up the whole stack in order. |
-| `status` | Show every unit's state and the bound ports. |
-| `truncate` | Truncate the on-disk state (fresh chain). |
-| `reset` | Tear down and re-initialize. |
-| `stop` | Stop all stack units. |
+`openai-api-rs` (which the node uses) reads `OPENAI_API_BASE` in `build()`, so no node
+patch is needed. The node's startup validation calls `GET /v1/models`, which the stub
+serves; confirm uptake with `curl 127.0.0.1:8571/stub/requests`. See the
+[OpenAI stub](../../packages/openai-stub/) crate.
 
-The usual first run is `stack.sh up`; `stack.sh status` shows what is live;
-`stack.sh stop` tears it down.
+## Running the L2 suite
 
-## Secrets and the OpenAI key
+Once the dev-net is up and the node points at the stub:
 
-`stack.sh` sources an untracked `secrets.env` (copied from `secrets.env.example`)
-and requires `CHATGPT_EMBERS_DEMO_API_KEY` to be set. The **node**, not embers,
-holds and uses the OpenAI key — embers never calls OpenAI directly (the node's
-`rho:ai:*` system channels do).
+```sh
+cargo make l2-test          # pytest -m "devnet and not remote" against $EMBERS_API_URL
+cargo make l2-recovery      # the durable-recovery suite (needs EMBERS_SERVICE_UNIT)
+cargo make l2-stub-stop     # stop the stub when done
+```
 
-For a hermetic **L2** run the node's `OPENAI_API_BASE` is pointed at the local
-[OpenAI stub](../testing/test-architecture.md) by adding an
-`export OPENAI_API_BASE=http://127.0.0.1:8571/v1` line to `secrets.env` (the node
-re-sources it), so even the model calls stay on loopback and the machine needs no
-real GPT-4 access. This is the mechanism behind the local-only mandate: nothing in
-L1 or L2 reaches an external host.
+`pds`/`chroma`/`gpt`/`recovery`-marked tests skip automatically when their backing
+service is absent (the session-cached probes in `conftest.py`), so a partial dev-net
+runs exactly the subset it supports. See [CI and tooling](ci-and-tooling.md).
 
-## Systemd unit naming
+## Relationship to Docker
 
-Units are user-scoped (`systemd-run --user`) and named per **run directory** so
-multiple stacks can coexist: `stack.sh` computes `STACK_PROFILE_ID` as the
-`sha256sum` of the normalized run directory (`EMBERS_STACK_RUN_DIR`, default
-`<stack>/run`) and embeds a 12-char prefix of it in each unit name (validator,
-read-node, F1r3drive, watchdog, embers). `stack.sh status` resolves and prints
-them; to drive one directly, read the unit name from `status` rather than guessing.
-
-## Relationship to embers
-
-- embers is configured to reach the local node's three endpoints and the F1r3drive
-  mount through its normal `EMBERS__…` environment; see
-  [configuration](configuration.md).
-- The [F1r3drive mount contract](../integrations/f1r3drive.md) is satisfied by
-  `stack.sh drive`, which mounts a real FUSE `fsname=f1r3drive` filesystem.
-- L2 orchestration (building embers + the stub, ensuring the stub uptake, running
-  the `devnet`-marked pytest suite) is layered on top of `stack.sh`; see
-  [test architecture](../testing/test-architecture.md).
+The [Docker path](docker.md) satisfies the same contract (a healthy node, a
+`fsname=f1r3drive` mount, the `EMBERS__…` configuration) by co-locating F1r3drive with
+embers in one container — an alternative to a native local launcher.

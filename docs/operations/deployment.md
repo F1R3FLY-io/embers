@@ -13,7 +13,8 @@ production/staging counterpart to the [local stack](local-stack.md) dev-net.
 - **A F1r3drive FUSE mount** for the continuation store. embers refuses to boot
   otherwise (see [F1r3drive integration](../integrations/f1r3drive.md)). In Docker
   this is provided by the co-located F1r3drive in the embers image (see
-  [Docker guide](docker.md)); natively, by `stack.sh drive`.
+  [Docker guide](docker.md)); natively, by a local dev-net launcher (see
+  [local stack](local-stack.md)).
 - **Funded service-key wallets** on each network (the keys that sign embers'
   deploys) and the per-domain **environment keys** — see [key inventory](../security/key-inventory.md).
 

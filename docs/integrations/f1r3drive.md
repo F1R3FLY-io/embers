@@ -91,4 +91,4 @@ storage while the production path keeps the mount requirement.
   See [deployment](../operations/deployment.md).
 - In Docker, the F1r3drive mount is provided to the embers container as described in
   the [Docker guide](../operations/docker.md); the local dev-net mounts it via
-  `stack.sh drive` (see [local stack](../operations/local-stack.md)).
+  a local dev-net launcher's F1r3drive mount step (see [local stack](../operations/local-stack.md)).

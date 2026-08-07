@@ -67,12 +67,17 @@ cargo test --manifest-path oracle/Cargo.toml
 '''
 workspace = false
 
-# L2 (loopback dev-net) orchestration — build embers + the OpenAI stub, arm the
-# stack's secrets.env, bring the stack up, and run the marker-selected suite against
-# it. See scripts/l2.sh and docs/testing/test-architecture.md. Every endpoint is
-# loopback; nothing reaches an external host.
-[tasks.l2-up]
-script    = ["bash scripts/l2.sh up"]
+# L2 (loopback dev-net) test orchestration. This manages ONLY the OpenAI stub and the
+# test runs — bringing up the dev-net (node + F1r3drive + optional PDS) is left to
+# whatever local launcher you use, so nothing here is coupled to a specific one. Point
+# the node's OPENAI_API_BASE at the stub (http://127.0.0.1:8571/v1). Everything is
+# loopback. See scripts/l2.sh and docs/testing/test-architecture.md.
+[tasks.l2-stub]
+script    = ["bash scripts/l2.sh stub"]
+workspace = false
+
+[tasks.l2-stub-stop]
+script    = ["bash scripts/l2.sh stub-stop"]
 workspace = false
 
 [tasks.l2-test]
@@ -85,10 +90,6 @@ workspace = false
 
 [tasks.l2-rust]
 script    = ["bash scripts/l2.sh rust"]
-workspace = false
-
-[tasks.l2-down]
-script    = ["bash scripts/l2.sh down"]
 workspace = false
 
 # Run the local OpenAI stub in the foreground (Ctrl-C to stop). Binds OPENAI_STUB_ADDR
