@@ -1,4 +1,14 @@
+use core::marker::PhantomData;
+
 use firefly_client::models::WalletAddress;
+use firefly_client::{
+    NodeEventSource,
+    NodeEvents,
+    ReadNode,
+    ReadNodeClient,
+    WriteNode,
+    WriteNodeClient,
+};
 use futures::future;
 use futures::sink::SinkExt;
 use poem::web::{Data, websocket};
@@ -25,11 +35,18 @@ use crate::api::wallets::models::{
 };
 use crate::domain::wallets::WalletsService;
 
-#[derive(Debug, Clone)]
-pub struct WalletsApi;
+pub struct WalletsApi<R = ReadNodeClient, W = WriteNodeClient, N = NodeEvents>(
+    PhantomData<(R, W, N)>,
+);
+
+impl<R, W, N> Default for WalletsApi<R, W, N> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
 
 #[OpenApi(prefix_path = "/wallets", tag = ApiTags::Wallets)]
-impl WalletsApi {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsApi<R, W, N> {
     #[oai(
         path = "/:address/state",
         method = "get",
@@ -38,7 +55,7 @@ impl WalletsApi {
     async fn wallet_state_and_history(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
-        Data(wallets): Data<&WalletsService>,
+        Data(wallets): Data<&WalletsService<R, W, N>>,
     ) -> poem::Result<Json<WalletStateAndHistory>> {
         let wallet_state_and_history = wallets
             .get_wallet_state_and_history(address.0)
@@ -56,7 +73,7 @@ impl WalletsApi {
     async fn prepare_transfer(
         &self,
         Json(body): Json<TransferReq>,
-        Data(wallets): Data<&WalletsService>,
+        Data(wallets): Data<&WalletsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<TransferResp>>> {
         PrepareResponse::from_call(
@@ -77,7 +94,7 @@ impl WalletsApi {
     async fn transfer(
         &self,
         SendRequest(body): SendRequest<SignedContract, TransferReq, TransferResp>,
-        Data(wallets): Data<&WalletsService>,
+        Data(wallets): Data<&WalletsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = wallets.deploy_signed_transfer(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
@@ -91,7 +108,7 @@ impl WalletsApi {
     async fn prepare_boost(
         &self,
         Json(body): Json<BoostReq>,
-        Data(wallets): Data<&WalletsService>,
+        Data(wallets): Data<&WalletsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<BoostResp>>> {
         PrepareResponse::from_call(
@@ -112,7 +129,7 @@ impl WalletsApi {
     async fn boost(
         &self,
         SendRequest(body): SendRequest<SignedContract, BoostReq, BoostResp>,
-        Data(wallets): Data<&WalletsService>,
+        Data(wallets): Data<&WalletsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = wallets.deploy_boost_transfer(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
@@ -127,7 +144,7 @@ impl WalletsApi {
     async fn deploys(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
-        Data(wallets): Data<&WalletsService>,
+        Data(wallets): Data<&WalletsService<R, W, N>>,
         ws: websocket::WebSocket,
     ) -> websocket::BoxWebSocketUpgraded {
         let wallets = wallets.clone();

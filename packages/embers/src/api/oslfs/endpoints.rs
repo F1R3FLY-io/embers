@@ -1,4 +1,14 @@
+use core::marker::PhantomData;
+
 use firefly_client::models::WalletAddress;
+use firefly_client::{
+    NodeEventSource,
+    NodeEvents,
+    ReadNode,
+    ReadNodeClient,
+    WriteNode,
+    WriteNodeClient,
+};
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
@@ -24,16 +34,23 @@ use crate::api::oslfs::models::{
 };
 use crate::domain::oslfs::OslfsService;
 
-#[derive(Debug, Clone)]
-pub struct OslfsApi;
+pub struct OslfsApi<R = ReadNodeClient, W = WriteNodeClient, N = NodeEvents>(
+    PhantomData<(R, W, N)>,
+);
+
+impl<R, W, N> Default for OslfsApi<R, W, N> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
 
 #[OpenApi(prefix_path = "/oslfs", tag = ApiTags::Oslfs)]
-impl OslfsApi {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
     #[oai(path = "/:address", method = "get", operation_id = "oslfs_list")]
     async fn list(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
     ) -> poem::Result<Json<Oslfs>> {
         let oslfs = oslfs.list(address.0).await?;
         Ok(Json(oslfs.into()))
@@ -48,7 +65,7 @@ impl OslfsApi {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
     ) -> MaybeNotFound<Oslfs> {
         oslfs.list_versions(address.0, id).await.into()
     }
@@ -63,7 +80,7 @@ impl OslfsApi {
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
     ) -> MaybeNotFound<Oslf> {
         oslfs.get(address.0, id, version).await.into()
     }
@@ -76,7 +93,7 @@ impl OslfsApi {
     async fn prepare_create(
         &self,
         Json(body): Json<CreateOslfReq>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<CreateOslfResp>>> {
         PrepareResponse::from_call(
@@ -97,7 +114,7 @@ impl OslfsApi {
     async fn create(
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateOslfReq, CreateOslfResp>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = oslfs.deploy_signed_create(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
@@ -112,7 +129,7 @@ impl OslfsApi {
         &self,
         Path(id): Path<String>,
         Json(body): Json<SaveOslfReq>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<SaveOslfResp>>> {
         PrepareResponse::from_call(
@@ -134,7 +151,7 @@ impl OslfsApi {
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, SaveOslfReq, SaveOslfResp>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = oslfs.deploy_signed_save(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
@@ -148,7 +165,7 @@ impl OslfsApi {
     async fn prepare_delete(
         &self,
         Path(id): Path<String>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
     ) -> poem::Result<Json<DeleteOslfResp>> {
         let contract = oslfs.prepare_delete_contract(id).await?;
         Ok(Json(contract.into()))
@@ -163,7 +180,7 @@ impl OslfsApi {
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
-        Data(oslfs): Data<&OslfsService>,
+        Data(oslfs): Data<&OslfsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = oslfs.deploy_signed_delete(body.into()).await?;
         Ok(Json(deploy_id.into()))

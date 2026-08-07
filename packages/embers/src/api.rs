@@ -5,3 +5,6 @@ pub mod oslfs;
 pub mod service;
 pub mod testnet;
 pub mod wallets;
+
+#[cfg(test)]
+mod tests;

@@ -3,20 +3,13 @@ use std::time::Duration;
 use anyhow::Context;
 use firefly_client::models::Uri;
 use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
+use poem::Server;
 use poem::listener::TcpListener;
-use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
-use poem::{EndpointExt, Route, Server};
-use poem_openapi::OpenApiService;
 use secp256k1::rand;
 use secp256k1::rand::distr::{Alphanumeric, SampleString};
 use tokio::try_join;
 
-use crate::api::agents::AgentsApi;
-use crate::api::agents_teams::AgentsTeamsApi;
-use crate::api::oslfs::OslfsApi;
-use crate::api::service::ServiceApi;
-use crate::api::testnet::TestnetApi;
-use crate::api::wallets::WalletsApi;
+use crate::app::{AppServices, build_app};
 use crate::configuration::collect_config;
 use crate::domain::agents::AgentsService;
 use crate::domain::agents_teams::continuation_store::F1r3driveContinuationStore;
@@ -26,6 +19,7 @@ use crate::domain::testnet::TestnetService;
 use crate::domain::wallets::WalletsService;
 
 mod api;
+mod app;
 mod blockchain;
 mod configuration;
 mod domain;
@@ -275,41 +269,17 @@ async fn main() -> anyhow::Result<()> {
 
     let secret = Alphanumeric.sample_string(&mut rand::rng(), 20);
 
-    let api = OpenApiService::new(
-        (
-            ServiceApi,
-            TestnetApi,
-            WalletsApi,
-            AgentsApi,
-            AgentsTeamsApi,
-            OslfsApi,
-        ),
-        "Embers API",
-        "0.1.0",
-    )
-    .url_prefix("/api");
-
-    let ui = api.swagger_ui();
-    let spec = api.spec_endpoint();
-    let spec_yaml = api.spec_endpoint_yaml();
-
-    let routes = Route::new()
-        .nest("/api", api)
-        .nest("/swagger-ui/index.html", ui)
-        .nest("/swagger-ui/openapi.json", spec)
-        .nest("/swagger-ui/openapi.yaml", spec_yaml)
-        .data(jsonwebtoken::EncodingKey::from_secret(secret.as_ref()))
-        .data(jsonwebtoken::DecodingKey::from_secret(secret.as_ref()))
-        .data(agents_service)
-        .data(agents_teams_service)
-        .data(oslfs_service)
-        .data(wallets_service)
-        .data(testnet_service)
-        .with(Cors::new().allow_origin_regex("*"))
-        .with(RequestId::default())
-        .with(Tracing)
-        .with(Compression::default())
-        .with(NormalizePath::new(TrailingSlash::Trim));
+    let routes = build_app(
+        AppServices {
+            agents: agents_service,
+            agents_teams: agents_teams_service,
+            oslfs: oslfs_service,
+            wallets: wallets_service,
+            testnet: testnet_service,
+        },
+        jsonwebtoken::EncodingKey::from_secret(secret.as_ref()),
+        jsonwebtoken::DecodingKey::from_secret(secret.as_ref()),
+    );
 
     Server::new(TcpListener::bind((config.address, config.port)))
         .run_with_graceful_shutdown(

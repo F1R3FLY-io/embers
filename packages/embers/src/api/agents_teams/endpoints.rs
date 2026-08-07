@@ -1,4 +1,14 @@
+use core::marker::PhantomData;
+
 use firefly_client::models::WalletAddress;
+use firefly_client::{
+    NodeEventSource,
+    NodeEvents,
+    ReadNode,
+    ReadNodeClient,
+    WriteNode,
+    WriteNodeClient,
+};
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
@@ -41,16 +51,23 @@ use crate::api::common::{
 use crate::domain::agents::AgentsService;
 use crate::domain::agents_teams::{AgentsTeamsService, models};
 
-#[derive(Debug, Clone)]
-pub struct AgentsTeamsApi;
+pub struct AgentsTeamsApi<R = ReadNodeClient, W = WriteNodeClient, N = NodeEvents>(
+    PhantomData<(R, W, N)>,
+);
+
+impl<R, W, N> Default for AgentsTeamsApi<R, W, N> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
 
 #[OpenApi(prefix_path = "/ai-agents-teams", tag = ApiTags::AIAgentsTeams)]
-impl AgentsTeamsApi {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
     #[oai(path = "/:address", method = "get", operation_id = "agents_teams_list")]
     async fn list(
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<AgentsTeams>> {
         let agents_teams = agents_teams.list(address.0).await?;
         Ok(Json(agents_teams.into()))
@@ -65,7 +82,7 @@ impl AgentsTeamsApi {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> MaybeNotFound<AgentsTeams> {
         agents_teams.list_versions(address.0, id).await.into()
     }
@@ -80,7 +97,7 @@ impl AgentsTeamsApi {
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Path(version): Path<String>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> MaybeNotFound<AgentsTeam> {
         agents_teams.get(address.0, id, version).await.into()
     }
@@ -93,7 +110,7 @@ impl AgentsTeamsApi {
     async fn prepare_create(
         &self,
         Json(body): Json<CreateAgentsTeamReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<CreateAgentsTeamResp>>> {
         PrepareResponse::from_call(
@@ -114,7 +131,7 @@ impl AgentsTeamsApi {
     async fn create(
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateAgentsTeamReq, CreateAgentsTeamResp>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
             .deploy_signed_create(body.request.into())
@@ -130,8 +147,8 @@ impl AgentsTeamsApi {
     async fn prepare_deploy(
         &self,
         Json(body): Json<DeployAgentsTeamReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
-        Data(agents): Data<&AgentsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+        Data(agents): Data<&AgentsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<DeployAgentsTeamResp>>> {
         PrepareResponse::from_call(
@@ -156,7 +173,7 @@ impl AgentsTeamsApi {
             DeployAgentsTeamReq,
             DeployAgentsTeamResp,
         >,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
             .deploy_signed_deploy(body.request.into())
@@ -172,7 +189,7 @@ impl AgentsTeamsApi {
     async fn prepare_run(
         &self,
         Json(body): Json<RunReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<RunResp>>> {
         PrepareResponse::from_call(
@@ -193,7 +210,7 @@ impl AgentsTeamsApi {
     async fn run(
         &self,
         SendRequest(body): SendRequest<SignedContract, RunReq, RunResp>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<serde_json::Value>> {
         agents_teams
             .deploy_signed_run_agents_team(models::DeploySignedRunReq {
@@ -214,7 +231,7 @@ impl AgentsTeamsApi {
     async fn prepare_run_on_firesky(
         &self,
         Json(body): Json<RunReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<RunResp>>> {
         PrepareResponse::from_call(
@@ -235,7 +252,7 @@ impl AgentsTeamsApi {
     async fn run_on_firesky(
         &self,
         SendRequest(body): SendRequest<DeploySignedRunOnFireskyReq, RunReq, RunResp>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<()> {
         Box::pin(
             agents_teams.deploy_signed_run_on_firesky(models::DeploySignedRunOnFireskyReq {
@@ -261,7 +278,7 @@ impl AgentsTeamsApi {
     async fn get_run(
         &self,
         Path(run_id): Path<String>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> MaybeNotFound<RunState> {
         agents_teams.get_run(run_id).await.into()
     }
@@ -275,7 +292,7 @@ impl AgentsTeamsApi {
         &self,
         Path(run_id): Path<String>,
         Json(body): Json<RunCommandReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<RunCommandResp>>> {
         PrepareResponse::from_call(
@@ -300,7 +317,7 @@ impl AgentsTeamsApi {
         &self,
         Path(run_id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, RunCommandReq, RunCommandResp>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<serde_json::Value>> {
         let prepare_request = body.prepare_request.into_domain(run_id)?;
         agents_teams
@@ -322,7 +339,7 @@ impl AgentsTeamsApi {
     async fn prepare_reveal_output(
         &self,
         Path(run_id): Path<String>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> PrepareRevealOutputResponse {
         match PrepareResponse::from_call(
@@ -346,7 +363,7 @@ impl AgentsTeamsApi {
         &self,
         Path(run_id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, String, RevealOutputResp>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> SendRevealOutputResponse {
         if body.prepare_request != run_id {
             return SendRevealOutputResponse::BadRequest(Json(
@@ -375,7 +392,7 @@ impl AgentsTeamsApi {
         &self,
         Path(id): Path<String>,
         Json(body): Json<SaveAgentsTeamReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<SaveAgentsTeamResp>>> {
         PrepareResponse::from_call(
@@ -397,7 +414,7 @@ impl AgentsTeamsApi {
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, SaveAgentsTeamReq, SaveAgentsTeamResp>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams.deploy_signed_save(body.request.into()).await?;
         Ok(Json(deploy_id.into()))
@@ -411,7 +428,7 @@ impl AgentsTeamsApi {
     async fn prepare_delete(
         &self,
         Path(id): Path<String>,
-        Data(agents): Data<&AgentsTeamsService>,
+        Data(agents): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<DeleteAgentsTeamResp>> {
         let contract = agents.prepare_delete_contract(id).await?;
         Ok(Json(contract.into()))
@@ -426,7 +443,7 @@ impl AgentsTeamsApi {
         &self,
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
-        Data(agents): Data<&AgentsTeamsService>,
+        Data(agents): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents.deploy_signed_delete(body.into()).await?;
         Ok(Json(deploy_id.into()))
@@ -443,7 +460,7 @@ impl AgentsTeamsApi {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(agent_id): Path<String>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<Vec<ReferencingTeam>>> {
         let teams = agents_teams.referencing_teams(address.0, agent_id).await?;
         Ok(Json(teams.into_iter().map(Into::into).collect()))
@@ -461,7 +478,7 @@ impl AgentsTeamsApi {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<()> {
         agents_teams.unpublish(address.0, id).await?;
         Ok(())
@@ -479,7 +496,7 @@ impl AgentsTeamsApi {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> MaybeNotFound<PublishedState> {
         agents_teams.published_state(address.0, id).await.into()
     }
@@ -494,7 +511,7 @@ impl AgentsTeamsApi {
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Json(body): Json<PublishToFireskyReq>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<PublishToFireskyResp>>> {
         PrepareResponse::from_call(
@@ -519,7 +536,7 @@ impl AgentsTeamsApi {
         #[allow(unused_variables)] Path(address): Path<Stringified<WalletAddress>>,
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, PublishToFireskyReq, PublishToFireskyResp>,
-        Data(agents_teams): Data<&AgentsTeamsService>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> poem::Result<Json<SendResp>> {
         let deploy_id = agents_teams
             .deploy_signed_publish_to_firesky(body.request.into())

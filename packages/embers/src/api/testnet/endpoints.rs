@@ -1,3 +1,13 @@
+use core::marker::PhantomData;
+
+use firefly_client::{
+    NodeEventSource,
+    NodeEvents,
+    ReadNode,
+    ReadNodeClient,
+    WriteNode,
+    WriteNodeClient,
+};
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::payload::Json;
@@ -12,11 +22,18 @@ use crate::api::testnet::models::{
 };
 use crate::domain::testnet::TestnetService;
 
-#[derive(Debug, Clone)]
-pub struct TestnetApi;
+pub struct TestnetApi<R = ReadNodeClient, W = WriteNodeClient, N = NodeEvents>(
+    PhantomData<(R, W, N)>,
+);
+
+impl<R, W, N> Default for TestnetApi<R, W, N> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
 
 #[OpenApi(prefix_path = "/testnet", tag = ApiTags::Testnet)]
-impl TestnetApi {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetApi<R, W, N> {
     #[oai(
         path = "/wallet",
         method = "post",
@@ -24,7 +41,7 @@ impl TestnetApi {
     )]
     async fn create_wallet(
         &self,
-        Data(testnet): Data<&TestnetService>,
+        Data(testnet): Data<&TestnetService<R, W, N>>,
     ) -> poem::Result<Json<CreateTestwalletResp>> {
         let wallet = testnet.create_wallet().await?;
         Ok(Json(wallet.into()))
@@ -38,7 +55,7 @@ impl TestnetApi {
     async fn prepare_deploy(
         &self,
         Json(body): Json<DeployTestReq>,
-        Data(testnet): Data<&TestnetService>,
+        Data(testnet): Data<&TestnetService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
     ) -> poem::Result<Json<PrepareResponse<DeployTestResp>>> {
         PrepareResponse::from_call(
@@ -59,7 +76,7 @@ impl TestnetApi {
     async fn deploy(
         &self,
         SendRequest(body): SendRequest<DeploySignedTestReq, DeployTestReq, DeployTestResp>,
-        Data(testnet): Data<&TestnetService>,
+        Data(testnet): Data<&TestnetService<R, W, N>>,
     ) -> poem::Result<Json<DeploySignedTestResp>> {
         let result = testnet.deploy_test_contract(body.request.into()).await?;
         Ok(Json(result.into()))
