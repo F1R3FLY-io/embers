@@ -17,7 +17,7 @@ title F1r3drive mount verification — fail-closed continuation placement
 start
 :continuation store opens at MOUNT_PATH;
 if (path is absolute\nand a directory?) then (no)
-  #F8CECC:bail: invalid mount path;
+  :bail: invalid mount path;<<#F8CECC>>
   stop
 endif
 :canonicalize the path;
@@ -26,7 +26,7 @@ partition "For each mount line (split on \" - \")" {
   if (canonical path\nstarts_with field[4]\n(mount point)?) then (yes)
     if (post-separator field[0]\n(fs type) starts_with "fuse"?) then (yes)
       if (post-separator field[1]\n(mount source) contains "f1r3drive"?) then (yes)
-        #CFE2F3:matched: FUSE fsname=f1r3drive;
+        :matched: FUSE fsname=f1r3drive;<<#CFE2F3>>
       else (no)
       endif
     else (no)
@@ -38,7 +38,7 @@ if (a matching mount was found?) then (yes)
   :proceed — place encrypted continuations\non the F1r3drive mount;
   stop
 else (no)
-  #F8CECC:bail: refuse to place continuations\non ordinary disk;
+  :bail: refuse to place continuations\non ordinary disk;<<#F8CECC>>
   stop
 endif
 @enduml

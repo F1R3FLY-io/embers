@@ -29,7 +29,7 @@ if (insert result?) then (a URI)
   :env registered / upgraded at env_uri;
   stop
 else (Nil)
-  #F8CECC:abort!("failed to insert env");
+  :abort!("failed to insert env");<<#F8CECC>>
   stop
 endif
 @enduml

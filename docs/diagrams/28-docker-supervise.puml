@@ -15,12 +15,12 @@ title Co-located F1r3drive + embers container (embers-entrypoint.sh)
 
 start
 if (F1R3DRIVE_ENABLED == true?) then (no)
-  #D5E8D4:exec embers directly;
+  :exec embers directly;<<#D5E8D4>>
   stop
 else (yes)
 endif
 if (/dev/fuse present?) then (no)
-  #F8CECC:FATAL (exit 70): needs devices:[/dev/fuse],\ncap_add:[SYS_ADMIN];
+  :FATAL (exit 70): needs devices:[/dev/fuse],\ncap_add:[SYS_ADMIN];<<#F8CECC>>
   stop
 else (yes)
 endif
@@ -28,11 +28,11 @@ endif
 :phase 1 — start f1r3drive (java),\nmounting the FUSE filesystem;
 :phase 2 — wait for fsname=f1r3drive mount\n+ unlocked wallet dir;
 if (mounted & unlocked in time?) then (no)
-  #F8CECC:FATAL (exit 72/73): drive did not mount;
+  :FATAL (exit 72/73): drive did not mount;<<#F8CECC>>
   stop
 else (yes)
 endif
-#D5E8D4:phase 3 — start embers;
+:phase 3 — start embers;<<#D5E8D4>>
 note right: embers' verify_f1r3drive_mount\nre-checks the same mount facts
 :supervise both (wait -n);
 if (which exited?) then (either process)

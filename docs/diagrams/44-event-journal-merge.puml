@@ -22,6 +22,6 @@ partition "Emit block-wise (anchors left-to-right)" {
   :per anchor: durable segment, then on_chain segment,\nthen the shared anchor ONCE;
   :append the durable and on_chain tails;
 }
-#D5E8D4:merged event history\n(INV-D8: both inputs remain subsequences —\nmechanized in rocq/MergeJournal.v);
+:merged event history\n(INV-D8: both inputs remain subsequences —\nmechanized in rocq/MergeJournal.v);<<#D5E8D4>>
 stop
 @enduml

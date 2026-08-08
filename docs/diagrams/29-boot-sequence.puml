@@ -15,7 +15,7 @@ title embers boot sequence (main.rs) — fail fast, then serve
 
 start
 :open F1r3drive continuation store\n(verify_f1r3drive_mount);
-note right: FIRST — no mount, no boot #E8DACB
+note right #E8DACB: FIRST — no mount, no boot
 :construct read / write / event clients\n(mainnet + testnet);
 partition "Bootstrap 5 domains in parallel (try_join!)" {
   fork
@@ -33,7 +33,7 @@ partition "Bootstrap 5 domains in parallel (try_join!)" {
 }
 if (every env readable?) then (yes)
 else (no — Nil / unreadable)
-  #F8CECC:bail — boot fails;
+  :bail — boot fails;<<#F8CECC>>
   stop
 endif
 :spawn registry health check\n(every 60s: treeHashMap OK; each env Nil/OK/LOST);
