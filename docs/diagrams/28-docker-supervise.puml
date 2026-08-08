@@ -34,10 +34,18 @@ else (yes)
 endif
 :phase 3 — start embers;<<#D5E8D4>>
 note right: embers' verify_f1r3drive_mount\nre-checks the same mount facts
-:supervise both (wait -n);
-if (which exited?) then (either process)
-  :take the other down (BindsTo coupling);
-  :fusermount3 -u the mount;
-  stop
+:supervise both\n(wait -n drive_pid embers_pid);
+note right: BindsTo coupling — the first\nprocess to exit takes the other down
+:the first to exit unblocks;\ncapture its status;
+if (was a signal (INT / TERM)\ntrapped?) then (yes — terminating)
+  :wait for both to settle;
+else (no — a process died)
+  if (which one exited?) then (f1r3drive)
+    :stop embers (kill -INT, wait);
+  else (embers)
+    :stop f1r3drive (kill -INT, wait);
+  endif
 endif
+:fusermount3 -u the mount;
+stop
 @enduml
