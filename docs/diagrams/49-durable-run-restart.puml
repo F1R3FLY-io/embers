@@ -1,0 +1,58 @@
+@startuml 49-durable-run-restart
+' Exactly-once across a crash: the outbox gives dispatch-at-least-once, the
+' observation store gives apply-exactly-once (recovery.rs + orchestration.rs).
+title Durable run across a restart — exactly-once effects (recovery.rs)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+participant "Kernel + recovery\nscheduler (embers)" as K #CDEACC
+participant "F1r3drive\ncontinuation store" as S #E8DACB
+participant "Validator\n(deploy · finality)" as V #FFE4A6
+
+== forward execution (revision N) ==
+K -> S : put EffectOutbox\n(sign the deploy once, INV-D6)
+K -> V : deploy invoke_activity.rho
+
+note over K, V #F8CECC
+  ✖ process crashes here — before the observation is written,
+  or after it but before advance_run. Either way the on-chain
+  revision is still N and no command is claimed.
+end note
+
+== after restart — run_recovery_loop polls ==
+K -> K : recover_runs_once: run is "running";\ntry_lock (non-blocking skip if busy, INV-T3)
+K -> S : get RunRequest + Continuation (revision N)
+S --> K : envelope (revision N)
+
+group per pending effect — execute_activity
+  K -> S : get Observation for effect_key?
+  alt observation already stored (crash was after observing)
+    S --> K : observation
+    note right of K #FFF0C7
+      Apply-exactly-once (INV-D5): the effect is
+      not re-dispatched; its stored result is applied.
+    end note
+  else not observed (crash was during dispatch)
+    S --> K : absent
+    K -> S : get EffectOutbox
+    S --> K : the same signed deploy
+    K -> V : re-dispatch it\n(dispatch-at-least-once, INV-D6;\nidentical deploy id never lands twice)
+    V --> K : finalized
+    K -> S : put Observation
+  end
+  K -> K : apply_effect_observation
+end
+
+K -> S : put Continuation (revision N+1)
+K -> V : advance_run CAS (expected_revision = N)
+V --> K : finalized (revision N+1)
+
+@enduml

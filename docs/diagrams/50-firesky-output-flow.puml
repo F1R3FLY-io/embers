@@ -1,0 +1,57 @@
+@startuml 50-firesky-output-flow
+' Where a run's Output goes: owner-authenticated reveal (reveal_output.rs) and
+' the bounded social reply to F1r3sky (run_on_firesky.rs).
+title From a run's Output to F1r3sky — reveal and social reply
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Run owner\n(wallet holder)" as Own #FFD8C2
+participant "embers\n(agents-teams)" as E #CDEACC
+participant "F1r3drive\nstore" as S #E8DACB
+participant "Validator\n(ledger)" as V #FFE4A6
+participant "PDS / F1r3sky\n(ATProto)" as P #E1D5E7
+
+== precondition — the run completed ==
+E -> S : put Output artifact (encrypted)
+E -> V : terminal advance_run\n(commits output content/capability hashes only)
+
+group owner-authenticated reveal — reveal_output.rs
+  Own -> E : prepare reveal (run_id)
+  E -> S : locate Output artifact\n(store-drift check before signing)
+  E --> Own : claimOutputReveal contract\n(fresh reveal_id)
+  Own -> E : send (locally signed)
+  E -> V : deploy claimOutputReveal
+  note right of V #FFF0C7
+    The ledger scrubs owner from every read, so authorization
+    is on-chain only: the clause appends an actor-less
+    outputRevealed event iff the signer owns the run.
+  end note
+  V --> E : finalized + new outputRevealed event
+  alt a new event appeared
+    E -> S : get Output artifact, AEAD-decrypt
+    S --> E : output value
+    E --> Own : the decrypted output (single-use, INV-S2)
+  else no new event (replay, or ledger predates the clause)
+    E --> Own : Consumed — fail closed, no disclosure (INV-S3)
+  end
+end
+
+group bounded social reply — run_on_firesky.rs
+  E -> E : transform Output to a post\n(text, or upload an image URL as a blob)
+  E -> P : create_record — thread reply\n(≤ 280 chars + "Run: <url>")
+end
+
+note over E, P #FFF0C7
+  Publishing the team definition to F1r3sky is a separate flow with its
+  own Draft→Published→PublishedStale→Unpublished lifecycle (diagram 35).
+end note
+
+@enduml
