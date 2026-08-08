@@ -18,7 +18,7 @@ skinparam ArrowColor #294C60
 
 package "embers process — off-chain orchestration" as P1 {
   [Agent-Teams kernel\nruntime.rs — deterministic durable engine\nmicrostep loop run_until_blocked] as kernel #CDEACC
-  [ContinuationEnvelope\n= the EMBERS continuation\nqueue · joins · scopes · history\npending_effects · pending_waits · events] as env #CDEACC
+  [ContinuationEnvelope\nthe EMBERS continuation\nqueue · joins · scopes · history\npending_effects · pending_waits · events] as env #CDEACC
   kernel --> env : checkpoints
 }
 
@@ -33,7 +33,7 @@ package "F1r3drive — encrypted, owner-isolated FUSE mount" as P2 {
 }
 
 package "f1r3node — replicated consensus state" as P3 {
-  [RSpace tuple space\ndata + waiting Rholang continuations\n= the RSPACE continuation\nfor (x <- chan) { P }] as rspace #FFE4A6
+  [RSpace tuple space\ndata + waiting Rholang continuations\nthe RSPACE continuation\nfor (x <- chan) { P }] as rspace #FFE4A6
   [agent contract (deployed Rholang)\nruns what each agent computes] as agent #FFE4A6
   [run register (agentsTeams)\nhashes · pointers · status · waits\ndeadlines · grants · event types\n(no plaintext)] as register #FFF1CC
   agent --> rspace : reduces on-chain

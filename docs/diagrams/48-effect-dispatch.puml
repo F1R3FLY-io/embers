@@ -1,0 +1,58 @@
+@startuml 48-effect-dispatch
+' One activity effect, end to end: the kernel renders Rholang, the node runs the
+' agent, the observation is checkpointed, and advance_run commits only hashes.
+title Effect dispatch — kernel drives one activity through the node (orchestration.rs)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+participant "Agent-Teams kernel\n(embers)" as K #CDEACC
+participant "F1r3drive\ncontinuation store" as S #E8DACB
+participant "Validator\n(deploy · finality)" as V #FFE4A6
+participant "Observer\n(explore-deploy)" as O #FFF1CC
+
+K -> K : run_until_blocked\nyields KernelOutcome::Effects([EffectRequest])
+K -> K : effect_key =\nH(run ‖ execution ‖ node ‖ epoch ‖ attempt)
+
+group per effect — execute_activity
+  K -> S : get Observation for effect_key?
+  alt observation already stored
+    S --> K : cached observation
+    note right of K #FFF0C7
+      Idempotent replay (INV-D5): a re-driven effect
+      whose observation exists skips the deploy entirely.
+    end note
+  else not yet observed
+    S --> K : absent
+    K -> S : put EffectOutbox\n(sign the deploy once, INV-D6)
+    K -> V : deploy invoke_activity.rho
+    V -> V : @agentsTeam!("control","activity",…)\nthe agent computes (may call rho:ai)
+    V --> K : finalized (deploy id)
+    K -> O : read result (get_run_result.rho)
+    O --> K : activity output
+    K -> S : put Observation\n(signed, content-addressed)
+  end
+  K -> K : apply_effect_observation\n(update the envelope, revision N -> N+1)
+end
+
+K -> S : put Continuation (revision N+1)
+K -> V : advance_run CAS\n(expected_revision = N; only hashes/pointers/status)
+V --> K : finalized
+K -> O : read RunState
+O --> K : on-chain state
+K -> K : ExpectedRunAdvancement::verify\n(revision, status, hashes, waits, cleared command)
+
+note over V, O #FFF0C7
+  Finality (validator) and visibility (observer) are separate
+  events; the read is retried until the postcondition is visible.
+  See <latex>L(d) = t_{vis}(d) - t_{fin}(d) \geq 0</latex> in deploy-lifecycle-and-consistency.
+end note
+
+@enduml

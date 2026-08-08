@@ -1,0 +1,59 @@
+@startuml 47-token-lifecycle
+' One token's journey through the kernel microstep loop (runtime.rs:
+' run_until_blocked -> enter_node / route_token -> apply_effect_observation).
+title Token lifecycle in the kernel microstep loop (runtime.rs)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam state {
+  BackgroundColor #CDEACC
+  BorderColor #5B9E5B
+  ArrowColor #294C60
+}
+skinparam ArrowColor #294C60
+
+[*] --> Queued : new token\n(entry · fan-out · resume)
+
+state Queued : in envelope.queue,\nawaiting a microstep
+state Entering : phase = Enter\n(enter_node)
+state Joining #FFF0C7
+state Joining : absorbed into a JoinState;\nawaits its correlation epoch
+state EffectPending : in pending_effects;\nkernel yields Effects(..)
+state GuardPending : outgoing edge needs\na pure guard observation
+state Suspended #FFF0C7
+state Suspended : in pending_waits;\nkernel yields Suspended(..)
+state Routing : phase = Route\n(route_token)
+state Retired : value collected;\ntoken leaves the loop
+
+Queued --> Entering : pop_front
+Entering --> Joining : join target,\nquorum not yet met
+Joining --> Routing : join fires\n(merged token, joined = true)
+Entering --> EffectPending : activity node\n(schedule_effect)
+Entering --> GuardPending : guarded route
+Entering --> Suspended : wait node
+Entering --> Routing : pass-through node
+
+EffectPending --> Routing : observation completed
+EffectPending --> Suspended : failed & retryable\n(SuspensionKind::Retry, backoff)
+Suspended --> Queued : resume\n(TimerFired · Approve/Reject ·\nSignal · Event · retry due)
+GuardPending --> Routing : guard observed
+
+Routing --> Queued : route to next node(s)\n(fan-out mints new tokens)
+Routing --> Retired : output / terminal node
+Retired --> [*]
+
+note right of Suspended #FFF0C7
+  SuspensionKind ∈ { Timer, Approval, Signal,
+  Event, Retry, DurableYield }. Each carries a
+  due_at and/or a signal name; a durable checkpoint
+  persists the wait so recovery can resume it.
+end note
+
+note bottom of Retired #FFF0C7
+  The run completes when queue, pending_effects,
+  pending_guards, and pending_waits are all empty
+  (KernelOutcome::Completed); the step budget is
+  <latex>10^6</latex> microsteps (INV-K14).
+end note
+
+@enduml
