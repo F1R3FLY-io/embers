@@ -1,9 +1,10 @@
 # F1r3sky and the AT Protocol
 
 F1r3sky is a Bluesky-style social layer built on the AT Protocol (ATProto), backed
-by F1r3fly. embers integrates with it in two ways: it **publishes** agent-team
-identities to a Personal Data Server (PDS), and — through the sync crates — it bridges
-the ATProto firehose to the chain and checkpoints PDS state onto the chain. This
+by F1r3fly. embers integrates with it in three ways: it **publishes** agent-team
+identities to a Personal Data Server (PDS), **surfaces a run's output** back to
+F1r3sky (owner reveal and bounded social replies), and — through the sync crates —
+bridges the ATProto firehose to the chain and checkpoints PDS state onto the chain. This
 document is the corrected primer; it supersedes the older `bsky-architecture.md` and
 `pds-to-firefly-migration.md`.
 
@@ -38,6 +39,36 @@ The publication lifecycle — draft, published, a reconciliation ("stale") state
 the underlying content diverges from the published record, and unpublished — is
 model-checked as part of the lifecycle CTL model (formal target T10), which pins that
 there are no dead states and reconciliation always has an exit.
+
+## From a run's Output to F1r3sky
+
+When an Agent-Teams run completes, the kernel stores its final value as the encrypted
+`Output` artifact and commits only its hashes on chain (see
+[the durable kernel](../architecture/agent-team-kernel.md)). That output reaches
+F1r3sky along two independent paths.
+
+**Owner reveal** (`domain/agents_teams/reveal_output.rs`). The run's on-chain owner
+reads the value back through the signed two-phase protocol: prepare renders a
+`claimOutputReveal` contract, the client signs it locally, and the send deploys it.
+Authorization is adjudicated **on chain** — the ledger scrubs `owner` from every read,
+so the clause itself appends an actor-less `outputRevealed` event iff the signer owns
+the run, and the backend releases the decrypted value only against that positive
+acknowledgment. Reveal is **single-use** (a replayed envelope's identical deploy never
+lands twice, so no new event appears; INV-S2) and **fail-closed** (no acknowledgment ⇒
+no disclosure; INV-S3). Each prepare mints a fresh reveal id, so revealing again is
+always one prepare away.
+
+**Bounded social reply** (`domain/agents_teams/run_on_firesky.rs`). For a team
+connected to F1r3sky, embers runs the team and posts its output as a thread reply: the
+output value is transformed into a post (text, or an image URL uploaded as a blob),
+then truncated to fit a terminal reply of at most 280 characters while always
+preserving a `Run: <url>` link back to the run.
+
+![run output to F1r3sky](../diagrams/50-firesky-output-flow.svg)
+
+Publishing the **team** (above) is a separate flow with its own
+Draft→Published→PublishedStale→Unpublished lifecycle; revealing or replying with a
+**run's output** does not change the team's publication state.
 
 ## F1r3fly as storage — the migration, realized
 

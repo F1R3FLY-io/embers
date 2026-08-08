@@ -24,7 +24,8 @@ the executable backend.
 - **Understanding the internals** → [`architecture/`](architecture/) — the
   [crate map](architecture/crate-architecture.md), the
   [deploy lifecycle and consistency model](architecture/deploy-lifecycle-and-consistency.md),
-  the [continuation store](architecture/continuation-store.md), the boot
+  the [continuation store](architecture/continuation-store.md), the
+  [durable agent-team kernel](architecture/agent-team-kernel.md), the boot
   sequence, and the event journal; and [`design/`](design/) for the environment
   registry, Rholang templating, and resource accounting.
 - **Reviewing security** → [`security/`](security/) — the
@@ -72,3 +73,14 @@ Defined once here; every document links a term on first use.
   activities (validated but not yet executed).
 - **Continuation store** — the encrypted, capability-addressed object store on the
   F1r3drive FUSE mount that holds a durable run's private state between steps.
+- **Kernel** — the deterministic, durable Agent-Teams orchestration engine
+  (`runtime.rs`) that runs a workflow-v2 run in the embers process. Its checkpoint
+  is the **continuation** (the `ContinuationEnvelope`), distinct from an *RSpace /
+  Rholang continuation* — the `for(x<-chan){P}` consumer f1r3node persists. (See
+  [the durable agent-team kernel](architecture/agent-team-kernel.md).)
+- **Effect key** — the domain-separated hash of (run, execution, node, epoch,
+  attempt) that names an activity effect; the observation store is a function of
+  it, giving apply-exactly-once recovery.
+- **Revision fence** — the monotone checkpoint number a run advances by exactly one
+  per `advanceRun`; commands and advances are bound (fenced) to the revision they
+  claimed.

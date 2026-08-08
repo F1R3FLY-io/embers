@@ -157,3 +157,9 @@ names the figure, its type, and the document(s) that embed it.
 | - | ---- | ---- | ----------- |
 | 30 | `30-deploy-lifecycle.puml` | Sequence | [architecture/deploy-lifecycle-and-consistency.md](../architecture/deploy-lifecycle-and-consistency.md) |
 | 32 | `32-crate-graph.puml` | Component | [architecture/crate-architecture.md](../architecture/crate-architecture.md) |
+| 46 | `46-two-layer-continuations.puml` | Component | [architecture/agent-team-kernel.md](../architecture/agent-team-kernel.md) |
+| 47 | `47-token-lifecycle.puml` | State machine | [architecture/agent-team-kernel.md](../architecture/agent-team-kernel.md) |
+| 48 | `48-effect-dispatch.puml` | Sequence | [architecture/agent-team-kernel.md](../architecture/agent-team-kernel.md) |
+| 49 | `49-durable-run-restart.puml` | Sequence | [architecture/agent-team-kernel.md](../architecture/agent-team-kernel.md) |
+| 50 | `50-firesky-output-flow.puml` | Sequence | [integrations/f1r3sky-and-atproto.md](../integrations/f1r3sky-and-atproto.md) |
+| 51 | `51-continuation-envelope-class.puml` | Class | [architecture/agent-team-kernel.md](../architecture/agent-team-kernel.md) |
