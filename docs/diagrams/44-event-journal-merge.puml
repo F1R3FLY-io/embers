@@ -16,7 +16,7 @@ title Event-journal merge (merge_event_sequences) — rightmost-anchor alignment
 start
 :inputs: durable[] (checkpoint journal),\non_chain[] (ledger);
 partition "Find anchors (durable right-to-left)" {
-  :for each durable[i] from the end, find the RIGHTMOST\non_chain match before the previous anchor (rposition)\n=> repeated ledger events align with the latest\nsuccessful claim, not an earlier rejected attempt;
+  :for each durable[i] from the end, find the RIGHTMOST\non_chain match before the previous anchor (rposition)\n→ repeated ledger events align with the latest\nsuccessful claim, not an earlier rejected attempt;
 }
 partition "Emit block-wise (anchors left-to-right)" {
   :per anchor: durable segment, then on_chain segment,\nthen the shared anchor ONCE;
