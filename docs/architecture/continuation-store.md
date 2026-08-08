@@ -10,6 +10,21 @@ scheme, and the guarantees each mechanism provides.
 Implementation: `packages/embers/src/domain/agents_teams/continuation_store.rs`
 (`F1r3driveContinuationStore`).
 
+## The `Continuation` artifact is not an RSpace continuation
+
+The `Continuation` object this store holds (the table below) is the kernel's
+`ContinuationEnvelope` — the durable checkpoint of an Agent-Teams run's whole
+workflow state: its token queue, joins, scopes, pending waits, and event
+journal. It is **not** a Rholang/RSpace continuation. The rho-calculus consumer
+`for (x <- chan) { P }` that f1r3node's tuple space persists is a different thing
+at a different layer, and RSpace never holds this envelope; the public ledger
+commits only the envelope's content and capability *hashes* (via `advanceRun`),
+never its bytes. The full side-by-side contrast — with the rho-calculus and
+durable-execution groundings — is in
+[the Agent-Teams durable kernel guide](./agent-team-kernel.md#two-notions-of-continuation),
+and the layering is shown in
+[diagram 46](../diagrams/46-two-layer-continuations.svg).
+
 ## What it stores, and the six artifact kinds
 
 Every object is filed under one of six `ArtifactKind`s, each with a stable

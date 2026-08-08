@@ -21,6 +21,19 @@ The Embers backend:
 
 The executable boundary requires no f1r3node or MeTTaIL modification. Foreign Language Term activities are represented by a pinned portable ABI but remain rejected until the Rholang 1.4 specification and the under-review FLT/virtual-host-bridge FIPS stabilize. Any additional protected-runtime dependency must be proposed through `../FIPS/` before implementation.
 
+## Kernel vs Rholang: division of labor
+
+An Agent Team runs across two complementary layers — the kernel does not replace Rholang, it dispatches to it. Each activity and guard is rendered to Rholang and deployed to the node (`invoke_activity.rho`, `invoke_guard.rho`); the node reduces it to completion, including any `rho:ai:{gpt4,dalle3,textToAudio}` call the agent makes. The kernel — the off-chain deterministic durable engine in `runtime.rs` — decides *which* agent runs *when*, checkpoints between steps, enforces timers and approvals, and applies each external effect exactly once.
+
+| Layer | Does | Does not | Where its state lives |
+| ----- | ---- | -------- | --------------------- |
+| f1r3node / RSpace (Rholang) | Reduce each agent activity/guard deterministically under consensus | Wall-clock time, human holds, external-effect dedup, private control-flow | Tuple space; the public run register (hashes only) |
+| embers kernel | Schedule, join, wait, checkpoint, recover, reveal — durably | Compute the agents themselves | The encrypted `ContinuationEnvelope` in F1r3drive |
+
+The direct v1 path compiles a whole graph to Rholang and runs it on-chain to completion; the v2 durable path adds the kernel on top. The full treatment — why the extra layer was necessary, the two notions of "continuation", the microstep loop, and the on-chain commit protocol — is in [the Agent-Teams durable kernel guide](architecture/agent-team-kernel.md).
+
+![Two layers, two continuations](diagrams/46-two-layer-continuations.svg)
+
 ## Finality and transport policy
 
 Consensus finality and observer visibility are checked separately. A mutation deploy is submitted once, awaited through finality, and then verified by polling for its exact postcondition. Named Agent Team deployment returns the final system-metadata deploy identity so client synchronization includes URI and `lastDeploy` publication rather than only the executable contract.
@@ -41,7 +54,7 @@ Command claims and rejections can occur between checkpoints. The read projection
 | --------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Typed definition and publish validation                   | `packages/embers/src/domain/agents_teams/workflow.rs`                       |
 | Direct Rholang workflow compiler                          | `packages/embers/src/domain/agents_teams/compilation/workflow_rendering.rs` |
-| Deterministic durable kernel                              | `packages/embers/src/domain/agents_teams/runtime.rs`                        |
+| Deterministic durable kernel ([design guide](architecture/agent-team-kernel.md)) | `packages/embers/src/domain/agents_teams/runtime.rs`                    |
 | Effects, guards, nested teams, and checkpoint publication | `packages/embers/src/domain/agents_teams/orchestration.rs`                  |
 | Encrypted F1r3drive artifact boundary                     | `packages/embers/src/domain/agents_teams/continuation_store.rs`             |
 | Signed run-command protocol                               | `packages/embers/src/domain/agents_teams/run_commands.rs`                   |
