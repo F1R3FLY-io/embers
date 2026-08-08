@@ -15,8 +15,14 @@ from tests.key import SECP256k1
 RUN_TIMEOUT = 600
 
 
-def deploy_graph_run_reveal(client: ApiClient, wallet: Wallet, graph: str, prompt: str) -> object:
-    """Deploy a team graph, run it with a prompt, and return the revealed output JSON."""
+def deploy_graph_and_run(client: ApiClient, wallet: Wallet, graph: str, prompt: str) -> object:
+    """Deploy a team graph, run it with a prompt, and return the run's output.
+
+    For a no-wait team the run completes synchronously and its send response carries
+    the output value directly (a suspended run would instead carry a disposition), so
+    no separate output-reveal is needed — reveal targets created+deployed named teams,
+    not anonymous deploy_graph deployments.
+    """
     deployment_key = SECP256k1.generate()
     client.agents_teams.deploy_graph(
         wallet,
@@ -26,13 +32,12 @@ def deploy_graph_run_reveal(client: ApiClient, wallet: Wallet, graph: str, promp
     ).wait_for_sync()
     uri = public_key_to_uri(deployment_key.public_key)
 
-    # The run id is minted in the prepare response (the public run() returns only the
-    # send response), so drive the two phases directly against the transport.
-    http = client.agents_teams._client  # noqa: SLF001 — run() hides the prepare response that carries the run id
+    # run() returns only the send response but the run flow needs the prepare
+    # response's contract/token, so drive the two phases directly against the transport.
+    http = client.agents_teams._client  # noqa: SLF001 — run() hides the prepare response
     prepare_request = {"prompt": prompt, "agents_team": uri}
     prepared = http.post("/ai-agents-teams/run/prepare", json=prepare_request)
     assert prepared.status == 200, prepared.body
-    run_id = prepared.json["response"]["run_id"]
     sent = http.post(
         "/ai-agents-teams/run/send",
         json={
@@ -44,4 +49,4 @@ def deploy_graph_run_reveal(client: ApiClient, wallet: Wallet, graph: str, promp
         timeout=RUN_TIMEOUT,
     )
     assert sent.status == 200, sent.body
-    return client.agents_teams.reveal_output(wallet, run_id, timeout=RUN_TIMEOUT).json
+    return sent.json

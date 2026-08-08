@@ -22,7 +22,7 @@ import pytest
 
 from tests.client import ApiClient, Wallet
 from tests.conftest import GPT_COMPRESS_TEAM
-from tests.remote._run import deploy_graph_run_reveal
+from tests.remote._run import deploy_graph_and_run
 
 pytestmark = [pytest.mark.devnet, pytest.mark.gpt]
 
@@ -51,7 +51,7 @@ def _stub_reachable() -> bool:
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_gpt_run_goes_through_the_local_stub(client: ApiClient, funded_wallet: Wallet):
     before = _stub_chat_hits()
-    revealed = deploy_graph_run_reveal(
+    output = deploy_graph_and_run(
         client,
         funded_wallet,
         GPT_COMPRESS_TEAM,
@@ -61,5 +61,5 @@ def test_gpt_run_goes_through_the_local_stub(client: ApiClient, funded_wallet: W
 
     # Hermeticity: the run's model call landed on the LOCAL stub, not real GPT.
     assert after > before, "the run should have hit the local stub's chat endpoint"
-    # The stubbed pipeline still produced a revealed output.
-    assert json.dumps(revealed).strip(), f"expected a non-empty revealed output; got: {revealed!r}"
+    # The stubbed pipeline still produced a non-empty run output.
+    assert json.dumps(output).strip(), f"expected a non-empty run output; got: {output!r}"

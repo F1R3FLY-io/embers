@@ -3,7 +3,7 @@
 Gated off by default (see the module guard); never runs on this machine. Derives an
 image team from the text-model team by retyping the model node to the image kind
 ("tti-model", the compiler's image node type in graphl_parsing.rs), deploys and runs
-it, and asserts the revealed output is a real REMOTE image URL — not the L2 stub's
+it, and asserts the run output is a real REMOTE image URL — not the L2 stub's
 loopback stub-assets URL.
 """
 
@@ -13,7 +13,7 @@ import pytest
 
 from tests.client import ApiClient, Wallet
 from tests.conftest import GPT_COMPRESS_TEAM
-from tests.remote._run import deploy_graph_run_reveal
+from tests.remote._run import deploy_graph_and_run
 
 pytestmark = [pytest.mark.remote, pytest.mark.gpt, pytest.mark.devnet]
 
@@ -23,14 +23,14 @@ TTI_COMPRESS_TEAM = GPT_COMPRESS_TEAM.replace("text-model", "tti-model")
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_real_image_generation(client: ApiClient, funded_wallet: Wallet):
-    revealed = deploy_graph_run_reveal(
+    output = deploy_graph_and_run(
         client,
         funded_wallet,
         TTI_COMPRESS_TEAM,
         "A single red circle centered on a white background.",
     )
-    text = json.dumps(revealed)
+    text = json.dumps(output)
     assert "[stub:" not in text, f"expected a real image URL, not the L2 stub: {text}"
     assert "127.0.0.1" not in text, f"expected a real remote image URL, not the loopback stub: {text}"
     assert "stub-assets" not in text, f"expected a real remote image URL, not the loopback stub: {text}"
-    assert "http" in text, f"expected an image URL in the revealed output; got: {text}"
+    assert "http" in text, f"expected an image URL in the run output; got: {text}"

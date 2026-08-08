@@ -13,19 +13,19 @@ import pytest
 
 from tests.client import ApiClient, Wallet
 from tests.conftest import GPT_COMPRESS_TEAM
-from tests.remote._run import deploy_graph_run_reveal
+from tests.remote._run import deploy_graph_and_run
 
 pytestmark = [pytest.mark.remote, pytest.mark.gpt, pytest.mark.devnet]
 
 
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_real_gpt_completion(client: ApiClient, funded_wallet: Wallet):
-    revealed = deploy_graph_run_reveal(
+    output = deploy_graph_and_run(
         client,
         funded_wallet,
         GPT_COMPRESS_TEAM,
         "Reply with only the capital city of France.",
     )
-    text = json.dumps(revealed).lower()
+    text = json.dumps(output).lower()
     assert "[stub:" not in text, f"expected a real model completion, not the L2 stub: {text}"
     assert "paris" in text, f"a real GPT completion should name Paris; got: {text}"
