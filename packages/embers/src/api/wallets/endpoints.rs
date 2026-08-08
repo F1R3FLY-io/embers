@@ -17,14 +17,7 @@ use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 use poem_openapi::types::ToJSON;
 
-use crate::api::common::{
-    ApiTags,
-    PrepareResponse,
-    SendRequest,
-    SendResp,
-    SignedContract,
-    Stringified,
-};
+use crate::api::common::{ApiResult, ApiTags, PrepareResponse, SendRequest, SendResp, SignedContract, Stringified};
 use crate::api::wallets::models::{
     BoostReq,
     BoostResp,
@@ -56,13 +49,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsApi<R, W, N> {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Data(wallets): Data<&WalletsService<R, W, N>>,
-    ) -> poem::Result<Json<WalletStateAndHistory>> {
-        let wallet_state_and_history = wallets
-            .get_wallet_state_and_history(address.0)
-            .await
-            .map(Into::into)?;
-
-        Ok(Json(wallet_state_and_history))
+    ) -> ApiResult<WalletStateAndHistory> {
+        wallets.get_wallet_state_and_history(address.0).await.into()
     }
 
     #[oai(
@@ -75,15 +63,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsApi<R, W, N> {
         Json(body): Json<TransferReq>,
         Data(wallets): Data<&WalletsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<TransferResp>>> {
+    ) -> ApiResult<PrepareResponse<TransferResp>> {
         PrepareResponse::from_call(
             body,
             |body| wallets.prepare_transfer_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -95,9 +82,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<SignedContract, TransferReq, TransferResp>,
         Data(wallets): Data<&WalletsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = wallets.deploy_signed_transfer(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        wallets.deploy_signed_transfer(body.request.into()).await.into()
     }
 
     #[oai(
@@ -110,15 +96,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsApi<R, W, N> {
         Json(body): Json<BoostReq>,
         Data(wallets): Data<&WalletsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<BoostResp>>> {
+    ) -> ApiResult<PrepareResponse<BoostResp>> {
         PrepareResponse::from_call(
             body,
             |body| wallets.prepare_boost_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -130,9 +115,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<SignedContract, BoostReq, BoostResp>,
         Data(wallets): Data<&WalletsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = wallets.deploy_boost_transfer(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        wallets.deploy_boost_transfer(body.request.into()).await.into()
     }
 
     #[allow(clippy::unused_async)]

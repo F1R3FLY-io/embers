@@ -395,6 +395,53 @@ where
     }
 }
 
+/// A 200-or-500 response for operations whose only failure mode is an internal error.
+/// The handlers return `anyhow::Result<T>`, which otherwise maps to an undeclared 500;
+/// declaring it here gives generated clients a typed error boundary (an `InternalError`
+/// body) instead of a bare 200-only operation with a generic error path.
+#[derive(Debug, Clone, ApiResponse)]
+pub enum ApiResult<T>
+where
+    T: Type + ToJSON + Send + Sync,
+{
+    #[oai(status = 200)]
+    Ok(Json<T>),
+    #[oai(status = 500)]
+    InternalError(Json<InternalError>),
+}
+
+impl<T, K> From<anyhow::Result<T>> for ApiResult<K>
+where
+    K: Type + ToJSON + Send + Sync + From<T>,
+{
+    fn from(value: anyhow::Result<T>) -> Self {
+        match value {
+            Ok(inner) => Self::Ok(Json(inner.into())),
+            Err(err) => Self::InternalError(Json(err.into())),
+        }
+    }
+}
+
+/// A 200-empty-or-500 response for operations that return no body but can fail
+/// internally, so the 500 (`InternalError`) path a bare `poem::Result<()>` hides is
+/// declared for generated clients.
+#[derive(Debug, Clone, ApiResponse)]
+pub enum VoidResult {
+    #[oai(status = 200)]
+    Ok,
+    #[oai(status = 500)]
+    InternalError(Json<InternalError>),
+}
+
+impl From<anyhow::Result<()>> for VoidResult {
+    fn from(value: anyhow::Result<()>) -> Self {
+        match value {
+            Ok(()) => Self::Ok,
+            Err(err) => Self::InternalError(Json(err.into())),
+        }
+    }
+}
+
 #[derive(derive_more::Debug, Clone, Hash, NewType)]
 #[oai(to_header = false, from_multipart = false)]
 #[debug("{:?}", _0.0.short_hex(32))]

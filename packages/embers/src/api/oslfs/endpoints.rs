@@ -14,15 +14,7 @@ use poem_openapi::OpenApi;
 use poem_openapi::param::Path;
 use poem_openapi::payload::Json;
 
-use crate::api::common::{
-    ApiTags,
-    MaybeNotFound,
-    PrepareResponse,
-    SendRequest,
-    SendResp,
-    SignedContract,
-    Stringified,
-};
+use crate::api::common::{ApiResult, ApiTags, MaybeNotFound, PrepareResponse, SendRequest, SendResp, SignedContract, Stringified};
 use crate::api::oslfs::models::{
     CreateOslfReq,
     CreateOslfResp,
@@ -51,9 +43,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Data(oslfs): Data<&OslfsService<R, W, N>>,
-    ) -> poem::Result<Json<Oslfs>> {
-        let oslfs = oslfs.list(address.0).await?;
-        Ok(Json(oslfs.into()))
+    ) -> ApiResult<Oslfs> {
+        oslfs.list(address.0).await.into()
     }
 
     #[oai(
@@ -95,15 +86,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
         Json(body): Json<CreateOslfReq>,
         Data(oslfs): Data<&OslfsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<CreateOslfResp>>> {
+    ) -> ApiResult<PrepareResponse<CreateOslfResp>> {
         PrepareResponse::from_call(
             body,
             |body| oslfs.prepare_create_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -115,9 +105,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateOslfReq, CreateOslfResp>,
         Data(oslfs): Data<&OslfsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = oslfs.deploy_signed_create(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        oslfs.deploy_signed_create(body.request.into()).await.into()
     }
 
     #[oai(
@@ -131,15 +120,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
         Json(body): Json<SaveOslfReq>,
         Data(oslfs): Data<&OslfsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<SaveOslfResp>>> {
+    ) -> ApiResult<PrepareResponse<SaveOslfResp>> {
         PrepareResponse::from_call(
             body,
             |body| oslfs.prepare_save_contract(id, body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -152,9 +140,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, SaveOslfReq, SaveOslfResp>,
         Data(oslfs): Data<&OslfsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = oslfs.deploy_signed_save(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        oslfs.deploy_signed_save(body.request.into()).await.into()
     }
 
     #[oai(
@@ -166,9 +153,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
         &self,
         Path(id): Path<String>,
         Data(oslfs): Data<&OslfsService<R, W, N>>,
-    ) -> poem::Result<Json<DeleteOslfResp>> {
-        let contract = oslfs.prepare_delete_contract(id).await?;
-        Ok(Json(contract.into()))
+    ) -> ApiResult<DeleteOslfResp> {
+        oslfs.prepare_delete_contract(id).await.into()
     }
 
     #[oai(
@@ -181,8 +167,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> OslfsApi<R, W, N> {
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
         Data(oslfs): Data<&OslfsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = oslfs.deploy_signed_delete(body.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        oslfs.deploy_signed_delete(body.into()).await.into()
     }
 }

@@ -26,15 +26,7 @@ use crate::api::agents::models::{
     SaveAgentReq,
     SaveAgentResp,
 };
-use crate::api::common::{
-    ApiTags,
-    MaybeNotFound,
-    PrepareResponse,
-    SendRequest,
-    SendResp,
-    SignedContract,
-    Stringified,
-};
+use crate::api::common::{ApiResult, ApiTags, MaybeNotFound, PrepareResponse, SendRequest, SendResp, SignedContract, Stringified};
 use crate::domain::agents::AgentsService;
 
 pub struct AgentsApi<R = ReadNodeClient, W = WriteNodeClient, N = NodeEvents>(
@@ -54,9 +46,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Data(agents): Data<&AgentsService<R, W, N>>,
-    ) -> poem::Result<Json<Agents>> {
-        let agents = agents.list(address.0).await?;
-        Ok(Json(agents.into()))
+    ) -> ApiResult<Agents> {
+        agents.list(address.0).await.into()
     }
 
     #[oai(
@@ -98,15 +89,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         Json(body): Json<CreateAgentReq>,
         Data(agents): Data<&AgentsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<CreateAgentResp>>> {
+    ) -> ApiResult<PrepareResponse<CreateAgentResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents.prepare_create_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -118,9 +108,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateAgentReq, CreateAgentResp>,
         Data(agents): Data<&AgentsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_create(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        agents.deploy_signed_create(body.request.into()).await.into()
     }
 
     #[oai(
@@ -133,15 +122,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         Json(body): Json<DeployAgentReq>,
         Data(agents): Data<&AgentsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<DeployAgentResp>>> {
+    ) -> ApiResult<PrepareResponse<DeployAgentResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents.prepare_deploy_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -153,9 +141,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<DeploySignedAgentReq, DeployAgentReq, DeployAgentResp>,
         Data(agents): Data<&AgentsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_deploy(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        agents.deploy_signed_deploy(body.request.into()).await.into()
     }
 
     #[oai(
@@ -169,15 +156,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         Json(body): Json<SaveAgentReq>,
         Data(agents): Data<&AgentsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<SaveAgentResp>>> {
+    ) -> ApiResult<PrepareResponse<SaveAgentResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents.prepare_save_contract(id, body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -190,9 +176,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, SaveAgentReq, SaveAgentResp>,
         Data(agents): Data<&AgentsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_save(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        agents.deploy_signed_save(body.request.into()).await.into()
     }
 
     #[oai(
@@ -204,9 +189,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         &self,
         Path(id): Path<String>,
         Data(agents): Data<&AgentsService<R, W, N>>,
-    ) -> poem::Result<Json<DeleteAgentResp>> {
-        let contract = agents.prepare_delete_contract(id).await?;
-        Ok(Json(contract.into()))
+    ) -> ApiResult<DeleteAgentResp> {
+        agents.prepare_delete_contract(id).await.into()
     }
 
     #[oai(
@@ -219,8 +203,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsApi<R, W, N> {
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
         Data(agents): Data<&AgentsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_delete(body.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        agents.deploy_signed_delete(body.into()).await.into()
     }
 }

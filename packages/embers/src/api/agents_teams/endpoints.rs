@@ -39,15 +39,7 @@ use crate::api::agents_teams::models::{
     SaveAgentsTeamResp,
     SendRevealOutputResponse,
 };
-use crate::api::common::{
-    ApiTags,
-    MaybeNotFound,
-    PrepareResponse,
-    SendRequest,
-    SendResp,
-    SignedContract,
-    Stringified,
-};
+use crate::api::common::{ApiResult, ApiTags, MaybeNotFound, PrepareResponse, SendRequest, SendResp, SignedContract, Stringified, VoidResult};
 use crate::domain::agents::AgentsService;
 use crate::domain::agents_teams::{AgentsTeamsService, models};
 
@@ -68,9 +60,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         &self,
         Path(address): Path<Stringified<WalletAddress>>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<AgentsTeams>> {
-        let agents_teams = agents_teams.list(address.0).await?;
-        Ok(Json(agents_teams.into()))
+    ) -> ApiResult<AgentsTeams> {
+        agents_teams.list(address.0).await.into()
     }
 
     #[oai(
@@ -112,15 +103,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Json(body): Json<CreateAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<CreateAgentsTeamResp>>> {
+    ) -> ApiResult<PrepareResponse<CreateAgentsTeamResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_create_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -132,11 +122,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<SignedContract, CreateAgentsTeamReq, CreateAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents_teams
+    ) -> ApiResult<SendResp> {
+        agents_teams
             .deploy_signed_create(body.request.into())
-            .await?;
-        Ok(Json(deploy_id.into()))
+            .await
+            .into()
     }
 
     #[oai(
@@ -150,15 +140,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(agents): Data<&AgentsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<DeployAgentsTeamResp>>> {
+    ) -> ApiResult<PrepareResponse<DeployAgentsTeamResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_deploy_contract(body.into(), agents),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -174,11 +163,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
             DeployAgentsTeamResp,
         >,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents_teams
+    ) -> ApiResult<SendResp> {
+        agents_teams
             .deploy_signed_deploy(body.request.into())
-            .await?;
-        Ok(Json(deploy_id.into()))
+            .await
+            .into()
     }
 
     #[oai(
@@ -191,15 +180,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Json(body): Json<RunReq>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<RunResp>>> {
+    ) -> ApiResult<PrepareResponse<RunResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_run_agents_team_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -211,7 +199,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<SignedContract, RunReq, RunResp>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<serde_json::Value>> {
+    ) -> ApiResult<serde_json::Value> {
         agents_teams
             .deploy_signed_run_agents_team(models::DeploySignedRunReq {
                 contract: body.request.into(),
@@ -219,8 +207,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
                 prepare_response: body.prepare_response.into(),
             })
             .await
-            .map(Json)
-            .map_err(Into::into)
+            .into()
     }
 
     #[oai(
@@ -233,15 +220,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Json(body): Json<RunReq>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<RunResp>>> {
+    ) -> ApiResult<PrepareResponse<RunResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_run_om_firesky_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -253,7 +239,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         &self,
         SendRequest(body): SendRequest<DeploySignedRunOnFireskyReq, RunReq, RunResp>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<()> {
+    ) -> VoidResult {
         Box::pin(
             agents_teams.deploy_signed_run_on_firesky(models::DeploySignedRunOnFireskyReq {
                 agents_team: body.prepare_request.agents_team.clone().into(),
@@ -266,8 +252,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
                 },
             }),
         )
-        .await?;
-        Ok(())
+        .await
+        .into()
     }
 
     #[oai(
@@ -294,7 +280,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Json(body): Json<RunCommandReq>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<RunCommandResp>>> {
+    ) -> ApiResult<PrepareResponse<RunCommandResp>> {
         PrepareResponse::from_call(
             body,
             |body| async {
@@ -304,8 +290,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -318,8 +303,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Path(run_id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, RunCommandReq, RunCommandResp>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<serde_json::Value>> {
-        let prepare_request = body.prepare_request.into_domain(run_id)?;
+    ) -> ApiResult<serde_json::Value> {
+        let prepare_request = match body.prepare_request.into_domain(run_id) {
+            Ok(request) => request,
+            Err(err) => return ApiResult::InternalError(Json(err.into())),
+        };
         agents_teams
             .deploy_signed_run_command(models::DeploySignedRunCommandReq {
                 contract: body.request.into(),
@@ -327,8 +315,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
                 prepare_response: body.prepare_response.into(),
             })
             .await
-            .map(Json)
-            .map_err(Into::into)
+            .into()
     }
 
     #[oai(
@@ -394,15 +381,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Json(body): Json<SaveAgentsTeamReq>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<SaveAgentsTeamResp>>> {
+    ) -> ApiResult<PrepareResponse<SaveAgentsTeamResp>> {
         PrepareResponse::from_call(
             body,
             |body| agents_teams.prepare_save_contract(id, body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -415,9 +401,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, SaveAgentsTeamReq, SaveAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents_teams.deploy_signed_save(body.request.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        agents_teams.deploy_signed_save(body.request.into()).await.into()
     }
 
     #[oai(
@@ -429,9 +414,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         &self,
         Path(id): Path<String>,
         Data(agents): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<DeleteAgentsTeamResp>> {
-        let contract = agents.prepare_delete_contract(id).await?;
-        Ok(Json(contract.into()))
+    ) -> ApiResult<DeleteAgentsTeamResp> {
+        agents.prepare_delete_contract(id).await.into()
     }
 
     #[oai(
@@ -444,9 +428,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         #[allow(unused_variables)] Path(id): Path<String>,
         Json(body): Json<SignedContract>,
         Data(agents): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents.deploy_signed_delete(body.into()).await?;
-        Ok(Json(deploy_id.into()))
+    ) -> ApiResult<SendResp> {
+        agents.deploy_signed_delete(body.into()).await.into()
     }
 
     /// Every team whose latest version uses the given agent, so deleting that agent
@@ -461,9 +444,12 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Path(address): Path<Stringified<WalletAddress>>,
         Path(agent_id): Path<String>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<Vec<ReferencingTeam>>> {
-        let teams = agents_teams.referencing_teams(address.0, agent_id).await?;
-        Ok(Json(teams.into_iter().map(Into::into).collect()))
+    ) -> ApiResult<Vec<ReferencingTeam>> {
+        agents_teams
+            .referencing_teams(address.0, agent_id)
+            .await
+            .map(|teams| teams.into_iter().map(Into::into).collect::<Vec<ReferencingTeam>>())
+            .into()
     }
 
     /// Stops a published team answering mentions, by removing the record that marks
@@ -479,9 +465,8 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Path(address): Path<Stringified<WalletAddress>>,
         Path(id): Path<String>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<()> {
-        agents_teams.unpublish(address.0, id).await?;
-        Ok(())
+    ) -> VoidResult {
+        agents_teams.unpublish(address.0, id).await.into()
     }
 
     /// Reports a team's publication as the chain records it, reconciled against
@@ -513,7 +498,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         Json(body): Json<PublishToFireskyReq>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<PublishToFireskyResp>>> {
+    ) -> ApiResult<PrepareResponse<PublishToFireskyResp>> {
         PrepareResponse::from_call(
             body,
             |body| {
@@ -522,8 +507,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
     #[oai(
@@ -537,10 +521,10 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         #[allow(unused_variables)] Path(id): Path<String>,
         SendRequest(body): SendRequest<SignedContract, PublishToFireskyReq, PublishToFireskyResp>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
-    ) -> poem::Result<Json<SendResp>> {
-        let deploy_id = agents_teams
+    ) -> ApiResult<SendResp> {
+        agents_teams
             .deploy_signed_publish_to_firesky(body.request.into())
-            .await?;
-        Ok(Json(deploy_id.into()))
+            .await
+            .into()
     }
 }
