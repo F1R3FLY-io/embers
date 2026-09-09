@@ -41,6 +41,8 @@ struct GetAgentsTeamManifest {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TeamManifest {
+    #[serde(default)]
+    pub deployment_bindings: std::collections::BTreeMap<String, String>,
     #[serde(deserialize_with = "crate::blockchain::common::deserialize_unescaped")]
     pub definition: String,
     pub definition_hash: String,
@@ -347,6 +349,24 @@ mod tests {
 
     use super::*;
     use crate::domain::test_helpers::*;
+
+    #[test]
+    fn team_manifest_accepts_legacy_and_container_metadata() {
+        let mut value = serde_json::json!({
+            "definition": "{}",
+            "definitionHash": "hash",
+            "protocol": "embers-agent-team-control-v1"
+        });
+        let legacy: TeamManifest = serde_json::from_value(value.clone()).unwrap();
+        assert!(legacy.deployment_bindings.is_empty());
+        value["deploymentBindings"] = serde_json::json!({});
+        let empty: TeamManifest = serde_json::from_value(value.clone()).unwrap();
+        assert!(empty.deployment_bindings.is_empty());
+        value["deploymentBindings"] = serde_json::json!({"agent": "rho:id:container"});
+        let container: TeamManifest = serde_json::from_value(value).unwrap();
+        assert_eq!(container.deployment_bindings["agent"], "rho:id:container");
+        assert_eq!(container.definition_hash, legacy.definition_hash);
+    }
 
     fn make_service(
         event_source: MockNodeEventSource,
