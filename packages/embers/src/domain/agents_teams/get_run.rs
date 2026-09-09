@@ -28,6 +28,18 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         &self,
         run_id: String,
     ) -> anyhow::Result<Option<crate::domain::agents_teams::models::RunState>> {
+        match self.get_run_metadata(run_id).await? {
+            Some(state) => Ok(Some(self.hydrate_run_events(state)?)),
+            None => Ok(None),
+        }
+    }
+
+    /// Ledger-only read for scheduling; recovery must not hydrate unrelated
+    /// historical checkpoints merely to decide whether a run needs work.
+    pub(crate) async fn get_run_metadata(
+        &self,
+        run_id: String,
+    ) -> anyhow::Result<Option<RunState>> {
         let code = GetRun {
             env_uri: self.uri.clone(),
             run_id,
@@ -41,10 +53,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .get_data_or_none_with_retry(code, 5, Duration::from_millis(500))
             .await?
             .flatten();
-        match state {
-            Some(state) => Ok(Some(self.hydrate_run_events(state.into())?)),
-            None => Ok(None),
-        }
+        Ok(state.map(Into::into))
     }
 
     /// Wait until a finalized run write is observable with the expected
@@ -84,11 +93,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         }
         .render()?;
         let states: Vec<models::RunState> = self.read_client.get_data(code).await?;
-        let mut hydrated = Vec::with_capacity(states.len());
-        for state in states {
-            hydrated.push(self.hydrate_run_events(state.into())?);
-        }
-        Ok(hydrated)
+        Ok(states.into_iter().map(Into::into).collect())
     }
 
     fn hydrate_run_events(&self, mut state: RunState) -> anyhow::Result<RunState> {

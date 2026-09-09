@@ -27,7 +27,9 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
     pub(crate) async fn recover_runs_once(&self) -> anyhow::Result<()> {
         let runs = self.list_runs().await?;
         for run in runs {
-            if run.definition_hash.is_none() {
+            if run.definition_hash.is_none()
+                || !matches!(run.status.as_str(), "running" | "resuming" | "suspended")
+            {
                 continue;
             }
             let run_id = run.run_id.clone();
@@ -47,8 +49,13 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             let Ok(_guard) = lock.try_lock() else {
                 continue;
             };
-            let Some(current) = self.get_run(run_id.clone()).await? else {
-                continue;
+            let current = match self.get_run_metadata(run_id.clone()).await {
+                Ok(Some(current)) => current,
+                Ok(None) => continue,
+                Err(error) => {
+                    tracing::error!(run_id, error = %error, "Could not read recoverable run metadata");
+                    continue;
+                }
             };
             let result = match current.status.as_str() {
                 "running" => self.resume_running_run(&current).await.map(|_| ()),
@@ -173,5 +180,93 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         })
         .await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use dashmap::DashMap;
+    use serde_json::{Value, json};
+
+    use super::*;
+    use crate::domain::agents_teams::continuation_store::F1r3driveContinuationStore;
+    use crate::domain::test_helpers::*;
+
+    fn run(id: &str, status: &str) -> Value {
+        json!({
+            "run_id": id,
+            "agents_team": AsRef::<String>::as_ref(&test_uri()),
+            "created_at": 0,
+            "status": status,
+            "events": [],
+            "definition_hash": "test-definition",
+            "revision": 3,
+            "continuation_content_hash": "missing-content",
+            "continuation_capability_hash": "missing-capability"
+        })
+    }
+
+    fn service(
+        read: MockReadNode,
+        dir: &std::path::Path,
+    ) -> AgentsTeamsService<MockReadNode, MockWriteNode, MockNodeEventSource> {
+        AgentsTeamsService {
+            uri: test_uri(),
+            read_client: read,
+            write_client: MockWriteNode::new(),
+            observer_node_events: MockNodeEventSource::new(),
+            service_key: test_secret_key(),
+            aes_encryption_key: [42u8; 32].into(),
+            continuation_store: F1r3driveContinuationStore::open_for_test(
+                dir, [7u8; 32], [9u8; 32],
+            )
+            .unwrap(),
+            deploy_finalization_timeout: Duration::from_secs(1),
+            run_locks: Arc::new(DashMap::new()),
+            firesky_accounts: Arc::new(DashMap::new()),
+        }
+    }
+
+    #[tokio::test]
+    async fn terminal_runs_with_missing_checkpoints_do_not_break_recovery() {
+        let dir = tempfile::tempdir().unwrap();
+        let read = MockReadNode::new().on_code_containing(
+            "listRuns",
+            json!([
+                run("completed", "completed"),
+                run("cancelled", "cancelled"),
+                run("failed", "failed")
+            ]),
+        );
+        let service = service(read.clone(), dir.path());
+        service.recover_runs_once().await.unwrap();
+        assert_eq!(
+            read.calls().len(),
+            1,
+            "terminal runs must not be hydrated or reread"
+        );
+    }
+
+    #[tokio::test]
+    async fn unreadable_active_run_does_not_prevent_later_runs_from_being_checked() {
+        let dir = tempfile::tempdir().unwrap();
+        let read = MockReadNode::new()
+            .on_code_containing(
+                "listRuns",
+                json!([run("first", "running"), run("second", "running")]),
+            )
+            .on_code_containing("\"first\"", run("first", "running"))
+            .on_code_containing("\"second\"", run("second", "running"));
+        let service = service(read.clone(), dir.path());
+        service.recover_runs_once().await.unwrap();
+        let calls = read.calls();
+        assert!(calls.iter().any(|code| code.contains("\"first\"")));
+        assert!(calls.iter().any(|code| code.contains("\"second\"")));
+        assert!(
+            service.get_run("first".into()).await.is_err(),
+            "owner reads must still report unavailable artifacts"
+        );
     }
 }

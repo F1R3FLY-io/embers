@@ -278,7 +278,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         let pointer = self
             .continuation_store
             .locate(kind, run_id, object_id)?
-            .with_context(|| format!("{kind:?} artifact {object_id} is missing"))?;
+            .with_context(|| format!("{kind:?} artifact {object_id} for run {run_id} is missing"))?;
         anyhow::ensure!(
             pointer.content_hash == content_hash,
             "artifact content hash differs from the user-authorized run metadata"
