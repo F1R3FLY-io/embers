@@ -17,7 +17,13 @@ use crate::api::common::{
     SignedContract,
     Stringified,
 };
-use crate::domain::agents_teams::{RevealOutputError, models};
+use crate::domain::agents_teams::{
+    GrantError,
+    PublishToMailError,
+    RevealOutputError,
+    RunUnderGrantError,
+    models,
+};
 
 /// JSON transport for the versioned workflow language.  The domain constructor
 /// performs full structural and semantic validation before this value can enter
@@ -540,6 +546,10 @@ pub struct RunState {
     pub run_id: String,
     /// The invoked team's registry URI.
     pub agents_team: Stringified<Uri>,
+    /// The grant a channel service initiated this run under, when there was
+    /// one. Present on this capability-gated read; the public run enumeration
+    /// scrubs it, because grant records are public and name their grantor.
+    pub grant_id: Option<String>,
     /// Run creation instant.
     pub created_at: Stringified<DateTime<Utc>>,
     /// Ledger status: running, suspended, resuming, completed, failed, or
@@ -733,6 +743,820 @@ impl From<RevealOutputError> for SendRevealOutputResponse {
             RevealOutputError::NotRevealable | RevealOutputError::Consumed => Self::NotRevealable,
             RevealOutputError::Unauthorized => Self::Unauthorized,
             RevealOutputError::Internal(err) => Self::InternalError(Json(err.into())),
+        }
+    }
+}
+
+/// A machine-readable failure body for the channel-connector surface: `code`
+/// is a stable identifier a channel service branches on, `description` is for
+/// humans and logs. Codes are documented per operation in the API reference.
+#[derive(Debug, Clone, Object)]
+pub struct ErrorBody {
+    /// Stable machine-readable failure code.
+    pub code: String,
+    /// Human-readable failure description.
+    pub description: String,
+}
+
+impl ErrorBody {
+    pub fn new(code: &str, description: impl std::fmt::Display) -> Self {
+        Self {
+            code: code.to_owned(),
+            description: description.to_string(),
+        }
+    }
+}
+
+/// The channels a grant may name. Chat platform disambiguation lives inside
+/// the opaque principal (already platform- and workspace-scoped), not here.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Enum)]
+#[oai(rename_all = "camelCase")]
+pub enum GrantChannel {
+    Chat,
+    Mail,
+}
+
+impl GrantChannel {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Chat => "chat",
+            Self::Mail => "mail",
+        }
+    }
+}
+
+/// Sender-authentication floor a mail grant requires; enforced by the mail
+/// bridge against chain-recorded authentication results, never by embers.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Enum)]
+#[oai(rename_all = "camelCase")]
+pub enum MinAuthLevel {
+    None,
+    Spf,
+    Dkim,
+    Dmarc,
+}
+
+impl MinAuthLevel {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Spf => "spf",
+            Self::Dkim => "dkim",
+            Self::Dmarc => "dmarc",
+        }
+    }
+}
+
+/// The command classes a grantor may delegate. `timerFired` belongs to the
+/// service scheduler and `migrate` is administrative; neither is delegable.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Enum)]
+#[oai(rename_all = "camelCase")]
+pub enum GrantCommandClass {
+    Approve,
+    Cancel,
+    Event,
+    Reject,
+    Retry,
+    Signal,
+}
+
+impl GrantCommandClass {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Approve => "approve",
+            Self::Cancel => "cancel",
+            Self::Event => "event",
+            Self::Reject => "reject",
+            Self::Retry => "retry",
+            Self::Signal => "signal",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Object)]
+pub struct GrantCaps {
+    /// UTC-epoch-day run ceiling; absent means uncapped. Up to twice the cap
+    /// can land across one midnight boundary; the cap is an abuse throttle.
+    pub max_runs_per_day: Option<Stringified<i64>>,
+}
+
+#[derive(Debug, Clone, Hash, Object)]
+pub struct GrantAuthority {
+    /// Whether the grantee may reveal outputs of runs initiated under this
+    /// grant, for delivery over the channel.
+    pub reveal: bool,
+    /// The command classes the grantee may issue on runs initiated under this
+    /// grant.
+    pub commands: Vec<GrantCommandClass>,
+}
+
+#[derive(Debug, Clone, Hash, Object)]
+pub struct CreateGrantReq {
+    /// The channel service's wallet address (the grantee, who signs and pays
+    /// run deploys under this grant).
+    pub grantee: Stringified<WalletAddress>,
+    /// The channel the grant serves.
+    pub channel: GrantChannel,
+    /// The channel-native principal this grant answers for: the chat
+    /// gateway's opaque author hash, or a mail sender address. Embers
+    /// string-matches it and never interprets it.
+    pub channel_principal: String,
+    /// The deployed team's registry URI the grant covers.
+    pub agents_team: Stringified<Uri>,
+    /// Frequency ceilings.
+    pub caps: GrantCaps,
+    /// The authority delegated to the grantee.
+    pub authority: GrantAuthority,
+    /// When true, a random subject bearer token is minted; its plaintext is
+    /// returned exactly once in the prepare response and only its blake2b-256
+    /// hex digest is stored on chain.
+    pub require_token: bool,
+    /// Sender-authentication floor for mail-channel grants.
+    pub min_auth: MinAuthLevel,
+}
+
+impl From<CreateGrantReq> for models::CreateGrantReq {
+    fn from(value: CreateGrantReq) -> Self {
+        Self {
+            grantee: value.grantee.0.as_ref().to_owned(),
+            channel: value.channel.as_str().to_owned(),
+            channel_principal: value.channel_principal,
+            agents_team: value.agents_team.0,
+            caps: models::GrantCaps {
+                max_runs_per_day: value.caps.max_runs_per_day.map(|cap| cap.0),
+            },
+            authority: models::GrantAuthority {
+                reveal: value.authority.reveal,
+                commands: value
+                    .authority
+                    .commands
+                    .into_iter()
+                    .map(|class| class.as_str().to_owned())
+                    .collect(),
+            },
+            require_token: value.require_token,
+            min_auth: value.min_auth.as_str().to_owned(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
+#[convert(from(models::CreateGrantResp))]
+pub struct CreateGrantResp {
+    /// The minted grant identity (`UUIDv7`).
+    pub grant_id: String,
+    /// The unsigned grant-creation contract bytes to sign (grantor-signed).
+    pub contract: PreparedContract,
+    /// Prepare instant.
+    pub issued_at: Stringified<DateTime<Utc>>,
+    /// The minted subject bearer token, present exactly once when requested;
+    /// it is never stored and cannot be recovered later.
+    pub require_token: Option<String>,
+}
+
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
+#[convert(from(models::RevokeGrantResp))]
+pub struct RevokeGrantResp {
+    /// The unsigned revocation contract bytes to sign (grantor-signed).
+    pub contract: PreparedContract,
+}
+
+impl From<CreateGrantResp> for models::CreateGrantResp {
+    fn from(value: CreateGrantResp) -> Self {
+        Self {
+            grant_id: value.grant_id,
+            contract: crate::domain::common::PreparedContract(value.contract.0.0),
+            issued_at: value.issued_at.0,
+            require_token: value.require_token,
+        }
+    }
+}
+
+impl From<RevokeGrantResp> for models::RevokeGrantResp {
+    fn from(value: RevokeGrantResp) -> Self {
+        Self {
+            contract: crate::domain::common::PreparedContract(value.contract.0.0),
+        }
+    }
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::GrantRunsToday))]
+pub struct GrantRunsToday {
+    /// The UTC epoch-day the counter covers.
+    pub day: Stringified<i64>,
+    /// Runs admitted within that day.
+    pub count: Stringified<i64>,
+}
+
+/// A grant record as the chain holds it: a public authorization fact. The
+/// HTTP surface mirrors the observer-readable chain clauses for UI and
+/// operations; channel services consume the chain clauses directly.
+#[derive(Debug, Clone, Object)]
+pub struct Grant {
+    /// Grant identity (`UUIDv7`).
+    pub grant_id: String,
+    /// The granting wallet address; derived on chain from the creating
+    /// deploy's signer.
+    pub grantor: String,
+    /// The channel service's wallet address.
+    pub grantee: String,
+    /// The channel the grant serves.
+    pub channel: String,
+    /// The channel-native principal, opaque to embers.
+    pub channel_principal: String,
+    /// The covered team deployment's registry URI.
+    pub agents_team: Stringified<Uri>,
+    /// Frequency ceilings.
+    pub caps: GrantCaps,
+    /// The delegated authority, as recorded.
+    pub authority: GrantAuthorityView,
+    /// blake2b-256 hex digest of the subject bearer token, when one is
+    /// required. The token itself is never stored.
+    pub require_token_hash: Option<String>,
+    /// Sender-authentication floor for mail-channel grants.
+    pub min_auth: String,
+    /// Creation instant.
+    pub created_at: Stringified<DateTime<Utc>>,
+    /// Whether the grant has been revoked. Revocation is delivery-only for
+    /// in-flight runs: they complete for their owner, while grantee reveal
+    /// and command claims fail from the moment of revocation.
+    pub revoked: bool,
+    /// The chain-maintained day counter.
+    pub runs_today: GrantRunsToday,
+}
+
+/// Recorded authority, with classes as strings so future recorded values
+/// survive the read path unmodified.
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::GrantAuthority))]
+pub struct GrantAuthorityView {
+    pub reveal: bool,
+    pub commands: Vec<String>,
+}
+
+impl From<models::Grant> for Grant {
+    fn from(value: models::Grant) -> Self {
+        Self {
+            grant_id: value.grant_id,
+            grantor: value.grantor,
+            grantee: value.grantee,
+            channel: value.channel,
+            channel_principal: value.channel_principal,
+            agents_team: Stringified(value.agents_team),
+            caps: GrantCaps {
+                max_runs_per_day: value.caps.max_runs_per_day.map(Stringified),
+            },
+            authority: value.authority.into(),
+            require_token_hash: value.require_token_hash,
+            min_auth: value.min_auth,
+            created_at: Stringified(value.created_at),
+            revoked: value.revoked,
+            runs_today: value.runs_today.into(),
+        }
+    }
+}
+
+/// Channel-supplied provenance for a grant-initiated run. Stored only inside
+/// the encrypted durable run-request artifact; the public ledger records only
+/// the grant id.
+#[derive(Debug, Clone, Hash, Object)]
+pub struct ChannelContext {
+    /// The channel issuing the run; must equal the grant's channel.
+    pub channel: GrantChannel,
+    /// The channel-native principal; must equal the grant's principal.
+    pub principal: String,
+    /// The channel's content-derived idempotency handle for the triggering
+    /// message. Recorded for audit; channels own their dedup discipline.
+    pub message_fingerprint: String,
+    /// Mail subject line, when the channel has one.
+    pub subject: Option<String>,
+}
+
+impl From<ChannelContext> for models::ChannelContext {
+    fn from(value: ChannelContext) -> Self {
+        Self {
+            channel: value.channel.as_str().to_owned(),
+            principal: value.principal,
+            message_fingerprint: value.message_fingerprint,
+            subject: value.subject,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Object)]
+pub struct RunUnderGrantReq {
+    /// The grant authorizing this run; the target team comes from it.
+    pub grant_id: String,
+    /// The invocation input.
+    pub prompt: String,
+    /// Provenance of the triggering channel message.
+    pub channel_context: ChannelContext,
+}
+
+impl From<RunUnderGrantReq> for models::RunUnderGrantReq {
+    fn from(value: RunUnderGrantReq) -> Self {
+        Self {
+            grant_id: value.grant_id,
+            prompt: value.prompt,
+            channel_context: value.channel_context.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Object)]
+pub struct RunUnderGrantResp {
+    /// The prepared run, identical in shape to a plain run prepare. The
+    /// deploy is signed and paid by the grantee; the run is owned by the
+    /// grantor per the on-chain grant.
+    pub run: RunResp,
+    /// The authorizing grant, echoed.
+    pub grant_id: String,
+    /// The team the grant names; the request never carries a team, so the
+    /// caller learns the resolved target here.
+    pub agents_team: Stringified<Uri>,
+}
+
+impl From<models::RunUnderGrantResp> for RunUnderGrantResp {
+    fn from(value: models::RunUnderGrantResp) -> Self {
+        Self {
+            run: value.run.into(),
+            grant_id: value.grant_id,
+            agents_team: Stringified(value.agents_team),
+        }
+    }
+}
+
+impl From<RunUnderGrantResp> for models::RunUnderGrantResp {
+    fn from(value: RunUnderGrantResp) -> Self {
+        Self {
+            run: value.run.into(),
+            grant_id: value.grant_id,
+            agents_team: value.agents_team.0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Object)]
+pub struct PublishToMailReq {
+    /// The local part of the team's mail address (before the `@`).
+    pub local_part: String,
+    /// The mail domain the address lives under.
+    pub mail_domain: String,
+}
+
+impl PublishToMailReq {
+    pub fn into_domain(self, team_id: String) -> models::PublishToMailReq {
+        models::PublishToMailReq {
+            team_id,
+            local_part: self.local_part,
+            mail_domain: self.mail_domain,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
+#[convert(from(models::PublishToMailResp))]
+pub struct PublishToMailResp {
+    /// The canonical (lowercased) address the team will be reachable at.
+    pub address: String,
+    /// The unsigned binding contract bytes to sign (team-owner-signed).
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
+#[convert(from(models::UnpublishMailResp))]
+pub struct UnpublishMailResp {
+    /// The address whose binding is being deactivated.
+    pub address: String,
+    /// The unsigned deactivation contract bytes to sign (team-owner-signed).
+    pub contract: PreparedContract,
+}
+
+impl From<PublishToMailResp> for models::PublishToMailResp {
+    fn from(value: PublishToMailResp) -> Self {
+        Self {
+            address: value.address,
+            contract: crate::domain::common::PreparedContract(value.contract.0.0),
+        }
+    }
+}
+
+impl From<UnpublishMailResp> for models::UnpublishMailResp {
+    fn from(value: UnpublishMailResp) -> Self {
+        Self {
+            address: value.address,
+            contract: crate::domain::common::PreparedContract(value.contract.0.0),
+        }
+    }
+}
+
+/// A team's public reachability record for one channel. Carries no key
+/// material: channel-side secrets are minted and custodied by the channel
+/// service, never by embers.
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::ChannelBinding))]
+pub struct ChannelBinding {
+    /// The channel the binding serves.
+    pub channel: String,
+    /// The channel-native address (for mail, `local@domain`).
+    pub address: String,
+    /// The bound team deployment's registry URI.
+    pub agents_team: Stringified<Uri>,
+    /// The bound team's identity (`UUIDv4`).
+    pub team_id: String,
+    /// The team owner's wallet address.
+    pub owner: String,
+    /// Whether the binding is in force; unpublishing flips this off,
+    /// reversibly.
+    pub active: bool,
+    /// Binding creation instant.
+    pub created_at: Stringified<DateTime<Utc>>,
+}
+
+/// Where a team is reachable, per channel, with honestly three-valued
+/// reachability: `true` verified reachable, `false` verified unreachable,
+/// absent when the question could not be answered -- which must never be
+/// rendered as "missing".
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::PublishedChannels))]
+pub struct PublishedChannels {
+    /// F1R3SKY publication state, when the team was ever published there.
+    pub firesky: Option<PublishedState>,
+    /// Mail bindings for the team.
+    pub mail: Vec<MailChannelState>,
+    /// Chat reachability, derived from grant presence.
+    pub chat: ChatChannelState,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::MailChannelState))]
+pub struct MailChannelState {
+    /// The bound mail address.
+    pub address: String,
+    /// Whether the binding is in force.
+    pub active: bool,
+    /// Always absent today: embers deliberately does not probe SMTP, so mail
+    /// reachability is unknown by design rather than falsely asserted.
+    pub reachable: Option<bool>,
+}
+
+/// Chat reachability derived from grant presence: a team with active chat
+/// grants is connectable by exactly those principals. The gateway dials out
+/// and exposes no status surface, so this is the honest maximum embers can
+/// report.
+#[derive(Debug, Clone, StructuralConvert, Object)]
+#[convert(from(models::ChatChannelState))]
+pub struct ChatChannelState {
+    /// Active (unrevoked) chat grants across all of the team's deployments.
+    pub active_grant_count: Stringified<u64>,
+    /// The distinct principals those grants name.
+    pub principals: Vec<String>,
+}
+
+/// Whether an internal failure is the node refusing a deploy for lack of
+/// funds; surfaced as its own code so channel services can distinguish "top
+/// up the channel wallet" from every other failure. The node reports this in
+/// prose, so the match is textual by necessity and documented as such.
+fn is_unfunded_deploy(err: &anyhow::Error) -> bool {
+    let text = format!("{err:?}").to_lowercase();
+    text.contains("insufficient funds")
+        || text.contains("insufficient phlo")
+        || text.contains("not enough phlo")
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum PrepareCreateGrantResponse {
+    #[oai(status = 200)]
+    Ok(Json<PrepareResponse<CreateGrantResp>>),
+    /// The request named a channel, authority class, or cap outside the legal
+    /// vocabulary (`grant_invalid_request`).
+    #[oai(status = 422)]
+    UnprocessableEntity(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<GrantError> for PrepareCreateGrantResponse {
+    fn from(error: GrantError) -> Self {
+        match error {
+            GrantError::InvalidRequest(reason) => {
+                Self::UnprocessableEntity(Json(ErrorBody::new("grant_invalid_request", reason)))
+            }
+            GrantError::NotFound | GrantError::Unauthorized => Self::InternalError(Json(
+                ErrorBody::new("internal_error", "unexpected claim-phase failure during prepare"),
+            )),
+            GrantError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum SendGrantResponse {
+    #[oai(status = 200)]
+    Ok(Json<crate::api::common::SendResp>),
+    /// The grant does not exist (`grant_not_found`).
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    /// The signer does not hold grant authority (`grant_unauthorized`).
+    #[oai(status = 403)]
+    Forbidden(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<GrantError> for SendGrantResponse {
+    fn from(error: GrantError) -> Self {
+        match error {
+            GrantError::NotFound => {
+                Self::NotFound(Json(ErrorBody::new("grant_not_found", "grant not found")))
+            }
+            GrantError::Unauthorized => Self::Forbidden(Json(ErrorBody::new(
+                "grant_unauthorized",
+                "the signer does not hold grant authority",
+            ))),
+            GrantError::InvalidRequest(reason) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", reason)))
+            }
+            GrantError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum PrepareRevokeGrantResponse {
+    #[oai(status = 200)]
+    Ok(Json<PrepareResponse<RevokeGrantResp>>),
+    /// The grant does not exist (`grant_not_found`).
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<GrantError> for PrepareRevokeGrantResponse {
+    fn from(error: GrantError) -> Self {
+        match error {
+            GrantError::NotFound => {
+                Self::NotFound(Json(ErrorBody::new("grant_not_found", "grant not found")))
+            }
+            GrantError::Unauthorized | GrantError::InvalidRequest(_) => Self::InternalError(Json(
+                ErrorBody::new("internal_error", "unexpected claim-phase failure during prepare"),
+            )),
+            GrantError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum PrepareRunUnderGrantResponse {
+    #[oai(status = 200)]
+    Ok(Json<PrepareResponse<RunUnderGrantResp>>),
+    /// The grant does not exist (`grant_not_found`).
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    /// The grant is revoked (`grant_revoked`).
+    #[oai(status = 403)]
+    Forbidden(Json<ErrorBody>),
+    /// The channel context does not match the grant
+    /// (`grant_principal_mismatch`), or the granted team has no durable
+    /// deployment (`team_not_durable`).
+    #[oai(status = 422)]
+    UnprocessableEntity(Json<ErrorBody>),
+    /// The grant's daily run cap is exhausted (`grant_caps_exceeded`).
+    #[oai(status = 429)]
+    TooManyRequests(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<RunUnderGrantError> for PrepareRunUnderGrantResponse {
+    fn from(error: RunUnderGrantError) -> Self {
+        match error {
+            RunUnderGrantError::GrantNotFound => {
+                Self::NotFound(Json(ErrorBody::new("grant_not_found", "grant not found")))
+            }
+            RunUnderGrantError::GrantRevoked => {
+                Self::Forbidden(Json(ErrorBody::new("grant_revoked", "grant is revoked")))
+            }
+            RunUnderGrantError::PrincipalMismatch => Self::UnprocessableEntity(Json(
+                ErrorBody::new(
+                    "grant_principal_mismatch",
+                    "channel context does not match the grant's principal",
+                ),
+            )),
+            RunUnderGrantError::TeamNotDurable => Self::UnprocessableEntity(Json(ErrorBody::new(
+                "team_not_durable",
+                "the granted team has no durable workflow deployment",
+            ))),
+            RunUnderGrantError::GrantCapsExceeded => Self::TooManyRequests(Json(ErrorBody::new(
+                "grant_caps_exceeded",
+                "grant daily run cap exhausted",
+            ))),
+            RunUnderGrantError::NotFinalized(_) => Self::InternalError(Json(ErrorBody::new(
+                "internal_error",
+                "unexpected claim-phase failure during prepare",
+            ))),
+            RunUnderGrantError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum SendRunUnderGrantResponse {
+    /// The run-state JSON read back from the observer after chain finality,
+    /// exactly as the plain run send returns it.
+    #[oai(status = 200)]
+    Ok(Json<serde_json::Value>),
+    /// The grant does not exist (`grant_not_found`).
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    /// The grant is revoked (`grant_revoked`).
+    #[oai(status = 403)]
+    Forbidden(Json<ErrorBody>),
+    /// The grant's daily run cap is exhausted (`grant_caps_exceeded`).
+    #[oai(status = 429)]
+    TooManyRequests(Json<ErrorBody>),
+    /// The channel wallet could not fund the deploy (`deploy_unfunded`).
+    #[oai(status = 402)]
+    PaymentRequired(Json<ErrorBody>),
+    /// The deploy was accepted but finality was not observed in time
+    /// (`deploy_not_finalized`); the run may still complete -- poll the run
+    /// state.
+    #[oai(status = 504)]
+    GatewayTimeout(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<RunUnderGrantError> for SendRunUnderGrantResponse {
+    fn from(error: RunUnderGrantError) -> Self {
+        match error {
+            RunUnderGrantError::GrantNotFound => {
+                Self::NotFound(Json(ErrorBody::new("grant_not_found", "grant not found")))
+            }
+            RunUnderGrantError::GrantRevoked => {
+                Self::Forbidden(Json(ErrorBody::new("grant_revoked", "grant is revoked")))
+            }
+            RunUnderGrantError::GrantCapsExceeded => Self::TooManyRequests(Json(ErrorBody::new(
+                "grant_caps_exceeded",
+                "grant daily run cap exhausted",
+            ))),
+            RunUnderGrantError::PrincipalMismatch | RunUnderGrantError::TeamNotDurable => {
+                Self::InternalError(Json(ErrorBody::new(
+                    "internal_error",
+                    "prepare-phase validation failed during send",
+                )))
+            }
+            RunUnderGrantError::NotFinalized(deploy_id) => {
+                Self::GatewayTimeout(Json(ErrorBody::new(
+                    "deploy_not_finalized",
+                    format!("run deploy {deploy_id} was not finalized; poll the run state"),
+                )))
+            }
+            RunUnderGrantError::Internal(err) if is_unfunded_deploy(&err) => {
+                Self::PaymentRequired(Json(ErrorBody::new(
+                    "deploy_unfunded",
+                    format!("{err:?}"),
+                )))
+            }
+            RunUnderGrantError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum PreparePublishToMailResponse {
+    #[oai(status = 200)]
+    Ok(Json<PrepareResponse<PublishToMailResp>>),
+    /// The team does not exist under the address (`team_not_found`).
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    /// The address is already actively bound to a different team
+    /// (`binding_duplicate`).
+    #[oai(status = 409)]
+    Conflict(Json<ErrorBody>),
+    /// The address fails the grammar (`invalid_mail_address`), or the team
+    /// has no deployment to bind (`team_not_deployed`).
+    #[oai(status = 422)]
+    UnprocessableEntity(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<PublishToMailError> for PreparePublishToMailResponse {
+    fn from(error: PublishToMailError) -> Self {
+        match error {
+            PublishToMailError::NotFound => Self::NotFound(Json(ErrorBody::new(
+                "team_not_found",
+                "the team does not exist under the address",
+            ))),
+            PublishToMailError::BindingDuplicate => Self::Conflict(Json(ErrorBody::new(
+                "binding_duplicate",
+                "the mail address is already bound to another team",
+            ))),
+            PublishToMailError::InvalidAddress(reason) => {
+                Self::UnprocessableEntity(Json(ErrorBody::new("invalid_mail_address", reason)))
+            }
+            PublishToMailError::NotDeployed => Self::UnprocessableEntity(Json(ErrorBody::new(
+                "team_not_deployed",
+                "the team has no deployment to bind",
+            ))),
+            PublishToMailError::Unauthorized => Self::InternalError(Json(ErrorBody::new(
+                "internal_error",
+                "unexpected claim-phase failure during prepare",
+            ))),
+            PublishToMailError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum PrepareUnpublishMailResponse {
+    #[oai(status = 200)]
+    Ok(Json<PrepareResponse<UnpublishMailResp>>),
+    /// No active mail binding exists for the team (`binding_not_found`).
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<PublishToMailError> for PrepareUnpublishMailResponse {
+    fn from(error: PublishToMailError) -> Self {
+        match error {
+            PublishToMailError::NotFound => Self::NotFound(Json(ErrorBody::new(
+                "binding_not_found",
+                "no active mail binding exists for the team",
+            ))),
+            PublishToMailError::BindingDuplicate
+            | PublishToMailError::InvalidAddress(_)
+            | PublishToMailError::NotDeployed
+            | PublishToMailError::Unauthorized => Self::InternalError(Json(ErrorBody::new(
+                "internal_error",
+                "unexpected claim-phase failure during prepare",
+            ))),
+            PublishToMailError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
+        }
+    }
+}
+
+#[derive(Debug, ApiResponse)]
+pub enum SendPublishToMailResponse {
+    #[oai(status = 200)]
+    Ok(Json<crate::api::common::SendResp>),
+    /// The address is already actively bound to a different team
+    /// (`binding_duplicate`).
+    #[oai(status = 409)]
+    Conflict(Json<ErrorBody>),
+    /// The signer does not own the team (`binding_unauthorized`).
+    #[oai(status = 403)]
+    Forbidden(Json<ErrorBody>),
+    /// No active binding exists (`binding_not_found`); unpublish only.
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+
+impl From<PublishToMailError> for SendPublishToMailResponse {
+    fn from(error: PublishToMailError) -> Self {
+        match error {
+            PublishToMailError::BindingDuplicate => Self::Conflict(Json(ErrorBody::new(
+                "binding_duplicate",
+                "the mail address is already bound to another team",
+            ))),
+            PublishToMailError::Unauthorized => Self::Forbidden(Json(ErrorBody::new(
+                "binding_unauthorized",
+                "the signer does not own the team",
+            ))),
+            PublishToMailError::NotFound => Self::NotFound(Json(ErrorBody::new(
+                "binding_not_found",
+                "no active mail binding exists for the team",
+            ))),
+            PublishToMailError::NotDeployed | PublishToMailError::InvalidAddress(_) => {
+                Self::InternalError(Json(ErrorBody::new(
+                    "internal_error",
+                    "prepare-phase validation failed during send",
+                )))
+            }
+            PublishToMailError::Internal(err) => {
+                Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
+            }
         }
     }
 }

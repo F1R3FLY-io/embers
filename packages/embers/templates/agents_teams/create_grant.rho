@@ -1,0 +1,22 @@
+new deployId(`rho:rchain:deployId`), rl(`rho:registry:lookup`),
+    agentsTeamsCh, acknowledged, forward
+in {
+    contract forward(@value, destination) = { destination!(value) } |
+    rl!({{ env_uri }}, *agentsTeamsCh) |
+    for(@(_, agentsTeams) <- agentsTeamsCh) {
+        @agentsTeams!("createGrant",
+            {{ grant_id }},
+            {{ grantee }},
+            {{ channel }},
+            {{ channel_principal }},
+            {{ agents_team }},
+            {{ caps }},
+            {{ authority }},
+            {{ require_token_hash }},
+            {{ min_auth }},
+            *acknowledged) |
+        for(@ack <- acknowledged) {
+            forward!(ack, (*deployId).toString())
+        }
+    }
+}

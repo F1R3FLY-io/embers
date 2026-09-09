@@ -25,8 +25,16 @@ use crate::domain::common::deserialize_decrypted;
 /// On-chain registry schema version. Increment whenever the private persistent
 /// state or public contract semantics change so an existing environment key is
 /// upgraded atomically by `insertSigned` on the next bootstrap.
-const AGENTS_TEAMS_ENV_VERSION: i64 = 2;
+///
+/// Version 3 adds the channel-connector layer: grant records with day-capped
+/// run counters, channel bindings, `beginDurableRunUnderGrant`, and the
+/// grantee branches of `claimOutputReveal` and `claimCommand`. A version bump
+/// deploys a fresh environment instance with empty state channels: development
+/// stacks reset with it, while production requires a v2-to-v3 state-migration
+/// deploy before rollout.
+const AGENTS_TEAMS_ENV_VERSION: i64 = 3;
 
+mod channels;
 mod compilation;
 pub mod continuation_store;
 mod create;
@@ -34,11 +42,13 @@ mod delete;
 mod deploy;
 mod get;
 mod get_run;
+mod grants;
 mod list;
 mod list_versions;
 pub mod models;
 mod orchestration;
 mod publish_to_firesky;
+mod publish_to_mail;
 mod published_state;
 mod recovery;
 mod referencing_teams;
@@ -46,6 +56,7 @@ mod reveal_output;
 mod run_agents_team;
 mod run_commands;
 mod run_on_firesky;
+mod run_under_grant;
 pub mod runtime;
 mod save;
 #[cfg(test)]
@@ -57,7 +68,10 @@ pub(crate) mod testing;
 mod unpublish;
 pub mod workflow;
 
+pub use grants::GrantError;
+pub use publish_to_mail::PublishToMailError;
 pub use reveal_output::RevealOutputError;
+pub use run_under_grant::RunUnderGrantError;
 
 #[derive(Clone)]
 pub struct AgentsTeamsService<
@@ -229,6 +243,33 @@ mod template_tests {
         assert!(code.contains("for(@runs <- runsCh)"));
         assert!(code.contains("for(@runs <<- runsCh)"));
         assert!(!code.contains("runsMapCh"));
+
+        // Version 3: the channel-connector layer.
+        assert!(code.contains("grantsCh!({})"));
+        assert!(code.contains("bindingsCh!({})"));
+        assert!(code.contains("\"createGrant\""));
+        assert!(code.contains("\"revokeGrant\""));
+        assert!(code.contains("\"getGrant\""));
+        assert!(code.contains("\"listGrantsByGrantor\""));
+        assert!(code.contains("\"listGrantsByGrantee\""));
+        assert!(code.contains("\"listGrantsForTeam\""));
+        assert!(code.contains("\"beginDurableRunUnderGrant\""));
+        assert!(code.contains("\"saveChannelBinding\""));
+        assert!(code.contains("\"setChannelBindingActive\""));
+        assert!(code.contains("\"listChannelBindings\""));
+        assert!(code.contains("\"getChannelBindingsForTeam\""));
+        // The atomic adjudication join: runs and grants taken together.
+        assert!(code.contains("for(@address <- deployerAddressCh; @runs <- runsCh; @grants <- grantsCh)"));
+        // The UTC-epoch-day counter divides the millisecond deploy timestamp.
+        assert!(code.contains("timestamp / 86400000"));
+        // Ledger datetimes are epoch seconds; deployData stamps are milliseconds.
+        assert!(code.contains("timestamp / 1000"));
+        // The grantee branches of reveal and command authority.
+        assert!(code.contains("grant.get(\"authority\").get(\"reveal\")"));
+        assert!(code.contains("grant.get(\"authority\").get(\"commands\").contains(command_class)"));
+        // The public enumeration scrubs the grant link alongside the owner.
+        assert!(code.contains("run.delete(\"owner\").delete(\"grant_id\")"));
+
         let uri_str: &str = env_uri.as_ref();
         assert!(code.contains(uri_str));
     }

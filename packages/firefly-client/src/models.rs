@@ -417,10 +417,19 @@ impl TryFrom<String> for Uri {
 
     fn try_from(value: String) -> Result<Self, Self::Error> {
         const HASH_SIZE: usize = <Blake2b<U32> as OutputSizeUser>::OutputSize::USIZE;
+        // 270 bits at 5 bits per character. zbase32 0.1.2 PANICS ("slice too
+        // short") instead of erroring when the input carries fewer bits than
+        // requested, so the length must be rejected before decode -- this
+        // parse runs on request paths, where a panic is a connection-killing
+        // crash an attacker can trigger with a short URI.
+        const ENCODED_LEN: usize = 270usize.div_ceil(5);
 
         let encoded = value
             .strip_prefix("rho:id:")
             .ok_or(Self::Error::IvalidPrefix)?;
+        if encoded.len() < ENCODED_LEN {
+            return Err(Self::Error::InvalidDecodedLength);
+        }
         let decoded = zbase32::decode_str(encoded, 270).map_err(Self::Error::InvalidZBase32)?;
         let bytes: [u8; HASH_SIZE + 2] = decoded
             .try_into()
@@ -585,6 +594,24 @@ mod tests {
         assert!(
             matches!(result.unwrap_err(), ParseUriError::InvalidZBase32(_)),
             "expected InvalidZBase32 variant"
+        );
+    }
+
+    #[test]
+    fn uri_try_from_short_input_errors_instead_of_panicking() {
+        // zbase32 0.1.2 panics when asked for more bits than the input
+        // holds; the parse must reject short URIs BEFORE decode, because it
+        // runs on request paths where a panic kills the connection.
+        let result = Uri::try_from("rho:id:abc".to_string());
+        assert!(
+            matches!(result.unwrap_err(), ParseUriError::InvalidDecodedLength),
+            "short input must be a parse error, never a panic"
+        );
+
+        let empty = Uri::try_from("rho:id:".to_string());
+        assert!(
+            matches!(empty.unwrap_err(), ParseUriError::InvalidDecodedLength),
+            "empty payload must be a parse error, never a panic"
         );
     }
 

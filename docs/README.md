@@ -1,11 +1,12 @@
 # Embers backend documentation
 
 Embers is the Rust backend that fronts the F1r3fly stack: it serves an HTTP API
-(55 operations) through which wallets, AI agents, agent teams, and OSLF documents
+(69 operations) through which wallets, AI agents, agent teams, and OSLF documents
 are read, created, deployed, run, and published. It deploys Rholang to f1r3node
 validators, reads results back from observer nodes, runs a durable agent-team
 workflow kernel over an encrypted F1r3drive-backed store, and integrates with the
-F1r3sky (AT Protocol) social layer.
+F1r3sky (AT Protocol) social layer plus — through the grant-based
+channel-connector layer — the F1R3BotGateway chat platforms and F1R3Mail.
 
 This directory is the backend's documentation. The **canonical agent-teams
 theory** — statechart and operational semantics, the durable-execution and
@@ -31,7 +32,9 @@ the executable backend.
 - **Reviewing security** → [`security/`](security/) — the
   [security model](security/security-model.md) and the key inventory.
 - **Integrations** → [`integrations/`](integrations/) — f1r3drive, F1r3sky/AT
-  Protocol, events-sync, state-sync.
+  Protocol, events-sync, state-sync, and the two grant-based channel
+  connectors: [F1R3BotGateway chat](integrations/f1r3botgateway.md) and
+  [F1R3Mail](integrations/f1r3mail.md).
 - **Testing and verification** → [`testing/`](testing/) and the
   [formal-verification program](formal/README.md) with its
   [invariant registry](formal/INVARIANTS.md).

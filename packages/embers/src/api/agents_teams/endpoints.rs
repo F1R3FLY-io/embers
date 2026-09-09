@@ -17,27 +17,48 @@ use poem_openapi::payload::Json;
 use crate::api::agents_teams::models::{
     AgentsTeam,
     AgentsTeams,
+    ChannelBinding,
     CreateAgentsTeamReq,
     CreateAgentsTeamResp,
+    CreateGrantReq,
+    CreateGrantResp,
     DeleteAgentsTeamResp,
     DeployAgentsTeamReq,
     DeployAgentsTeamResp,
     DeploySignedAgentsTeamReq,
     DeploySignedRunOnFireskyReq,
+    ErrorBody,
+    Grant,
+    GrantChannel,
+    PrepareCreateGrantResponse,
+    PreparePublishToMailResponse,
     PrepareRevealOutputResponse,
+    PrepareRevokeGrantResponse,
+    PrepareRunUnderGrantResponse,
+    PrepareUnpublishMailResponse,
     PublishToFireskyReq,
     PublishToFireskyResp,
+    PublishToMailReq,
+    PublishToMailResp,
+    PublishedChannels,
     PublishedState,
     ReferencingTeam,
     RevealOutputResp,
+    RevokeGrantResp,
     RunCommandReq,
     RunCommandResp,
     RunReq,
     RunResp,
     RunState,
+    RunUnderGrantReq,
+    RunUnderGrantResp,
     SaveAgentsTeamReq,
     SaveAgentsTeamResp,
+    SendGrantResponse,
+    SendPublishToMailResponse,
     SendRevealOutputResponse,
+    SendRunUnderGrantResponse,
+    UnpublishMailResp,
 };
 use crate::api::common::{ApiResult, ApiTags, MaybeNotFound, PrepareResponse, SendRequest, SendResp, SignedContract, Stringified, VoidResult};
 use crate::domain::agents::AgentsService;
@@ -525,6 +546,353 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         agents_teams
             .deploy_signed_publish_to_firesky(body.request.into())
             .await
+            .into()
+    }
+
+    /// Prepares a standing channel grant: "channel identity C may initiate
+    /// runs of team T owned by me, within caps, with the delegated
+    /// authority". The grantor signs in the environment where their key
+    /// lives; the chain derives the grantor from the deploy's signer.
+    #[oai(
+        path = "/grants/create/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_create_grant"
+    )]
+    async fn prepare_create_grant(
+        &self,
+        Json(body): Json<CreateGrantReq>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> PrepareCreateGrantResponse {
+        match PrepareResponse::from_call(
+            body,
+            |body| agents_teams.prepare_create_grant(body.into()),
+            encoding_key,
+        )
+        .await
+        {
+            Ok(response) => PrepareCreateGrantResponse::Ok(Json(response)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/grants/create/send",
+        method = "post",
+        operation_id = "agents_teams_send_create_grant"
+    )]
+    async fn send_create_grant(
+        &self,
+        SendRequest(body): SendRequest<SignedContract, CreateGrantReq, CreateGrantResp>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> SendGrantResponse {
+        match agents_teams
+            .deploy_signed_create_grant(models::DeploySignedCreateGrantReq {
+                contract: body.request.into(),
+                prepare_request: body.prepare_request.into(),
+                prepare_response: body.prepare_response.into(),
+            })
+            .await
+        {
+            Ok(deploy_id) => SendGrantResponse::Ok(Json(deploy_id.into())),
+            Err(error) => error.into(),
+        }
+    }
+
+    /// Prepares a grant revocation. Revocation is delivery-only for in-flight
+    /// runs: they complete for their owner, while the grantee's reveal and
+    /// command claims fail from the moment of revocation. The grantor keeps
+    /// `cancel` through the ordinary command envelope.
+    #[oai(
+        path = "/grants/:grant_id/revoke/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_revoke_grant"
+    )]
+    async fn prepare_revoke_grant(
+        &self,
+        Path(grant_id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> PrepareRevokeGrantResponse {
+        match PrepareResponse::from_call(
+            grant_id,
+            |grant_id| agents_teams.prepare_revoke_grant(models::RevokeGrantReq { grant_id }),
+            encoding_key,
+        )
+        .await
+        {
+            Ok(response) => PrepareRevokeGrantResponse::Ok(Json(response)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/grants/:grant_id/revoke/send",
+        method = "post",
+        operation_id = "agents_teams_send_revoke_grant"
+    )]
+    async fn send_revoke_grant(
+        &self,
+        Path(grant_id): Path<String>,
+        SendRequest(body): SendRequest<SignedContract, String, RevokeGrantResp>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> SendGrantResponse {
+        if body.prepare_request != grant_id {
+            return SendGrantResponse::InternalError(Json(ErrorBody::new(
+                "internal_error",
+                "grant revocation id differs from the prepared grant",
+            )));
+        }
+        match agents_teams
+            .deploy_signed_revoke_grant(models::DeploySignedRevokeGrantReq {
+                contract: body.request.into(),
+                prepare_request: models::RevokeGrantReq { grant_id },
+                prepare_response: body.prepare_response.into(),
+            })
+            .await
+        {
+            Ok(deploy_id) => SendGrantResponse::Ok(Json(deploy_id.into())),
+            Err(error) => error.into(),
+        }
+    }
+
+    /// Grants created by a wallet, for the grant-management interface.
+    /// Revoked grants are included, flagged.
+    #[oai(
+        path = "/grants/by-grantor/:address",
+        method = "get",
+        operation_id = "agents_teams_grants_by_grantor"
+    )]
+    async fn grants_by_grantor(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> ApiResult<Vec<Grant>> {
+        agents_teams
+            .list_grants_by_grantor(address.0.as_ref().to_owned())
+            .await
+            .map(|grants| grants.into_iter().map(Into::into).collect::<Vec<Grant>>())
+            .into()
+    }
+
+    /// Grants naming a channel wallet as grantee. An operations cross-check:
+    /// channel services consume the observer-readable chain clause directly
+    /// and use this mirror only for diagnostics.
+    #[oai(
+        path = "/grants/by-grantee/:address",
+        method = "get",
+        operation_id = "agents_teams_grants_by_grantee"
+    )]
+    async fn grants_by_grantee(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> ApiResult<Vec<Grant>> {
+        agents_teams
+            .list_grants_by_grantee(address.0.as_ref().to_owned())
+            .await
+            .map(|grants| grants.into_iter().map(Into::into).collect::<Vec<Grant>>())
+            .into()
+    }
+
+    /// Prepares a run under a grant: the channel wallet signs and pays the
+    /// deploy, the grantor owns the run, and the chain adjudicates the grant
+    /// atomically with run registration. Durable teams only.
+    #[oai(
+        path = "/run-under-grant/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_run_under_grant"
+    )]
+    async fn prepare_run_under_grant(
+        &self,
+        Json(body): Json<RunUnderGrantReq>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> PrepareRunUnderGrantResponse {
+        match PrepareResponse::from_call(
+            body,
+            |body| agents_teams.prepare_run_under_grant(body.into()),
+            encoding_key,
+        )
+        .await
+        {
+            Ok(response) => PrepareRunUnderGrantResponse::Ok(Json(response)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/run-under-grant/send",
+        method = "post",
+        operation_id = "agents_teams_send_run_under_grant"
+    )]
+    async fn send_run_under_grant(
+        &self,
+        SendRequest(body): SendRequest<SignedContract, RunUnderGrantReq, RunUnderGrantResp>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> SendRunUnderGrantResponse {
+        match agents_teams
+            .deploy_signed_run_under_grant(models::DeploySignedRunUnderGrantReq {
+                contract: body.request.into(),
+                prepare_request: body.prepare_request.into(),
+                prepare_response: body.prepare_response.into(),
+            })
+            .await
+        {
+            Ok(value) => SendRunUnderGrantResponse::Ok(Json(value)),
+            Err(error) => error.into(),
+        }
+    }
+
+    /// Prepares a mail binding: `local@domain` recognized by the mail
+    /// channel, bound on chain to the team's deployed registry URI. The
+    /// prepare is side-effect light -- a pure render plus a uniqueness read
+    /// -- and the binding carries no key material.
+    #[oai(
+        path = "/:address/:id/publish-to-mail/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_publish_to_mail"
+    )]
+    async fn prepare_publish_to_mail(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Path(id): Path<String>,
+        Json(body): Json<PublishToMailReq>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> PreparePublishToMailResponse {
+        match PrepareResponse::from_call(
+            body,
+            |body| agents_teams.prepare_publish_to_mail(address.into(), body.into_domain(id)),
+            encoding_key,
+        )
+        .await
+        {
+            Ok(response) => PreparePublishToMailResponse::Ok(Json(response)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/:address/:id/publish-to-mail/send",
+        method = "post",
+        operation_id = "agents_teams_send_publish_to_mail"
+    )]
+    async fn send_publish_to_mail(
+        &self,
+        #[allow(unused_variables)] Path(address): Path<Stringified<WalletAddress>>,
+        Path(id): Path<String>,
+        SendRequest(body): SendRequest<SignedContract, PublishToMailReq, PublishToMailResp>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> SendPublishToMailResponse {
+        match agents_teams
+            .deploy_signed_publish_to_mail(models::DeploySignedPublishToMailReq {
+                contract: body.request.into(),
+                prepare_request: body.prepare_request.into_domain(id),
+                prepare_response: body.prepare_response.into(),
+            })
+            .await
+        {
+            Ok(deploy_id) => SendPublishToMailResponse::Ok(Json(deploy_id.into())),
+            Err(error) => error.into(),
+        }
+    }
+
+    /// Prepares deactivation of the team's mail binding. Reversible: the
+    /// binding record is kept and publishing again reactivates the address.
+    #[oai(
+        path = "/:address/:id/unpublish-mail/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_unpublish_mail"
+    )]
+    async fn prepare_unpublish_mail(
+        &self,
+        #[allow(unused_variables)] Path(address): Path<Stringified<WalletAddress>>,
+        Path(id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+        Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> PrepareUnpublishMailResponse {
+        match PrepareResponse::from_call(
+            id,
+            |team_id| agents_teams.prepare_unpublish_mail(models::UnpublishMailReq { team_id }),
+            encoding_key,
+        )
+        .await
+        {
+            Ok(response) => PrepareUnpublishMailResponse::Ok(Json(response)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/:address/:id/unpublish-mail/send",
+        method = "post",
+        operation_id = "agents_teams_send_unpublish_mail"
+    )]
+    async fn send_unpublish_mail(
+        &self,
+        #[allow(unused_variables)] Path(address): Path<Stringified<WalletAddress>>,
+        Path(id): Path<String>,
+        SendRequest(body): SendRequest<SignedContract, String, UnpublishMailResp>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> SendPublishToMailResponse {
+        if body.prepare_request != id {
+            return SendPublishToMailResponse::InternalError(Json(ErrorBody::new(
+                "internal_error",
+                "mail unpublish team id differs from the prepared team",
+            )));
+        }
+        match agents_teams
+            .deploy_signed_unpublish_mail(models::DeploySignedUnpublishMailReq {
+                contract: body.request.into(),
+                prepare_request: models::UnpublishMailReq { team_id: id },
+                prepare_response: body.prepare_response.into(),
+            })
+            .await
+        {
+            Ok(deploy_id) => SendPublishToMailResponse::Ok(Json(deploy_id.into())),
+            Err(error) => error.into(),
+        }
+    }
+
+    /// Where the team is reachable, per channel, with honestly three-valued
+    /// reachability. Mail reachability is never asserted (embers does not
+    /// probe SMTP); chat reachability is derived from grant presence.
+    #[oai(
+        path = "/:address/:id/published-channels",
+        method = "get",
+        operation_id = "agents_teams_published_channels"
+    )]
+    async fn published_channels(
+        &self,
+        Path(address): Path<Stringified<WalletAddress>>,
+        Path(id): Path<String>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> ApiResult<PublishedChannels> {
+        agents_teams.published_channels(address.0, id).await.into()
+    }
+
+    /// Every binding for a channel, an HTTP mirror of the observer-readable
+    /// chain clause for UI and operations.
+    #[oai(
+        path = "/bindings/by-channel/:channel",
+        method = "get",
+        operation_id = "agents_teams_bindings_by_channel"
+    )]
+    async fn bindings_by_channel(
+        &self,
+        Path(channel): Path<GrantChannel>,
+        Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> ApiResult<Vec<ChannelBinding>> {
+        agents_teams
+            .list_channel_bindings(channel.as_str().to_owned())
+            .await
+            .map(|bindings| {
+                bindings
+                    .into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<ChannelBinding>>()
+            })
             .into()
     }
 }

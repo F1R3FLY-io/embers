@@ -69,6 +69,10 @@ pub struct DurableRunRequest {
     pub agents_team: String,
     pub prompt: String,
     pub created_at: DateTime<Utc>,
+    /// Present exactly on grant-initiated runs (schema v3); plain runs keep
+    /// writing v2 without it, and v2 artifacts deserialize with `None` here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub channel_context: Option<crate::domain::agents_teams::models::ChannelContext>,
 }
 
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
@@ -94,6 +98,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             agents_team: request.agents_team.as_ref().to_owned(),
             prompt: request.prompt.clone(),
             created_at,
+            channel_context: None,
         };
         let request_pointer = self.continuation_store.put(
             ArtifactKind::RunRequest,

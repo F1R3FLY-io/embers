@@ -89,6 +89,8 @@ pub struct AgentsTeam {
 pub struct RunState {
     pub run_id: String,
     pub agents_team: Uri,
+    #[serde(default)]
+    pub grant_id: Option<String>,
     pub created_at: DateTime,
     pub status: String,
     pub events: Vec<RunEvent>,
@@ -164,6 +166,58 @@ pub struct FireskyCredentials {
 pub struct EncryptedMsg {
     pub ciphertext: Hex,
     pub nonce: Hex,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::Grant))]
+pub struct Grant {
+    pub grant_id: String,
+    pub grantor: String,
+    pub grantee: String,
+    pub channel: String,
+    pub channel_principal: String,
+    pub agents_team: Uri,
+    pub caps: GrantCaps,
+    pub authority: GrantAuthority,
+    #[serde(default)]
+    pub require_token_hash: Option<String>,
+    pub min_auth: String,
+    pub created_at: DateTime,
+    pub revoked: bool,
+    pub runs_today: GrantRunsToday,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::GrantCaps))]
+pub struct GrantCaps {
+    #[serde(default)]
+    pub max_runs_per_day: Option<i64>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::GrantAuthority))]
+pub struct GrantAuthority {
+    pub reveal: bool,
+    pub commands: Vec<String>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::GrantRunsToday))]
+pub struct GrantRunsToday {
+    pub day: i64,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::ChannelBinding))]
+pub struct ChannelBinding {
+    pub channel: String,
+    pub address: String,
+    pub agents_team: Uri,
+    pub team_id: String,
+    pub owner: String,
+    pub active: bool,
+    pub created_at: DateTime,
 }
 
 #[cfg(test)]

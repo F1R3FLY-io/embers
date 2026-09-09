@@ -1,0 +1,16 @@
+new rl(`rho:registry:lookup`), agentsTeamsCh, acknowledged in {
+    rl!({{ env_uri }}, *agentsTeamsCh) |
+    for(@(_, agentsTeams) <- agentsTeamsCh) {
+        @agentsTeams!("beginDurableRunUnderGrant",
+            {{ run_id }},
+            {{ grant_id }},
+            {{ agents_team }},
+            {{ created_at }},
+            {{ definition_hash }},
+            {{ request_content_hash }},
+            {{ request_capability_hash }},
+            {{ continuation_content_hash }},
+            {{ continuation_capability_hash }},
+            *acknowledged)
+    }
+}

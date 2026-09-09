@@ -34,7 +34,13 @@ pair "atomically claims and applies one durable command against an exact run rev
 - **Authorization is adjudicated on chain**: the run owner and the configured Embers
   service hold run-level authority for every command class; a delegated approver may
   decide exactly the wait named in their grant
-  (`approval_authority_grants`). The full model is in
+  (`approval_authority_grants`); and, for a run initiated
+  [under a channel grant](run-under-grant.md), the grant's grantee wallet may issue
+  exactly the command classes the grantor delegated — checked at claim time against
+  the live grant (`grantee` matches the signer, not revoked, class listed), and only
+  on runs carrying that grant's link, so one grant never commands another grant's
+  runs. An unauthorized claim aborts on chain and surfaces as a 500 on this
+  pre-connector surface. The full model is in
   [Durable and hierarchical execution](../../../../../embers-frontend/docs/agent-teams/architecture/durable-execution.md)
   and the [threat model](../../../../../embers-frontend/docs/agent-teams/security/threat-model.md).
 
@@ -172,6 +178,15 @@ compare-and-set and does not double-apply; the readback shows the revision havin
 once. A stale-revision outcome is the signal to refresh and re-issue against the observed
 revision. Approvals are additionally idempotent per actor via `decision_id` uniqueness.
 
+Machine clients exercising the grant branch build on both properties: the chat
+gateway derives one deterministic `decision_id` per platform message
+(`author_hash + ":" + message_id`), so a platform redelivery replays the same
+decision, and answers a stale fence with a single re-read-and-re-issue carrying
+the **same** decision id. Channels restrict who may trigger these commands to
+the run's initiator — accepting a bystander's approval would launder their
+intent through the initiator's grant; the wait-level delegated-approver ACL is
+the sanctioned second-decider path.
+
 ## Sequence
 
 ![Run commands sequence](../../diagrams/ai-agents-teams/run-commands.svg)
@@ -207,6 +222,8 @@ const { sendResponse } = await sdk.agentsTeams.command(runId, {
 ## Related
 
 - [Run state](run-state.md) — the revision and waits a command cites.
+- [Run under grant](run-under-grant.md) — the runs whose grant branch this
+  clause adjudicates.
 - [Durable execution](../../../../../embers-frontend/docs/agent-teams/architecture/durable-execution.md) — the
   command envelope and authority table.
 - [Error semantics](../../http-api.md#error-semantics) — stale-revision and

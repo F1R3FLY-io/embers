@@ -31,6 +31,16 @@ Two implementation properties make the read trustworthy:
   claim rather than an earlier rejected attempt, and both inputs remain subsequences of
   the merged history.
 
+**Grant-initiated runs** ([run under grant](run-under-grant.md)) carry one extra
+field on this read: `grantId`, the on-chain link to the authorizing grant. It
+appears **only here**, on the capability-gated read — the public run enumeration
+scrubs it alongside `owner`, because grant records are public and name their
+grantor, and the link would de-anonymize the owner the ledger deliberately
+scrubs. Machine clients (the chat gateway's sweeper, the mail bridge's poll
+loop) treat this read as the correctness path: every outcome of a granted run is
+reachable from here plus a grantee [reveal](reveal-output.md), regardless of how
+the original send call ended.
+
 ## Request
 
 | Parameter | In | Type | Required | Meaning |
@@ -81,6 +91,12 @@ export interface RunState {
   dueAt?: TimestampMillis;
   /** The merged, ordered audit history — event types only. */
   events: Array<RunEvent>;
+  /**
+   * The grant a channel service initiated this run under, when there was
+   * one. Present on this capability-gated read; the public run enumeration
+   * scrubs it, because grant records are public and name their grantor.
+   */
+  grantId?: string;
   /** Capability commitment over the terminal output artifact. */
   outputCapabilityHash?: string;
   /** Content commitment over the terminal output artifact. */

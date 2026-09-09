@@ -1,0 +1,77 @@
+@startuml
+title POST /api/ai-agents-teams/run-under-grant/prepare + /send — channel-paid, grantor-owned run
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+participant "Channel service\n(gateway / mail bridge)" as Channel #C8E6DC
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "Continuation store\n(encrypted artifacts)" as Store #E8DACB
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+group Phase 1 — prepare (deploys nothing)
+Channel -> API : POST .../run-under-grant/prepare\n{grant_id, prompt, channel_context}
+API -> Domain : prepare run under grant
+Domain -> Chain : getGrant(grant_id)
+alt no grant
+Domain --> API : 404 {code: grant_not_found}
+else revoked
+Domain --> API : 403 {code: grant_revoked}
+else channel_context does not match the grant's\nchannel or principal
+Domain --> API : 422 {code: grant_principal_mismatch}
+else advisory day counter already at cap
+Domain --> API : 429 {code: grant_caps_exceeded}
+else granted team has no durable (Workflow v2) manifest
+Domain --> API : 422 {code: team_not_durable}\n(legacy GraphL output is never revealable)
+else admissible
+Domain -> Store : encrypted run request v3 (channel_context\ninside — never on the public ledger) +\ncontinuation revision-0
+Domain --> API : RunUnderGrantResp { run: RunResp,\n  grant_id, agents_team (resolved FROM the grant) }
+API --> Channel : PrepareResponse { response, token }
+end
+end
+
+group Sign and send
+Channel -> Channel : sign with the CHANNEL wallet\n(grantee and payer; the grantor owns the run)
+Channel -> API : POST .../run-under-grant/send\n{ echo, signed, token }
+API -> Domain : deploy signed run
+Domain -> Chain : deploy beginDurableRunUnderGrant
+note right of Chain #FFF0C7
+One atomic join over runsCh + grantsCh:
+signer == grantee, not revoked, team match,
+UTC-epoch-day counter, then registration with
+owner = grantor and grant_id. A resent
+same-signed envelope re-registers
+idempotently without a second cap unit.
+end note
+alt clause aborts
+Chain --> Domain : deploy errored
+Domain -> Chain : re-read the grant to classify honestly
+Domain --> API : 404 grant_not_found / 403 grant_revoked /\n429 grant_caps_exceeded / 500 internal_error
+else node refuses the deploy for funds
+Domain --> API : 402 {code: deploy_unfunded}\n(top up the channel wallet)
+else finality not observed in the window
+Domain --> API : 504 {code: deploy_not_finalized}\n— the run may still land: poll GET /runs/{run_id}
+else clause lands
+Chain --> Domain : finalized
+Domain -> Chain : verify registration: run_id, grant_id link,\nteam, created_at, revision 0, "running",\nall five hashes
+Domain -> Domain : resume the durable kernel\n(the same pipeline as a plain run)
+Domain --> API : run-state JSON readback
+API --> Channel : 200 run-state JSON
+end
+end
+
+note over Channel, Chain #FFF0C7
+The transport after registration is UNCHANGED from a plain
+run: poll GET /runs/{run_id}, reveal under the grant's
+authority, command under its delegated classes. Correctness
+never depends on this send call surviving.
+end note
+@enduml

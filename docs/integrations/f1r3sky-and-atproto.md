@@ -86,9 +86,22 @@ So the relationship between a PDS's Postgres and F1r3fly is no longer a design s
 it is these two deployed bridges. The migration doc is kept only as historical
 context.
 
+## Relationship to the channel-connector layer
+
+F1r3sky was the first external interface, and the grant-based channel-connector
+layer ([F1R3BotGateway chat](f1r3botgateway.md), [F1R3Mail](f1r3mail.md))
+**generalizes its pattern**: the mention-triggered run signed by the user's own
+wallet becomes a run under a standing, revocable on-chain grant, so channels
+whose service can never hold the user's key still start user-owned runs. This
+integration still runs its bespoke adapter (`run_on_firesky.rs`); migrating it
+onto the connector layer is a documented follow-on
+([ADR-004](../../../embers-frontend/docs/architecture/decisions/004-grant-based-channel-connectors.md)),
+not part of the connector change.
+
 ## Related
 
 - [events-sync integration](events-sync.md) · [state-sync integration](state-sync.md)
+- [F1R3BotGateway integration](f1r3botgateway.md) · [F1R3Mail integration](f1r3mail.md)
 - [deploy lifecycle and consistency](../architecture/deploy-lifecycle-and-consistency.md)
 - The publish/unpublish paths are covered by the PDS-dependent pytest modules (L2/L3;
   see [test architecture](../testing/test-architecture.md)).

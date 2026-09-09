@@ -41,15 +41,15 @@ wait timed out (an ambiguous outcome, see below).
 ## Finality and visibility are separate — the lag
 
 The read path hits the observer, whose state trails the validator by a brief
-window after finality. Define the **visibility lag** of a deploy `$`d`$` as the
+window after finality. Define the **visibility lag** of a deploy $`d`$ as the
 delay between its finalization and its readability on the observer:
 
 ```math
 L(d) \;=\; t_{\mathrm{vis}}(d) - t_{\mathrm{fin}}(d) \;\ge\; 0 .
 ```
 
-During `$`[t_{\mathrm{fin}}(d),\, t_{\mathrm{vis}}(d))`$` a read that logically must
-observe `$`d`$` (because the client just finalized it) returns *empty*. A
+During $`[t_{\mathrm{fin}}(d),\, t_{\mathrm{vis}}(d))`$ a read that logically must
+observe $`d`$ (because the client just finalized it) returns *empty*. A
 single-shot read-after-write therefore fails intermittently — worse under load,
 when the observer trails further. This is exactly the failure the project's
 "read-after-write retry" note records.
@@ -63,22 +63,22 @@ Its shape:
 - **Retry only on empty** (INV-C1): a retry fires only on the `ReturnValueMissing`
   (empty) result — never on any other error, which would be a genuine failure to
   surface immediately.
-- **Exponential backoff with jitter**: attempt `$`i`$` waits
+- **Exponential backoff with jitter**: attempt $`i`$ waits
 
   ```math
   w_i \;=\; \min\!\bigl(2^{i}\,\delta,\; 5\delta\bigr)\,(1 + J_i),
   ```
 
-  where `$`\delta`$` is the base delay, the term is capped at `$`5\delta`$`, and
-  `$`J_i`$` is per-attempt jitter.
-- **A total budget** `$`T`$` = `TOTAL_READ_BUDGET` = 150 s, with the tested
+  where $`\delta`$ is the base delay, the term is capped at $`5\delta`$, and
+  $`J_i`$ is per-attempt jitter.
+- **A total budget** $`T`$ = `TOTAL_READ_BUDGET` = 150 s, with the tested
   side-condition (INV-C5)
 
   ```math
   T \;\ge\; 2\,t_{\mathrm{req}}
   ```
 
-  (`read_node_client.rs:30, :658`; `$`t_{\mathrm{req}}`$` is `request_timeout`,
+  (`read_node_client.rs:30, :658`; $`t_{\mathrm{req}}`$ is `request_timeout`,
   60 s), so the budget always covers at least two full request attempts. The
   historical 45 s budget was too small — a real read once took 34 s — which is
   why it is 150 s today.
@@ -86,8 +86,8 @@ Its shape:
   is spent. So a genuinely-absent value still resolves to empty; a lagging value
   is waited out.
 
-The correctness condition follows: a read issued after `$`d`$`'s finality is
-guaranteed to observe `$`d`$` iff the lag fits the budget,
+The correctness condition follows: a read issued after $`d`$'s finality is
+guaranteed to observe $`d`$ iff the lag fits the budget,
 
 ```math
 L(d) \;\le\; T .

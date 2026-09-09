@@ -1,0 +1,64 @@
+@startuml
+title POST /api/ai-agents-teams/grants/create/prepare + /send — grantor-signed channel grant
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Grantor\n(team user)" as Grantor #FFD8C2
+participant "AgentsTeamsApiSdk\n.createGrant(req)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Grantor -> SDK : createGrant({grantee, channel,\nchannelPrincipal, agentsTeam, caps,\nauthority, requireToken, minAuth})
+
+group Phase 1 — prepare (deploys nothing)
+SDK -> API : POST .../grants/create/prepare
+API -> Domain : validate the vocabulary
+alt unknown channel / non-delegable command class /\nnon-positive cap / empty principal or grantee
+Domain --> API : 422 {code: grant_invalid_request}
+API --> SDK : refusal before anything is signed
+else legal request
+Domain -> Domain : mint grant_id (UUIDv7);\nwhen requireToken: mint 32 CSPRNG bytes,\nhash blake2b-256 -> only the digest enters\nthe contract; render createGrant
+Domain --> API : CreateGrantResp { grant_id, contract,\n  issued_at, require_token? }
+API --> SDK : PrepareResponse { response, token }
+note right of SDK #FFF6C9
+The token plaintext appears HERE, exactly
+once. It is never stored and cannot be
+recovered; surface it immediately.
+end note
+end
+end
+
+group Sign and send
+SDK -> SDK : sign the contract locally with the\nGRANTOR's wallet key (secp256k1)
+SDK -> API : POST .../grants/create/send\n{ echo, signed contract, token }
+API -> Domain : deploy signed createGrant
+Domain -> Chain : deploy
+note right of Chain #FFF0C7
+The clause derives the grantor from the
+deploy's signer — never from a parameter —
+so a grant can only ever bind its author.
+An existing grant_id with identical fields
+re-acknowledges; any difference aborts
+"grant identity conflict".
+end note
+alt clause aborts
+Chain --> Domain : deploy errored
+Domain --> API : 500 {code: internal_error}\n(grant identity conflict)
+else clause lands
+Chain --> Domain : finalized; acknowledgment true
+Domain -> Chain : registration readback: the grant\nmust be observable before the caller\nis told it exists
+Domain --> API : deploy id
+API --> SDK : 200 SendResp { deployId }
+SDK --> Grantor : grant active; channel services\ndiscover it by chain read
+end
+end
+@enduml

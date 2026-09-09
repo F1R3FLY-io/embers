@@ -214,6 +214,12 @@ pub struct DeploySignedRevealOutputReq {
 pub struct RunState {
     pub run_id: String,
     pub agents_team: Uri,
+    /// The grant a channel service initiated this run under, when there was
+    /// one. Present on capability-gated single-run reads; the public run
+    /// enumeration scrubs it, because grant records are public and name their
+    /// grantor, and carrying the link there would de-anonymize the owner the
+    /// ledger deliberately scrubs.
+    pub grant_id: Option<String>,
     pub created_at: DateTime<Utc>,
     pub status: String,
     pub events: Vec<RunEvent>,
@@ -320,6 +326,228 @@ pub struct PublishedState {
     /// old one. Nothing reported this, which is what makes "I re-deployed but
     /// nothing changed" so hard to diagnose.
     pub is_latest_deployment: bool,
+}
+
+/// A standing, revocable, on-chain delegation: "channel identity `grantee` may
+/// initiate runs of `agents_team` owned by me, within `caps`, and may exercise
+/// exactly the `authority` I delegated on those runs."
+///
+/// The grantor is derived on chain from the creating deploy's signer and is
+/// never accepted as input. Grants are public authorization facts; the only
+/// secret involved is the optional subject bearer token, of which the chain
+/// stores only a blake2b-256 hash.
+#[derive(Debug, Clone)]
+pub struct Grant {
+    pub grant_id: String,
+    pub grantor: String,
+    pub grantee: String,
+    pub channel: String,
+    pub channel_principal: String,
+    pub agents_team: Uri,
+    pub caps: GrantCaps,
+    pub authority: GrantAuthority,
+    pub require_token_hash: Option<String>,
+    pub min_auth: String,
+    pub created_at: DateTime<Utc>,
+    pub revoked: bool,
+    pub runs_today: GrantRunsToday,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrantCaps {
+    /// UTC-epoch-day run ceiling; `None` means uncapped. The window resets by
+    /// day-number comparison, so up to twice the cap can land across one
+    /// midnight boundary; the cap is an abuse throttle, not an invariant.
+    pub max_runs_per_day: Option<i64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrantAuthority {
+    /// Whether the grantee may reveal outputs of runs initiated under this
+    /// grant, for delivery over the channel.
+    pub reveal: bool,
+    /// The command classes (subset of the run-command envelope kinds) the
+    /// grantee may issue on runs initiated under this grant.
+    pub commands: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GrantRunsToday {
+    pub day: i64,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateGrantReq {
+    pub grantee: String,
+    pub channel: String,
+    pub channel_principal: String,
+    pub agents_team: Uri,
+    pub caps: GrantCaps,
+    pub authority: GrantAuthority,
+    /// When true the server mints a random subject bearer token, returns its
+    /// plaintext exactly once in the prepare response, and the contract stores
+    /// only the token's blake2b-256 hex digest.
+    pub require_token: bool,
+    pub min_auth: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct CreateGrantResp {
+    pub grant_id: String,
+    pub contract: PreparedContract,
+    pub issued_at: DateTime<Utc>,
+    /// The minted subject token, present exactly once when requested; it is
+    /// never stored and cannot be recovered later.
+    pub require_token: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedCreateGrantReq {
+    pub contract: SignedCode,
+    pub prepare_request: CreateGrantReq,
+    pub prepare_response: CreateGrantResp,
+}
+
+#[derive(Debug, Clone)]
+pub struct RevokeGrantReq {
+    pub grant_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct RevokeGrantResp {
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedRevokeGrantReq {
+    pub contract: SignedCode,
+    pub prepare_request: RevokeGrantReq,
+    pub prepare_response: RevokeGrantResp,
+}
+
+/// Channel-supplied provenance for a run initiated under a grant. Stored only
+/// inside the encrypted durable run-request artifact: the principal and
+/// subject are PII-adjacent, and the public run ledger is metadata-only by
+/// design. The public ledger records only the grant id.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ChannelContext {
+    pub channel: String,
+    /// Must equal the grant's `channel_principal`; embers fails fast on
+    /// mismatch and the channel service enforces the actual routing.
+    pub principal: String,
+    /// The channel's content-derived idempotency handle for the triggering
+    /// message. Recorded for audit; embers does not dedupe on it, channels own
+    /// their dedup discipline.
+    pub message_fingerprint: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunUnderGrantReq {
+    pub grant_id: String,
+    pub prompt: String,
+    pub channel_context: ChannelContext,
+}
+
+#[derive(Debug, Clone)]
+pub struct RunUnderGrantResp {
+    pub run: RunResp,
+    pub grant_id: String,
+    /// The team the grant names; the request never carries a team, so the
+    /// caller learns the resolved target here.
+    pub agents_team: Uri,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedRunUnderGrantReq {
+    pub contract: SignedCode,
+    pub prepare_request: RunUnderGrantReq,
+    pub prepare_response: RunUnderGrantResp,
+}
+
+/// A team's public reachability record for one channel: the address the
+/// channel recognizes, bound on chain by the team's owner. Carries no key
+/// material; channel-side secrets (such as mailbox content keys) are minted
+/// and custodied by the channel service, never by embers.
+#[derive(Debug, Clone)]
+pub struct ChannelBinding {
+    pub channel: String,
+    pub address: String,
+    pub agents_team: Uri,
+    pub team_id: String,
+    pub owner: String,
+    pub active: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PublishToMailReq {
+    pub team_id: String,
+    pub local_part: String,
+    pub mail_domain: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct PublishToMailResp {
+    pub address: String,
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedPublishToMailReq {
+    pub contract: SignedCode,
+    pub prepare_request: PublishToMailReq,
+    pub prepare_response: PublishToMailResp,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnpublishMailReq {
+    pub team_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct UnpublishMailResp {
+    pub address: String,
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
+pub struct DeploySignedUnpublishMailReq {
+    pub contract: SignedCode,
+    pub prepare_request: UnpublishMailReq,
+    pub prepare_response: UnpublishMailResp,
+}
+
+/// Where a team is reachable, per channel, with honestly three-valued
+/// reachability: `Some(true)` verified reachable, `Some(false)` verified
+/// unreachable, `None` could not be determined and must never be rendered as
+/// missing.
+#[derive(Debug, Clone)]
+pub struct PublishedChannels {
+    pub firesky: Option<PublishedState>,
+    pub mail: Vec<MailChannelState>,
+    pub chat: ChatChannelState,
+}
+
+#[derive(Debug, Clone)]
+pub struct MailChannelState {
+    pub address: String,
+    pub active: bool,
+    /// Always `None` today: embers deliberately does not probe SMTP, so mail
+    /// reachability is unknown by design rather than falsely asserted.
+    pub reachable: Option<bool>,
+}
+
+/// Chat reachability is derived from grant presence: a team with active chat
+/// grants is connectable by exactly those principals. The gateway exposes no
+/// queryable status surface, so this is the honest maximum embers can say.
+#[derive(Debug, Clone)]
+pub struct ChatChannelState {
+    pub active_grant_count: u64,
+    pub principals: Vec<String>,
 }
 
 #[derive(Debug, Clone)]

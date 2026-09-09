@@ -362,9 +362,14 @@ def test_research_desk_demo_choreography(client: ApiClient, funded_wallet: Walle
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_research_desk_demo_local_rag(client: ApiClient, funded_wallet: Wallet):
     """embers ⇄ f1r3node ⇄ ChromaDB end to end, entirely on localhost."""
+    collection = f"embers-test-research-desk-{uuid.uuid4().hex}"
+
+    def isolate(code: str) -> str:
+        return code.replace("embers-demo-docs", collection)
+
     seeded = client.testnet.deploy(
         funded_wallet,
-        (DEMO_DIR / "seed" / "seed-corpus.rho").read_text(),
+        isolate((DEMO_DIR / "seed" / "seed-corpus.rho").read_text()),
         timeout=RUN_TIMEOUT,
     ).json
     assert seeded["type"] == "Ok", seeded
@@ -373,9 +378,9 @@ def test_research_desk_demo_local_rag(client: ApiClient, funded_wallet: Wallet):
     uri = _deploy_team(
         client,
         funded_wallet,
-        RETRIEVAL_RESEARCHER,
+        isolate(RETRIEVAL_RESEARCHER),
         HERMETIC_CRITIC,
-        _archivist_code(),
+        isolate(_archivist_code()),
         "research-desk-local-rag",
     )
 
@@ -394,16 +399,14 @@ def test_research_desk_demo_local_rag(client: ApiClient, funded_wallet: Wallet):
         "the accept path must bypass the Archivist by topology"
     )
 
-    # The knowledge loop, end to end. A per-run-unique question keeps repeated
-    # pytest invocations and the other legs from seeing each other's archived
-    # documents (the discriminator is an exact "Q: <question>" prefix, so
-    # near-duplicates are inert).
+    # Keep test answers in a separate collection. Similarity search can expose
+    # a fictional answer to live agents even when its question is unique.
     loop_uri = _deploy_team(
         client,
         funded_wallet,
-        KNOWLEDGE_LOOP_RESEARCHER,
+        isolate(KNOWLEDGE_LOOP_RESEARCHER),
         HERMETIC_CRITIC,
-        _archivist_code(),
+        isolate(_archivist_code()),
         "research-desk-knowledge-loop",
     )
     question = (

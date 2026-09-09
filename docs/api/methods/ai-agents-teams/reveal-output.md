@@ -32,11 +32,18 @@ non-bearer, owner-only read** of that artifact:
   decrypted value only after reading that positive acknowledgment and matching it
   against the prepare echo; against an environment predating the clause no
   acknowledgment ever appears and the reveal **fails closed**.
-- **Ownership is the entire authority tier.** Delegated approver grants are wait-scoped
-  and the terminal advancement republishes them empty, so delegated authority provably
-  ends when the run completes; the service address needs no HTTP read path (it holds the
-  store keys ambiently). A mention-triggered F1r3sky run is signed by the mentioning
-  user's own wallet, so the person who posted the mention is the owner and can reveal.
+- **The authority tier is the owner, or a live channel grant.** The clause
+  authorizes the run's recorded owner, and — for a run initiated
+  [under a grant](run-under-grant.md) — the grant's grantee wallet, exactly while
+  the grant stands: `grantee` matches the signer, the grant is not revoked, and
+  its recorded `authority.reveal` is true, re-checked **at claim time**, so
+  revocation cuts a channel's disclosure immediately without touching the run.
+  Wait-scoped delegated approver grants remain excluded: the terminal
+  advancement republishes them empty, so that delegation provably ends when the
+  run completes; the service address needs no HTTP read path (it holds the store
+  keys ambiently). A mention-triggered F1r3sky run is signed by the mentioning
+  user's own wallet, so the person who posted the mention is the owner and can
+  reveal.
 - **The occurrence is public, the value and the actor are not.** `outputRevealed`
   appears on the run's public timeline — good audit at zero cost — while the value
   travels only over the signer's response channel and the revealer's identity stays off
@@ -63,7 +70,7 @@ additionally requires it to equal the path `run_id`.
 | prepare | 409 | — | The run has no recorded output artifact yet. |
 | send | 200 | untyped JSON | The run's final output value, released only over this channel. |
 | send | 400 | `InternalError` | Token/echo mismatch, or the echoed run id differs from the path. |
-| send | 403 | — | The signer is not the run's on-chain owner. Deliberately not 404: run existence is already public through the bearer link. |
+| send | 403 | — | The signer holds no reveal authority: not the owner, and not the grantee of a live grant with `reveal`. Deliberately not 404: run existence is already public through the bearer link. **For a channel whose grant was revoked mid-run this is an expected outcome**, answered with an "output withheld" reply rather than retried — the run is the grantor's, and they can reveal it themselves. |
 | send | 404 / 409 | — | The post-abort classification found the record absent / output-less — or (409) the envelope was already consumed: a replayed send produces no new `outputRevealed` event and is refused without disclosure. |
 | send | 500 | `InternalError` | Deploy not finalized, missing acknowledgment (fail-closed), store drift. |
 
@@ -115,7 +122,7 @@ export interface RevealOutputResp {
 | Property | Value |
 | --- | --- |
 | Token | Present — binds the path run id (the hashed prepare request) and the prepare response. |
-| Signing key | The run owner's wallet key; the chain rejects every other signer. |
+| Signing key | The run owner's wallet key, or — for a grant-initiated run — the grantee channel wallet while the grant stands with `reveal`; the chain rejects every other signer. |
 | Contracts signed | One: the claim contract. |
 | Deploy identifier | Not returned — the response is the value itself. |
 
@@ -162,6 +169,8 @@ const { sendResponse } = await sdk.agentsTeams.revealOutput(runId);
 
 - [Run state](run-state.md) — the public record whose `output_content_hash` /
   `output_capability_hash` witness the sealed artifact.
+- [Run under grant](run-under-grant.md) — the runs whose grantee branch this
+  clause adjudicates.
 - [Run commands](run-commands.md) — the sibling signed-claim surface for resuming runs.
 - [Capability model](../../../../../embers-frontend/docs/agent-teams/security/capability-model.md) — where this
   read sits in the platform's authority taxonomy.

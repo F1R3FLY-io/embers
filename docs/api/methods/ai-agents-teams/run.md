@@ -40,6 +40,12 @@ The send response is **untyped** in the schema (and `unknown` in the SDK): it is
 run-state JSON as the ledger records it; parse it with the same expectations as
 [run state](run-state.md#responses).
 
+**Channel services do not call this pair.** A run triggered from chat or mail goes
+through [run under grant](run-under-grant.md): the same prepared-run shape and the
+same post-registration transport, but the channel wallet signs and pays while the
+granting user owns the run, and the chain adjudicates the grant atomically with
+registration. Everything below about polling and retries applies to both.
+
 ## Request
 
 ### `POST /api/ai-agents-teams/run/prepare`
@@ -129,6 +135,14 @@ never ran). A failed send is diagnosable through `GET /runs/{run_id}`: if the ru
 the invocation landed. Re-running is never idempotent — every successful run is a distinct
 run.
 
+For machine clients holding a signed envelope, one stronger property is worth
+knowing: **resending the same envelope is safe**. It carries the same signature
+and therefore the same deploy identity, so the deploy cannot land twice, and the
+registration clauses verify an already-registered run's identity and acknowledge
+idempotently. The disciplined pattern — treat every send failure as
+indeterminate and poll the run home — is specified for channels in
+[external interfaces](../../../../../embers-frontend/docs/agent-teams/architecture/external-interfaces.md#disconnect-and-resend-semantics).
+
 ## Sequence
 
 ![Run team sequence](../../diagrams/ai-agents-teams/run.svg)
@@ -171,4 +185,5 @@ const state = await sdk.agentsTeams.getRun(runId);
 - [Run state](run-state.md) — inspecting the run via its capability.
 - [Run commands](run-commands.md) — signals, approvals, retries, cancellation.
 - [Run on F1r3sky](run-on-firesky.md) — the socially-answered variant.
+- [Run under grant](run-under-grant.md) — the channel-initiated variant.
 - [Deploy](deploy.md) — where the target URI comes from.

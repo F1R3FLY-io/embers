@@ -103,6 +103,61 @@ All paths are relative to `/api/ai-agents-teams` (`endpoints.rs:47`). `address` 
 | `POST /{address}/{id}/publish-to-firesky/prepare` | `PublishToFireskyReq` | `PrepareResponse<PublishToFireskyResp>` | Prepare the social publication. | `:487` |
 | `POST /{address}/{id}/publish-to-firesky/send` | `SendRequestBody<SignedContract, PublishToFireskyReq, PublishToFireskyResp>` | `SendResp` | Deploy the signed publication. | `:512` |
 
+## Channel connectors and grants
+
+Fourteen operations form the channel-connector family: standing on-chain
+**grants** through which a channel service (the F1R3BotGateway chat daemon, the
+F1R3Mail bridge) initiates runs **owned by the granting user** while the channel
+wallet signs and pays, plus mail **bindings** and reachability aggregation. The
+architecture is [external interfaces](../../../embers-frontend/docs/agent-teams/architecture/external-interfaces.md),
+the delegation model is [channel grants](../../../embers-frontend/docs/agent-teams/architecture/channel-grants.md),
+and each operation has its own reference document. All mutations are the
+standard two-phase envelopes; grantor-signed operations are signed by the user's
+browser wallet, channel-signed ones by the channel service's ordinary funded
+wallet (never the Embers service key).
+
+| Method and path | Signer | Purpose | Reference |
+| --- | --- | --- | --- |
+| `POST /grants/create/prepare` + `/send` | Grantor | Create a standing channel grant; the one-time subject token appears only in the prepare response. | [grants-create](methods/ai-agents-teams/grants-create.md) |
+| `POST /grants/{grant_id}/revoke/prepare` + `/send` | Grantor | Revoke, delivery-only for in-flight runs. | [grants-revoke](methods/ai-agents-teams/grants-revoke.md) |
+| `GET /grants/by-grantor/{address}` | — | The wallet's delegations, revoked ones flagged. | [grants-list](methods/ai-agents-teams/grants-list.md) |
+| `GET /grants/by-grantee/{address}` | — | Operations mirror of the chain clause channel services consume directly. | [grants-list](methods/ai-agents-teams/grants-list.md) |
+| `POST /run-under-grant/prepare` + `/send` | Channel (grantee) | Start a grantor-owned run; the chain adjudicates the grant atomically with registration. | [run-under-grant](methods/ai-agents-teams/run-under-grant.md) |
+| `POST /{address}/{id}/publish-to-mail/prepare` + `/send` | Team owner | Bind `local@domain` to the team on chain; no key material. | [publish-to-mail](methods/ai-agents-teams/publish-to-mail.md) |
+| `POST /{address}/{id}/unpublish-mail/prepare` + `/send` | Team owner | Deactivate the binding, reversibly. | [unpublish-mail](methods/ai-agents-teams/unpublish-mail.md) |
+| `GET /{address}/{id}/published-channels` | — | Three-valued per-channel reachability for the Interfaces panel. | [published-channels](methods/ai-agents-teams/published-channels.md) |
+| `GET /bindings/by-channel/{channel}` | — | The channel's public binding set (UI/ops mirror; the mail bridge reads the chain directly). | [bindings](methods/ai-agents-teams/bindings.md) |
+
+Unlike the legacy operations (whose failure bodies carry `description` alone),
+the connector family answers machine-readable `ErrorBody {code, description}`
+payloads, so channel services branch on stable codes rather than prose:
+
+| Code | Status | Raised by | Meaning |
+| --- | --- | --- | --- |
+| `grant_invalid_request` | 422 | grants create prepare | Channel, command class, cap, or principal outside the legal vocabulary. |
+| `grant_not_found` | 404 | grant mutations, run-under-grant | No grant record under the id. |
+| `grant_unauthorized` | 403 | grant mutation sends | The signer does not hold grant authority (revocation is grantor-only). |
+| `grant_revoked` | 403 | run-under-grant | The grant exists but is revoked; new runs refuse from the revocation instant. |
+| `grant_principal_mismatch` | 422 | run-under-grant prepare | The supplied channel context does not match the grant's channel or principal. |
+| `team_not_durable` | 422 | run-under-grant prepare | The granted team has no durable (Workflow v2) deployment; legacy GraphL output is never revealable, so such runs could never serve a channel. |
+| `grant_caps_exceeded` | 429 | run-under-grant | The UTC-epoch-day run cap is exhausted (resets at midnight UTC; up to twice the cap can land across the boundary). |
+| `deploy_unfunded` | 402 | run-under-grant send | The node refused the deploy for funds — the **channel** wallet needs topping up; never the user's fault. |
+| `deploy_not_finalized` | 504 | run-under-grant send | Finality was not observed in the window; the run may still land — poll `GET /runs/{run_id}`. |
+| `team_not_found` / `team_not_deployed` | 404 / 422 | publish-to-mail prepare | Unknown team / no deployed registry URI to bind. |
+| `invalid_mail_address` | 422 | publish-to-mail prepare | The address fails the conservative RFC 5321-compatible grammar. |
+| `binding_duplicate` | 409 | publish-to-mail | The address is already actively bound to a different team. |
+| `binding_unauthorized` | 403 | mail binding sends | The signer does not own the team. |
+| `binding_not_found` | 404 | unpublish-mail | No (active) mail binding exists for the team. |
+| `internal_error` | 500 | any | Everything else, description included. |
+
+Two adjacent surfaces stay status-coded rather than code-bodied, and channels
+branch on the status: the [reveal](methods/ai-agents-teams/reveal-output.md)
+pair (403 now also covers a grantee whose grant was revoked mid-run — an
+expected "output withheld" outcome, not a retry case; 409 is not-yet-revealable)
+and the [command](methods/ai-agents-teams/run-commands.md) pair (an
+unauthorized on-chain claim surfaces as 500; a stale revision is not an HTTP
+error at all — the command deploys and does not apply).
+
 ## Authentication and authorization
 
 Four distinct authorities govern the surface, and they compose rather than substitute:
@@ -110,7 +165,7 @@ Four distinct authorities govern the surface, and they compose rather than subst
 - **Wallet signatures** authorize deployments. Every mutation is a chain deploy signed by the client wallet; the chain, not the HTTP service, is the verifier of record. An unsigned or badly signed contract cannot mutate anything regardless of what the HTTP layer accepts.
 - **The run capability** authorizes reads. `GET /runs/{run_id}` answers to whoever holds the UUIDv7 run URL and returns execution metadata only — status, revision, public wait identifiers, grants, and event types; never prompts, outputs, credentials, or artifacts. Holding the URL grants no command authority, and the sole content read on the whole surface is the separately signed owner reveal below.
 - **The on-chain command ledger** authorizes commands. A signed `RunCommandReq` deploys a claim that the run ledger itself adjudicates: the run owner and the configured Embers service hold run-level authority for every command class, while delegated approvers may decide exactly the wait named in their grant. The full command model, including revision-gated optimistic concurrency, is specified in [Durable and hierarchical execution](../../../embers-frontend/docs/agent-teams/architecture/durable-execution.md) and its authority table in the [threat model](../../../embers-frontend/docs/agent-teams/security/threat-model.md).
-- **The on-chain owner record** authorizes the output reveal. A signed reveal (`POST /runs/{run_id}/output/prepare` + `/send`) deploys a `claimOutputReveal` claim that the ledger adjudicates against the run's recorded owner — the ledger scrubs `owner` from every read, so the chain is the only party that can make this decision. Ownership is the whole tier: delegated approver grants are wait-scoped and the terminal advancement republishes them empty, so delegation provably ends when the run completes. See [Reveal a run's output](methods/ai-agents-teams/reveal-output.md).
+- **The on-chain owner record** authorizes the output reveal. A signed reveal (`POST /runs/{run_id}/output/prepare` + `/send`) deploys a `claimOutputReveal` claim that the ledger adjudicates against the run's recorded owner — the ledger scrubs `owner` from every read, so the chain is the only party that can make this decision. For a run initiated [under a channel grant](methods/ai-agents-teams/run-under-grant.md), the same clause also authorizes the grant's grantee wallet exactly while the grant stands with `reveal` — re-checked at claim time, so revocation cuts a channel's disclosure immediately. Wait-scoped delegated approver grants remain excluded: the terminal advancement republishes them empty, so that delegation provably ends when the run completes. See [Reveal a run's output](methods/ai-agents-teams/reveal-output.md).
 
 ## Error semantics
 
