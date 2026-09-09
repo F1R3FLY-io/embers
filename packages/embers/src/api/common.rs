@@ -406,6 +406,8 @@ where
 {
     #[oai(status = 200)]
     Ok(Json<T>),
+    #[oai(status = 422)]
+    ValidationError(Json<crate::api::agents_teams::models::ErrorBody>),
     #[oai(status = 500)]
     InternalError(Json<InternalError>),
 }
@@ -417,7 +419,17 @@ where
     fn from(value: anyhow::Result<T>) -> Self {
         match value {
             Ok(inner) => Self::Ok(Json(inner.into())),
-            Err(err) => Self::InternalError(Json(err.into())),
+            Err(err) => match err.downcast_ref::<crate::domain::validation::ValidationError>() {
+                Some(validation) => {
+                    let mut body = crate::api::agents_teams::models::ErrorBody::new(
+                        &validation.code,
+                        &validation.description,
+                    );
+                    body.field_errors = Some(validation.fields.clone());
+                    Self::ValidationError(Json(body))
+                }
+                None => Self::InternalError(Json(err.into())),
+            },
         }
     }
 }

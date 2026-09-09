@@ -11,9 +11,10 @@ use firefly_client::{
 };
 use poem::web::Data;
 use poem_openapi::OpenApi;
-use poem_openapi::param::Path;
+use poem_openapi::param::{Header, Path, Query};
 use poem_openapi::payload::Json;
 
+use super::models::{TracePrepareResponse, TraceResponse};
 use crate::api::agents_teams::models::{
     AgentsTeam,
     AgentsTeams,
@@ -60,7 +61,17 @@ use crate::api::agents_teams::models::{
     SendRunUnderGrantResponse,
     UnpublishMailResp,
 };
-use crate::api::common::{ApiResult, ApiTags, MaybeNotFound, PrepareResponse, SendRequest, SendResp, SignedContract, Stringified, VoidResult};
+use crate::api::common::{
+    ApiResult,
+    ApiTags,
+    MaybeNotFound,
+    PrepareResponse,
+    SendRequest,
+    SendResp,
+    SignedContract,
+    Stringified,
+    VoidResult,
+};
 use crate::domain::agents::AgentsService;
 use crate::domain::agents_teams::{AgentsTeamsService, models};
 
@@ -76,6 +87,85 @@ impl<R, W, N> Default for AgentsTeamsApi<R, W, N> {
 
 #[OpenApi(prefix_path = "/ai-agents-teams", tag = ApiTags::AIAgentsTeams)]
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
+    #[oai(
+        path = "/runs/:run_id/trace/prepare",
+        method = "post",
+        operation_id = "agents_teams_prepare_trace"
+    )]
+    async fn prepare_trace(
+        &self,
+        Path(run_id): Path<String>,
+        Data(service): Data<&AgentsTeamsService<R, W, N>>,
+        Data(key): Data<&jsonwebtoken::EncodingKey>,
+    ) -> TraceResponse<PrepareResponse<TracePrepareResponse>> {
+        match PrepareResponse::from_call(run_id, |id| service.prepare_trace(id), key).await {
+            Ok(value) => TraceResponse::Ok(Json(value)),
+            Err(error) => error.into(),
+        }
+    }
+    #[oai(
+        path = "/runs/:run_id/trace/send",
+        method = "post",
+        operation_id = "agents_teams_send_trace"
+    )]
+    async fn send_trace(
+        &self,
+        Path(run_id): Path<String>,
+        SendRequest(body): SendRequest<SignedContract, String, TracePrepareResponse>,
+        Data(service): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> TraceResponse<serde_json::Value> {
+        if body.prepare_request != run_id {
+            return crate::domain::agents_teams::trace::TraceError::Unauthorized.into();
+        }
+        let prepared = crate::domain::agents_teams::trace::TracePreparation {
+            contract: crate::domain::common::PreparedContract(body.prepare_response.contract.0.0),
+            nonce: body.prepare_response.nonce,
+            expires_at: body.prepare_response.expires_at,
+        };
+        match service
+            .authorize_trace(run_id, prepared, body.request.into())
+            .await
+        {
+            Ok(value) => TraceResponse::Ok(Json(value)),
+            Err(error) => error.into(),
+        }
+    }
+    #[oai(
+        path = "/runs/:run_id/trace",
+        method = "get",
+        operation_id = "agents_teams_read_trace"
+    )]
+    async fn read_trace(
+        &self,
+        Path(run_id): Path<String>,
+        Header(authorization): Header<Option<String>>,
+        Query(offset): Query<Option<usize>>,
+        Data(service): Data<&AgentsTeamsService<R, W, N>>,
+    ) -> TraceResponse<serde_json::Value> {
+        match service
+            .read_trace(
+                run_id,
+                authorization.as_deref().unwrap_or(""),
+                offset.unwrap_or(0),
+            )
+            .await
+        {
+            Ok(value) => TraceResponse::Ok(Json(value)),
+            Err(error) => error.into(),
+        }
+    }
+
+    #[oai(
+        path = "/publication/pds",
+        method = "get",
+        operation_id = "agents_teams_describe_pds"
+    )]
+    async fn describe_pds(&self, Query(pds_url): Query<String>) -> ApiResult<serde_json::Value> {
+        crate::domain::agents_teams::publish_to_firesky::discover_pds(&pds_url)
+            .await
+            .into()
+    }
+
     #[oai(path = "/:address", method = "get", operation_id = "agents_teams_list")]
     async fn list(
         &self,
@@ -423,7 +513,10 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         SendRequest(body): SendRequest<SignedContract, SaveAgentsTeamReq, SaveAgentsTeamResp>,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> ApiResult<SendResp> {
-        agents_teams.deploy_signed_save(body.request.into()).await.into()
+        agents_teams
+            .deploy_signed_save(body.request.into())
+            .await
+            .into()
     }
 
     #[oai(
@@ -469,7 +562,12 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         agents_teams
             .referencing_teams(address.0, agent_id)
             .await
-            .map(|teams| teams.into_iter().map(Into::into).collect::<Vec<ReferencingTeam>>())
+            .map(|teams| {
+                teams
+                    .into_iter()
+                    .map(Into::into)
+                    .collect::<Vec<ReferencingTeam>>()
+            })
             .into()
     }
 

@@ -89,7 +89,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
         let http_client = ReqwestClient::new(cred.pds_url);
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
-        let did = session.login(cred.email, cred.token).await?.data.did;
+        let did = session
+            .login(cred.did.unwrap_or(cred.email), cred.token)
+            .await?
+            .data
+            .did;
 
         let agent = Agent::new(session);
 

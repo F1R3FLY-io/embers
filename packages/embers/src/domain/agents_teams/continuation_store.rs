@@ -26,6 +26,7 @@ pub struct F1r3driveContinuationStore {
     capability_key: [u8; 32],
     max_object_bytes: u64,
     write_lock: Arc<Mutex<()>>,
+    pub(crate) trace_lock: Arc<Mutex<()>>,
 }
 
 impl F1r3driveContinuationStore {
@@ -74,6 +75,7 @@ impl F1r3driveContinuationStore {
             capability_key,
             max_object_bytes,
             write_lock: Arc::new(Mutex::new(())),
+            trace_lock: Arc::new(Mutex::new(())),
         })
     }
 
@@ -336,6 +338,7 @@ impl F1r3driveContinuationStore {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum ArtifactKind {
+    Trace,
     Command,
     Continuation,
     EffectOutbox,
@@ -347,6 +350,7 @@ pub enum ArtifactKind {
 impl ArtifactKind {
     const fn as_str(self) -> &'static str {
         match self {
+            Self::Trace => "traces",
             Self::Command => "commands",
             Self::Continuation => "continuations",
             Self::EffectOutbox => "effect-outbox",

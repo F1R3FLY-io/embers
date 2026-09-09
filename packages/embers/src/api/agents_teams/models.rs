@@ -605,6 +605,8 @@ pub struct RunEvent {
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(into(models::PublishToFireskyReq))]
 pub struct PublishToFireskyReq {
+    /// `create` or `existing`; omitted preserves legacy create-or-login behavior.
+    pub account_mode: Option<String>,
     /// The PDS to host the account.
     pub pds_url: String,
     /// Account email.
@@ -756,6 +758,8 @@ pub struct ErrorBody {
     pub code: String,
     /// Human-readable failure description.
     pub description: String,
+    /// Field names use the API's snake_case request names.
+    pub field_errors: Option<std::collections::BTreeMap<String, Vec<String>>>,
 }
 
 impl ErrorBody {
@@ -763,6 +767,7 @@ impl ErrorBody {
         Self {
             code: code.to_owned(),
             description: description.to_string(),
+            field_errors: None,
         }
     }
 }
@@ -1243,9 +1248,12 @@ impl From<GrantError> for PrepareCreateGrantResponse {
             GrantError::InvalidRequest(reason) => {
                 Self::UnprocessableEntity(Json(ErrorBody::new("grant_invalid_request", reason)))
             }
-            GrantError::NotFound | GrantError::Unauthorized => Self::InternalError(Json(
-                ErrorBody::new("internal_error", "unexpected claim-phase failure during prepare"),
-            )),
+            GrantError::NotFound | GrantError::Unauthorized => {
+                Self::InternalError(Json(ErrorBody::new(
+                    "internal_error",
+                    "unexpected claim-phase failure during prepare",
+                )))
+            }
             GrantError::Internal(err) => {
                 Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
             }
@@ -1304,9 +1312,12 @@ impl From<GrantError> for PrepareRevokeGrantResponse {
             GrantError::NotFound => {
                 Self::NotFound(Json(ErrorBody::new("grant_not_found", "grant not found")))
             }
-            GrantError::Unauthorized | GrantError::InvalidRequest(_) => Self::InternalError(Json(
-                ErrorBody::new("internal_error", "unexpected claim-phase failure during prepare"),
-            )),
+            GrantError::Unauthorized | GrantError::InvalidRequest(_) => {
+                Self::InternalError(Json(ErrorBody::new(
+                    "internal_error",
+                    "unexpected claim-phase failure during prepare",
+                )))
+            }
             GrantError::Internal(err) => {
                 Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
             }
@@ -1345,12 +1356,12 @@ impl From<RunUnderGrantError> for PrepareRunUnderGrantResponse {
             RunUnderGrantError::GrantRevoked => {
                 Self::Forbidden(Json(ErrorBody::new("grant_revoked", "grant is revoked")))
             }
-            RunUnderGrantError::PrincipalMismatch => Self::UnprocessableEntity(Json(
-                ErrorBody::new(
+            RunUnderGrantError::PrincipalMismatch => {
+                Self::UnprocessableEntity(Json(ErrorBody::new(
                     "grant_principal_mismatch",
                     "channel context does not match the grant's principal",
-                ),
-            )),
+                )))
+            }
             RunUnderGrantError::TeamNotDurable => Self::UnprocessableEntity(Json(ErrorBody::new(
                 "team_not_durable",
                 "the granted team has no durable workflow deployment",
@@ -1423,10 +1434,7 @@ impl From<RunUnderGrantError> for SendRunUnderGrantResponse {
                 )))
             }
             RunUnderGrantError::Internal(err) if is_unfunded_deploy(&err) => {
-                Self::PaymentRequired(Json(ErrorBody::new(
-                    "deploy_unfunded",
-                    format!("{err:?}"),
-                )))
+                Self::PaymentRequired(Json(ErrorBody::new("deploy_unfunded", format!("{err:?}"))))
             }
             RunUnderGrantError::Internal(err) => {
                 Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
@@ -1557,6 +1565,49 @@ impl From<PublishToMailError> for SendPublishToMailResponse {
             PublishToMailError::Internal(err) => {
                 Self::InternalError(Json(ErrorBody::new("internal_error", format!("{err:?}"))))
             }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, Object)]
+pub struct TracePrepareResponse {
+    pub contract: PreparedContract,
+    pub nonce: String,
+    pub expires_at: i64,
+}
+impl From<crate::domain::agents_teams::trace::TracePreparation> for TracePrepareResponse {
+    fn from(value: crate::domain::agents_teams::trace::TracePreparation) -> Self {
+        Self {
+            contract: value.contract.into(),
+            nonce: value.nonce,
+            expires_at: value.expires_at,
+        }
+    }
+}
+#[derive(Debug, ApiResponse)]
+pub enum TraceResponse<T: poem_openapi::types::Type + poem_openapi::types::ToJSON + Send + Sync> {
+    #[oai(status = 200)]
+    Ok(Json<T>),
+    #[oai(status = 403)]
+    Forbidden(Json<ErrorBody>),
+    #[oai(status = 404)]
+    NotFound(Json<ErrorBody>),
+    #[oai(status = 410)]
+    Expired(Json<ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<ErrorBody>),
+}
+impl<T: poem_openapi::types::Type + poem_openapi::types::ToJSON + Send + Sync>
+    From<crate::domain::agents_teams::trace::TraceError> for TraceResponse<T>
+{
+    fn from(error: crate::domain::agents_teams::trace::TraceError) -> Self {
+        use crate::domain::agents_teams::trace::TraceError;
+        let body = ErrorBody::new("trace_error", &error);
+        match error {
+            TraceError::Unauthorized => Self::Forbidden(Json(body)),
+            TraceError::NotFound => Self::NotFound(Json(body)),
+            TraceError::Expired => Self::Expired(Json(body)),
+            TraceError::Internal(_) => Self::InternalError(Json(body)),
         }
     }
 }

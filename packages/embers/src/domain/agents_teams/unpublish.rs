@@ -71,7 +71,13 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             MemorySessionStore::default(),
         );
         session
-            .login(credentials.email.clone(), credentials.token.clone())
+            .login(
+                credentials
+                    .did
+                    .clone()
+                    .unwrap_or_else(|| credentials.email.clone()),
+                credentials.token.clone(),
+            )
             .await?;
 
         Agent::new(session)

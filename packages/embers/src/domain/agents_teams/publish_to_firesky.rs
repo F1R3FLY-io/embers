@@ -95,9 +95,92 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         &self,
         address: WalletAddress,
         id: String,
-        request: PublishToFireskyReq,
+        mut request: PublishToFireskyReq,
     ) -> anyhow::Result<PublishToFireskyResp> {
-        let handle = Handle::new(request.handle).map_err(|err| anyhow::anyhow!(err))?;
+        use crate::domain::validation::ValidationError;
+        let existing_mode = request.account_mode.as_deref() == Some("existing");
+        if !matches!(
+            request.account_mode.as_deref(),
+            None | Some("create" | "existing")
+        ) {
+            return Err(ValidationError::field(
+                "account_mode",
+                "invalid_account_mode",
+                "Choose Create account or Use existing account.",
+            )
+            .into());
+        }
+        let pds = reqwest::Url::parse(request.pds_url.trim())
+            .ok()
+            .filter(|url| {
+                matches!(url.scheme(), "http" | "https")
+                    && url.host_str().is_some()
+                    && url.username().is_empty()
+                    && url.password().is_none()
+            });
+        let pds = pds.ok_or_else(|| {
+            ValidationError::field(
+                "pds_url",
+                "invalid_pds_url",
+                "Enter the PDS's HTTP or HTTPS address.",
+            )
+        })?;
+        request.pds_url = pds.as_str().trim_end_matches('/').to_owned();
+        request.handle = request.handle.trim().trim_start_matches('@').to_lowercase();
+        let domains = discover_pds(&request.pds_url).await?;
+        if !request.handle.contains('.') {
+            let suffix = domains
+                .get("availableUserDomains")
+                .and_then(serde_json::Value::as_array)
+                .and_then(|values| values.first())
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| {
+                    ValidationError::field(
+                        "handle",
+                        "handle_suffix_required",
+                        "Enter a complete handle including its domain suffix.",
+                    )
+                })?;
+            request.handle = format!("{}.{}", request.handle, suffix.trim_start_matches('.'));
+        }
+        let handle = Handle::new(request.handle.clone()).map_err(|_| ValidationError::field("handle", "invalid_handle", "Enter a valid complete handle, including the PDS suffix (for example redblue.test)."))?;
+        if request.password.is_empty() {
+            return Err(ValidationError::field(
+                "password",
+                "password_required",
+                "Enter the team account password.",
+            )
+            .into());
+        }
+        if !existing_mode
+            && (request
+                .email
+                .trim()
+                .split_once('@')
+                .is_none_or(|(local, domain)| local.is_empty() || !domain.contains('.'))
+                || request.email.chars().any(char::is_whitespace))
+        {
+            return Err(ValidationError::field(
+                "email",
+                "invalid_email",
+                "Enter a valid contact email for the team account.",
+            )
+            .into());
+        }
+        if !existing_mode
+            && domains
+                .get("inviteCodeRequired")
+                .and_then(serde_json::Value::as_bool)
+                == Some(true)
+            && request.invite_code.as_deref().is_none_or(str::is_empty)
+        {
+            return Err(ValidationError::field(
+                "invite_code",
+                "invite_required",
+                "This PDS requires an invitation code.",
+            )
+            .into());
+        }
         // Captured before `handle` and `did` are consumed below: these are what let
         // a later read say *which* account a team was published under, and so
         // whether that account still exists.
@@ -115,71 +198,81 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         let http_client = ReqwestClient::new(request.pds_url.clone());
         let client = AtpServiceClient::new(http_client.clone());
 
-        let created = client
-            .service
-            .com
-            .atproto
-            .server
-            .create_account(
-                server::create_account::InputData {
-                    did: None,
-                    email: request.email.clone().into(),
-                    handle: handle.clone(),
-                    invite_code: request.invite_code,
-                    password: request.password.clone().into(),
-                    plc_op: None,
-                    recovery_key: None,
-                    verification_code: None,
-                    verification_phone: None,
-                }
-                .into(),
-            )
-            .await;
-
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
-
-        // Publishing to a handle that already exists is the ordinary way to publish
-        // again after unpublishing. Unpublishing deliberately keeps the account and
-        // the handle, so that it is reversible rather than a slower deletion -- but
-        // creating unconditionally made that promise false: the second publish died
-        // on the handle the first one had taken, and the only way back was to pick a
-        // different handle, which is precisely what was being preserved.
-        //
-        // Signing in is what tells the two cases apart. Credentials that work belong
-        // to the caller; credentials that do not mean the handle is somebody else's,
-        // which is a real conflict and is reported as one.
-        let did = match created {
-            Ok(account) => {
-                session.login(&request.email, &request.password).await?;
-                account.data.did
+        let did = if existing_mode {
+            let account = session
+                .login(&request.handle, &request.password)
+                .await
+                .map_err(|_| {
+                    ValidationError::field(
+                        "password",
+                        "account_signin_failed",
+                        "Could not sign in. Check the handle and the account password.",
+                    )
+                })?;
+            if account.data.handle != handle {
+                return Err(ValidationError::field(
+                    "handle",
+                    "account_handle_mismatch",
+                    "These credentials belong to another handle.",
+                )
+                .into());
             }
-            Err(create_error) => {
-                let existing = session
-                    .login(&request.email, &request.password)
-                    .await
-                    .map_err(|login_error| {
-                        anyhow::anyhow!(
-                            "could not create an account for this handle ({create_error}), \
-                             and could not sign in to an existing one either \
-                             ({login_error}) — the handle may belong to someone else, or \
-                             the password may differ from the one it was created with"
-                        )
-                    })?;
-
-                // The identifier signed in with is the email, so the account reached
-                // is not necessarily the one that carries the requested handle.
-                // Publishing to it anyway would put the team on an account the user
-                // did not name, under a handle they did not ask for.
-                if existing.data.handle != handle {
-                    return Err(anyhow::anyhow!(
-                        "these credentials belong to @{}, not @{}; publish under that \
-                         handle, or use the credentials of the account you meant",
-                        existing.data.handle.as_str(),
-                        handle.as_str(),
-                    ));
+            account.data.did
+        } else {
+            let created = client
+                .service
+                .com
+                .atproto
+                .server
+                .create_account(
+                    server::create_account::InputData {
+                        did: None,
+                        email: Some(request.email.clone()),
+                        handle: handle.clone(),
+                        invite_code: request.invite_code,
+                        password: Some(request.password.clone()),
+                        plc_op: None,
+                        recovery_key: None,
+                        verification_code: None,
+                        verification_phone: None,
+                    }
+                    .into(),
+                )
+                .await;
+            match created {
+                Ok(account) => {
+                    session.login(&request.handle, &request.password).await
+                        .map_err(|_| ValidationError::field("password", "account_signin_failed", "The account was created, but sign-in failed. Retry using this handle and password."))?;
+                    account.data.did
                 }
-
-                existing.data.did.clone()
+                Err(error) => {
+                    // A retry after partial publication may find the account already
+                    // created. Authenticate the exact requested handle before reuse.
+                    let description = error.to_string().to_lowercase();
+                    if description.contains("taken")
+                        || description.contains("already")
+                        || request.account_mode.is_none()
+                    {
+                        if let Ok(account) = session.login(&request.handle, &request.password).await
+                        {
+                            if account.data.handle == handle {
+                                account.data.did
+                            } else {
+                                return Err(ValidationError::field(
+                                    "handle",
+                                    "account_handle_mismatch",
+                                    "These credentials belong to another handle.",
+                                )
+                                .into());
+                            }
+                        } else {
+                            return Err(publication_error(&description).into());
+                        }
+                    } else {
+                        return Err(publication_error(&description).into());
+                    }
+                }
             }
         };
 
@@ -410,6 +503,7 @@ mod tests {
 
     fn request(pds: &FakePds) -> PublishToFireskyReq {
         PublishToFireskyReq {
+            account_mode: None,
             pds_url: pds.origin().to_owned(),
             email: "publisher@example.com".to_owned(),
             handle: TEST_HANDLE.to_owned(),
@@ -480,7 +574,11 @@ mod tests {
         let uri = deployed_uri();
         let read = MockReadNode::new().on_code_containing(
             "team-id",
-            team_json(AsRef::<String>::as_ref(&uri), None, Some("A hermetic test team")),
+            team_json(
+                AsRef::<String>::as_ref(&uri),
+                None,
+                Some("A hermetic test team"),
+            ),
         );
         let service = service_with(read);
 
@@ -511,7 +609,11 @@ mod tests {
         let uri = deployed_uri();
         let read = MockReadNode::new().on_code_containing(
             "team-id",
-            team_json(AsRef::<String>::as_ref(&uri), None, Some("A hermetic test team")),
+            team_json(
+                AsRef::<String>::as_ref(&uri),
+                None,
+                Some("A hermetic test team"),
+            ),
         );
         let service = service_with(read);
 
@@ -538,4 +640,117 @@ mod tests {
 
         pds.shutdown().await;
     }
+}
+
+/// Public PDS metadata only. A bounded request keeps a mistyped host from
+/// leaving the form indefinitely submitting.
+pub async fn discover_pds(pds_url: &str) -> anyhow::Result<serde_json::Value> {
+    use crate::domain::validation::ValidationError;
+    let url = reqwest::Url::parse(pds_url)
+        .ok()
+        .filter(|url| {
+            matches!(url.scheme(), "http" | "https")
+                && url.host_str().is_some()
+                && url.username().is_empty()
+                && url.password().is_none()
+        })
+        .ok_or_else(|| {
+            ValidationError::field(
+                "pds_url",
+                "invalid_pds_url",
+                "Enter the PDS's HTTP or HTTPS address.",
+            )
+        })?;
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(8))
+        .redirect(reqwest::redirect::Policy::none())
+        .build()?;
+    let response = client
+        .get(format!(
+            "{}/xrpc/com.atproto.server.describeServer",
+            url.as_str().trim_end_matches('/')
+        ))
+        .send()
+        .await
+        .map_err(|_| {
+            ValidationError::field(
+                "pds_url",
+                "pds_unreachable",
+                "Could not reach this PDS. Check its address and that it is running.",
+            )
+        })?;
+    let value: serde_json::Value = response
+        .error_for_status()
+        .map_err(|_| {
+            ValidationError::field(
+                "pds_url",
+                "invalid_pds",
+                "This address did not return PDS server information.",
+            )
+        })?
+        .json()
+        .await
+        .map_err(|_| {
+            ValidationError::field(
+                "pds_url",
+                "invalid_pds",
+                "This address did not return valid PDS server information.",
+            )
+        })?;
+    if !value
+        .get("availableUserDomains")
+        .is_some_and(serde_json::Value::is_array)
+    {
+        return Err(ValidationError::field(
+            "pds_url",
+            "invalid_pds",
+            "The server did not advertise its handle domains.",
+        )
+        .into());
+    }
+    Ok(
+        serde_json::json!({"availableUserDomains": value["availableUserDomains"], "inviteCodeRequired": value["inviteCodeRequired"]}),
+    )
+}
+
+fn publication_error(message: &str) -> crate::domain::validation::ValidationError {
+    use crate::domain::validation::ValidationError;
+    let (field, code, text) = if message.contains("email") {
+        (
+            "email",
+            "email_rejected",
+            "This email is unavailable or unsupported. Use another email, or choose Use existing account.",
+        )
+    } else if message.contains("password") {
+        (
+            "password",
+            "password_rejected",
+            "The PDS rejected this password. Check its password requirements.",
+        )
+    } else if message.contains("invite") {
+        (
+            "invite_code",
+            "invite_rejected",
+            "The invitation code is missing, invalid, or already used.",
+        )
+    } else if message.contains("taken") || message.contains("already") {
+        (
+            "handle",
+            "handle_unavailable",
+            "This handle is already registered. Choose Use existing account and enter its password, or choose another handle.",
+        )
+    } else if message.contains("handle") || message.contains("domain") {
+        (
+            "handle",
+            "handle_rejected",
+            "The PDS rejected this handle. Include one of the suffixes advertised by this PDS, such as .test on the demo server.",
+        )
+    } else {
+        (
+            "pds_url",
+            "pds_publication_failed",
+            "The PDS could not create the account. Check the server address and try again.",
+        )
+    };
+    ValidationError::field(field, code, text)
 }

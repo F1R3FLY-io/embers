@@ -705,6 +705,7 @@ class AgentsTeamsApi:
         handle: str = "bar.test",
         email: str = "bar@bar.com",
         password: str = DEFAULT_TEST_ACCOUNT_PASSWORD,
+        account_mode: str | None = None,
     ) -> UpdateResponce:
         # Parameterised so a test can pick a handle nobody else has taken: the PDS
         # rejects a duplicate outright, so a hardcoded one makes the test pass once
@@ -715,6 +716,8 @@ class AgentsTeamsApi:
             "handle": handle,
             "password": password,
         }
+        if account_mode is not None:
+            prepare_request["account_mode"] = account_mode
         resp = self._client.post(
             f"/ai-agents-teams/{wallet.address}/{agent_id}/publish-to-firesky/prepare",
             json=prepare_request,

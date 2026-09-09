@@ -250,6 +250,7 @@ pub struct RunEvent {
 
 #[derive(Debug, Clone)]
 pub struct PublishToFireskyReq {
+    pub account_mode: Option<String>,
     pub pds_url: String,
     pub email: String,
     pub handle: String,

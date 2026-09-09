@@ -47,7 +47,7 @@ mod list;
 mod list_versions;
 pub mod models;
 mod orchestration;
-mod publish_to_firesky;
+pub mod publish_to_firesky;
 mod publish_to_mail;
 mod published_state;
 mod recovery;
@@ -65,6 +65,7 @@ mod save;
     reason = "the testing tree is deliberately pub(crate): the annotation documents the crate-wide sharing intent and stays correct if the domain module ever becomes public"
 )]
 pub(crate) mod testing;
+pub mod trace;
 mod unpublish;
 pub mod workflow;
 
@@ -259,14 +260,20 @@ mod template_tests {
         assert!(code.contains("\"listChannelBindings\""));
         assert!(code.contains("\"getChannelBindingsForTeam\""));
         // The atomic adjudication join: runs and grants taken together.
-        assert!(code.contains("for(@address <- deployerAddressCh; @runs <- runsCh; @grants <- grantsCh)"));
+        assert!(
+            code.contains(
+                "for(@address <- deployerAddressCh; @runs <- runsCh; @grants <- grantsCh)"
+            )
+        );
         // The UTC-epoch-day counter divides the millisecond deploy timestamp.
         assert!(code.contains("timestamp / 86400000"));
         // Ledger datetimes are epoch seconds; deployData stamps are milliseconds.
         assert!(code.contains("timestamp / 1000"));
         // The grantee branches of reveal and command authority.
         assert!(code.contains("grant.get(\"authority\").get(\"reveal\")"));
-        assert!(code.contains("grant.get(\"authority\").get(\"commands\").contains(command_class)"));
+        assert!(
+            code.contains("grant.get(\"authority\").get(\"commands\").contains(command_class)")
+        );
         // The public enumeration scrubs the grant link alongside the owner.
         assert!(code.contains("run.delete(\"owner\").delete(\"grant_id\")"));
 

@@ -117,6 +117,10 @@ impl FakePds {
 
         let app = Route::new()
             .at(
+                "/xrpc/com.atproto.server.describeServer",
+                get(describe_server),
+            )
+            .at(
                 "/xrpc/com.atproto.server.createAccount",
                 post(create_account),
             )
@@ -307,4 +311,11 @@ fn logo() -> Response {
     Response::builder()
         .content_type("image/png")
         .body(LOGO_BYTES.to_vec())
+}
+
+#[handler]
+async fn describe_server() -> Json<Value> {
+    Json(
+        json!({"did":"did:web:localhost", "availableUserDomains":[".test"], "inviteCodeRequired":false}),
+    )
 }

@@ -6,7 +6,15 @@ use firefly_client::{
     WriteNode,
     WriteNodeClient,
 };
-use poem::middleware::{Compression, Cors, NormalizePath, RequestId, Tracing, TrailingSlash};
+use poem::middleware::{
+    Compression,
+    Cors,
+    NormalizePath,
+    RequestId,
+    SetHeader,
+    Tracing,
+    TrailingSlash,
+};
 use poem::{Endpoint, EndpointExt, Route};
 use poem_openapi::OpenApiService;
 
@@ -85,7 +93,10 @@ pub fn build_app<R: ReadNode, W: WriteNode, N: NodeEventSource>(
     let spec_yaml = api.spec_endpoint_yaml();
 
     Route::new()
-        .nest("/api", api)
+        .nest(
+            "/api",
+            api.with(SetHeader::new().overriding("Cache-Control", "no-store")),
+        )
         .nest("/swagger-ui/index.html", ui)
         .nest("/swagger-ui/openapi.json", spec)
         .nest("/swagger-ui/openapi.yaml", spec_yaml)

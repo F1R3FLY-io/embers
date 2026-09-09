@@ -301,6 +301,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             match outcome {
                 KernelOutcome::Effects(effects) => {
                     for effect in effects {
+                        self.trace_started(&continuation, &effect).await?;
                         let execution =
                             if matches!(&effect.activity, ActivityReference::Workflow { .. }) {
                                 self.execute_nested_activity(
@@ -341,11 +342,14 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                                 }));
                             }
                             NestedExecution::Terminal { code, message } => {
+                                self.trace_failed(&team_uri, &effect, &message).await?;
                                 return self
                                     .fail_continuation(&mut continuation, code, &message)
                                     .await;
                             }
                         };
+                        self.trace_finished(&team_uri, &effect, &observation)
+                            .await?;
                         logical_time = observation.observed_at;
                         if let Err(error) =
                             continuation.apply_effect_observation(observation, logical_time)
@@ -607,6 +611,11 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 match outcome {
                     KernelOutcome::Effects(effects) => {
                         for effect in effects {
+                            let child = parent
+                                .nested_workflows
+                                .get(&request.effect_key)
+                                .context("nested trace parent missing")?;
+                            self.trace_started(child, &effect).await?;
                             let execution =
                                 if matches!(&effect.activity, ActivityReference::Workflow { .. }) {
                                     let child = parent
@@ -639,9 +648,12 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                                     )));
                                 }
                                 NestedExecution::Terminal { code, message } => {
+                                    self.trace_failed(&child_uri, &effect, &message).await?;
                                     return Ok(NestedExecution::Terminal { code, message });
                                 }
                             };
+                            self.trace_finished(&child_uri, &effect, &observation)
+                                .await?;
                             logical_time = observation.observed_at;
                             let child = parent
                                 .nested_workflows
