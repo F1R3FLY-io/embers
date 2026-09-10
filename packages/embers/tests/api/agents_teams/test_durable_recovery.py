@@ -1,10 +1,12 @@
-"""L2: durable Agent-Team recovery across an embers restart (single-process).
+"""L2: durable Agent-Team recovery across backend and storage restarts.
 
 Marked devnet+recovery+slow. Deploys a signal-wait workflow, runs it to a suspended
 wait, then restarts ONLY the embers systemd unit (F1r3node and F1r3drive stay up) —
 gracefully and, as a chaos variant, via SIGKILL — and from a FRESH client resumes the
 run and asserts the exact awaited output. The run is recovered from the F1r3drive
 continuation store across the restart; its revision and wait identity are unchanged.
+With F1R3DRIVE_SERVICE_UNIT set, a third case restarts the storage mount too, proving
+that chain reconstruction retains the checkpoint after losing the in-memory tree.
 
 Skips cleanly unless EMBERS_SERVICE_UNIT names an active user unit, so it never fails
 outside the managed L2 dev-net. live_workflow_recovery.py is the manual two-process
@@ -28,6 +30,7 @@ from tests.key import SECP256k1
 pytestmark = [pytest.mark.devnet, pytest.mark.recovery, pytest.mark.slow]
 
 EMBERS_SERVICE_UNIT = os.environ.get("EMBERS_SERVICE_UNIT", "")
+F1R3DRIVE_SERVICE_UNIT = os.environ.get("F1R3DRIVE_SERVICE_UNIT", "")
 EMBERS_URL = os.environ.get("EMBERS_API_URL", "[::1]:8080")
 
 
@@ -40,7 +43,11 @@ def _unit_active(unit: str) -> bool:
 
 
 def _restart_embers(method: str) -> None:
-    if method == "kill":
+    if method == "storage":
+        # The managed backend is bound to its storage unit. A fresh mount must
+        # reconstruct the checkpoint from chain data, not a surviving FUSE cache.
+        _systemctl("restart", F1R3DRIVE_SERVICE_UNIT, check=True)
+    elif method == "kill":
         _systemctl("kill", "-s", "SIGKILL", EMBERS_SERVICE_UNIT)
         _systemctl("start", EMBERS_SERVICE_UNIT)
     else:
@@ -65,7 +72,20 @@ def _wait_embers_ready(timeout: int = 120) -> None:
     not _unit_active(EMBERS_SERVICE_UNIT),
     reason="set EMBERS_SERVICE_UNIT to an active embers user unit (see scripts/l2.sh) to run recovery",
 )
-@pytest.mark.parametrize("restart_method", ["restart", "kill"])
+@pytest.mark.parametrize(
+    "restart_method",
+    [
+        "restart",
+        "kill",
+        pytest.param(
+            "storage",
+            marks=pytest.mark.skipif(
+                not _unit_active(F1R3DRIVE_SERVICE_UNIT),
+                reason="set F1R3DRIVE_SERVICE_UNIT to verify recovery after a fresh storage mount",
+            ),
+        ),
+    ],
+)
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
 def test_durable_recovery_across_embers_restart(client: ApiClient, funded_wallet: Wallet, restart_method: str):
     # Deploy the signal-wait workflow and run it to a suspended wait.
@@ -90,9 +110,9 @@ def test_durable_recovery_across_embers_restart(client: ApiClient, funded_wallet
     revision = int(suspended["revision"])
     wait_id = suspended["waits"][0]["id"]
 
-    # Restart ONLY embers; the node and drive keep the durable state alive.
+    # Restart the backend, or its storage dependency for the remount case.
     _restart_embers(restart_method)
-    _wait_embers_ready()
+    _wait_embers_ready(timeout=600 if restart_method == "storage" else 120)
 
     # A FRESH client recovers the run and drives the awaited signal.
     fresh = ApiClient(EMBERS_URL)
