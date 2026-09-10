@@ -37,6 +37,29 @@ struct RecordDeploy {
     uri: Uri,
 }
 
+// Rholang fresh names are derived from the deployer and timestamp. Distinct
+// contracts in one deployment plan must therefore have distinct timestamps.
+fn deployment_record_timestamp(
+    main_timestamp: i64,
+    claims: &std::collections::BTreeMap<String, crate::domain::common::RegistryDeploy>,
+) -> anyhow::Result<DateTime<Utc>> {
+    let mut timestamps = std::collections::BTreeSet::from([main_timestamp]);
+    for (id, claim) in claims {
+        anyhow::ensure!(
+            timestamps.insert(claim.timestamp.timestamp_millis()),
+            "Deployment stage timestamps must be distinct to prevent private-channel collisions; container {id} reuses a timestamp."
+        );
+    }
+    let next = timestamps
+        .last()
+        .copied()
+        .unwrap_or(main_timestamp)
+        .checked_add(1)
+        .context("Deployment timestamp overflow")?;
+    DateTime::from_timestamp_millis(next.max(Utc::now().timestamp_millis()))
+        .context("Deployment timestamp is outside the supported range")
+}
+
 enum TeamSource {
     Graph(Graph),
     Workflow(WorkflowDefinition),
@@ -135,12 +158,27 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         }
 
         let valid_after = self.write_client.clone().get_head_block_index().await?;
+        let container_claims = match &request {
+            DeployReq::AgentsTeam {
+                container_deploys, ..
+            }
+            | DeployReq::Graph {
+                container_deploys, ..
+            } => container_deploys.clone().unwrap_or_default(),
+        };
+        let main_timestamp = match &request {
+            DeployReq::AgentsTeam { deploy, .. } | DeployReq::Graph { deploy, .. } => {
+                deploy.timestamp.timestamp_millis()
+            }
+        };
+        let record_timestamp = deployment_record_timestamp(main_timestamp, &container_claims)?;
         let (source, deploy, system, address) = match request {
             DeployReq::AgentsTeam {
                 id,
                 version,
                 address,
                 deploy,
+                ..
             } => {
                 let agents_team = self
                     .get_with_retry(
@@ -171,7 +209,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                     env_uri: self.uri.clone(),
                     id,
                     version: agents_team.version,
-                    last_deploy: Utc::now(),
+                    last_deploy: record_timestamp,
                     uri: deploy.uri_pub_key.into(),
                 }
                 .render()?;
@@ -182,17 +220,30 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                     Some(
                         prepare_for_signing()
                             .code(system_code)
+                            .timestamp(record_timestamp)
                             .valid_after_block_number(valid_after)
                             .call(),
                     ),
                     Some(address),
                 )
             }
-            DeployReq::Graph { graph, deploy } => (TeamSource::Graph(graph), deploy, None, None),
+            DeployReq::Graph { graph, deploy, .. } => {
+                (TeamSource::Graph(graph), deploy, None, None)
+            }
         };
 
         let timestamp = deploy.timestamp;
 
+        let source = match source {
+            TeamSource::Graph(graph) => {
+                match super::compilation::lower_deployment_containers(&graph)? {
+                    Some(definition) => TeamSource::Workflow(definition),
+                    None => TeamSource::Graph(graph),
+                }
+            }
+            source => source,
+        };
+        let mut containers = Vec::new();
         let code = match source {
             TeamSource::Graph(graph) => {
                 let graph_code = parse(&graph)?;
@@ -209,11 +260,25 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
                 let agent_codes = self
                     .resolve_workflow_agent_codes(&definition, address.as_ref(), agents)
                     .await?;
-                render_workflow(&definition, deploy, &agent_codes)?
+                let (prepared, bindings) = super::deployment_containers::prepare(
+                    &definition,
+                    container_claims,
+                    &agent_codes,
+                    valid_after,
+                )?;
+                anyhow::ensure!(
+                    prepared
+                        .iter()
+                        .all(|container| container.uri != Uri::from(deploy.uri_pub_key)),
+                    "Container URI must differ from the team URI."
+                );
+                containers = prepared;
+                render_workflow(&definition, deploy, &agent_codes, &bindings)?
             }
         };
 
         Ok(DeployResp {
+            containers,
             contract: prepare_for_signing()
                 .code(code)
                 .valid_after_block_number(valid_after)
@@ -348,6 +413,26 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
         let mut write_client = self.write_client.clone();
 
+        let containers = request.containers.unwrap_or_default();
+        if !containers.is_empty() {
+            for (index, contract) in containers.into_iter().enumerate() {
+                self.finalize_deployment_stage(
+                    contract,
+                    &format!("Deployment container {}", index + 1),
+                )
+                .await?;
+            }
+            let main = self
+                .finalize_deployment_stage(request.contract, "Team deployment")
+                .await?;
+            return match request.system {
+                Some(system) => {
+                    self.finalize_deployment_stage(system, "Team deployment record")
+                        .await
+                }
+                None => Ok(main),
+            };
+        }
         let main_deploy_id = write_client
             .deploy_signed_contract(request.contract)
             .await?;
@@ -361,6 +446,42 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             Some(system) => write_client.deploy_signed_contract(system).await,
             None => Ok(main_deploy_id),
         }
+    }
+
+    async fn finalize_deployment_stage(
+        &self,
+        contract: firefly_client::models::SignedCode,
+        stage: &str,
+    ) -> anyhow::Result<DeployId> {
+        let signed_id = DeployId::from(hex::encode(&contract.sig));
+        if self
+            .observer_node_events
+            .wait_for_deploy(&signed_id, Duration::ZERO)
+            .await
+            == Some(false)
+        {
+            return Ok(signed_id);
+        }
+        match self.read_client.deploy_finalization(&signed_id).await? {
+            Some(false) => return Ok(signed_id),
+            Some(true) => anyhow::bail!(
+                "{stage} previously finalized with an execution error. Prepare a new deployment attempt."
+            ),
+            None => {}
+        }
+        let id = self
+            .write_client
+            .clone()
+            .deploy_signed_contract(contract)
+            .await?;
+        anyhow::ensure!(
+            self.observer_node_events
+                .wait_for_deploy(&id, self.deploy_finalization_timeout)
+                .await
+                == Some(false),
+            "{stage} did not finalize successfully; later deployment stages were not submitted. Retry to reuse stages already finalized on the observer."
+        );
+        Ok(id)
     }
 }
 
@@ -499,6 +620,121 @@ mod tests {
         }
     }
 
+    #[test]
+    fn deployment_stages_cannot_share_their_fresh_name_seed() {
+        let main = Utc::now().timestamp_millis() + 100;
+        let claim = |millis| crate::domain::common::RegistryDeploy {
+            timestamp: DateTime::from_timestamp_millis(millis).unwrap(),
+            version: 0,
+            uri_pub_key: test_public_key(),
+            signature: vec![],
+        };
+        let duplicate_main = BTreeMap::from([("first".to_owned(), claim(main))]);
+        assert!(
+            deployment_record_timestamp(main, &duplicate_main)
+                .unwrap_err()
+                .to_string()
+                .contains("private-channel collisions")
+        );
+        let duplicate_containers = BTreeMap::from([
+            ("first".to_owned(), claim(main + 1)),
+            ("second".to_owned(), claim(main + 1)),
+        ]);
+        assert!(deployment_record_timestamp(main, &duplicate_containers).is_err());
+        let distinct = BTreeMap::from([
+            ("first".to_owned(), claim(main + 1)),
+            ("second".to_owned(), claim(main + 2)),
+        ]);
+        assert!(
+            deployment_record_timestamp(main, &distinct)
+                .unwrap()
+                .timestamp_millis()
+                > main + 2
+        );
+    }
+
+    #[tokio::test]
+    async fn container_failure_prevents_team_and_metadata_submission() {
+        let write = MockWriteNode::new()
+            .with_deploy_response(Ok(DeployId::from("first".to_owned())))
+            .with_deploy_response(Ok(DeployId::from("second".to_owned())));
+        let mut service = make_service(MockReadNode::new(), write.clone());
+        service.observer_node_events =
+            MockNodeEventSource::new().with_wait_result("second", Some(true));
+        let error = service
+            .deploy_signed_deploy(DeploySignedReq {
+                containers: Some(vec![dummy_signed_code(1), dummy_signed_code(2)]),
+                contract: dummy_signed_code(3),
+                system: Some(dummy_signed_code(4)),
+            })
+            .await
+            .unwrap_err();
+        assert!(error.to_string().contains("container 2"));
+        assert_eq!(write.deployed_contracts().len(), 2);
+    }
+
+    #[tokio::test]
+    async fn container_retry_reuses_finalized_stage_and_orders_team_before_record() {
+        let mut first = dummy_signed_code(1);
+        first.sig = vec![1; 64];
+        let write = MockWriteNode::new()
+            .with_deploy_response(Ok(DeployId::from("second".to_owned())))
+            .with_deploy_response(Ok(DeployId::from("main".to_owned())))
+            .with_deploy_response(Ok(DeployId::from("record".to_owned())));
+        let mut service = make_service(MockReadNode::new(), write.clone());
+        service.observer_node_events =
+            MockNodeEventSource::new().with_wait_result(&hex::encode(&first.sig), Some(false));
+        let id = service
+            .deploy_signed_deploy(DeploySignedReq {
+                containers: Some(vec![first, dummy_signed_code(2)]),
+                contract: dummy_signed_code(3),
+                system: Some(dummy_signed_code(4)),
+            })
+            .await
+            .unwrap();
+        assert_eq!(id, DeployId::from("record".to_owned()));
+        let submitted = write.deployed_contracts();
+        assert_eq!(
+            submitted.iter().map(|code| code[0]).collect::<Vec<_>>(),
+            vec![2, 3, 4]
+        );
+    }
+
+    #[tokio::test]
+    async fn activity_result_waits_for_observer_visibility_beyond_five_empty_reads() {
+        let read = MockReadNode::new().on_code_containing_empty_then(
+            "visibility",
+            6,
+            serde_json::json!({"answer":42}),
+        );
+        let service = make_service(read, MockWriteNode::new());
+        let result: serde_json::Value = service
+            .read_deploy_result(DeployId::from("visibility".to_owned()))
+            .await
+            .unwrap();
+        assert_eq!(result, serde_json::json!({"answer":42}));
+    }
+
+    #[tokio::test]
+    async fn retry_after_restart_uses_observer_status_without_resubmission() {
+        let first = dummy_signed_code(1);
+        let read = MockReadNode::new().on_code_containing(
+            &format!("deploy-finalization:{}", hex::encode(&first.sig)),
+            serde_json::json!(false),
+        );
+        let write = MockWriteNode::new();
+        let service = make_service(read, write.clone());
+        let expected = DeployId::from(hex::encode(&first.sig));
+        assert_eq!(
+            service
+                .finalize_deployment_stage(first, "container")
+                .await
+                .unwrap(),
+            expected
+        );
+        assert!(write.deployed_contracts().is_empty());
+    }
+
     // -------------------------------------------------------
     // deploy_signed_deploy tests
     // -------------------------------------------------------
@@ -514,6 +750,7 @@ mod tests {
 
         let contract = dummy_signed_code(0xAA);
         let request = DeploySignedReq {
+            containers: None,
             contract: contract.clone(),
             system: None,
         };
@@ -552,6 +789,7 @@ mod tests {
         let system_contract = dummy_signed_code(0xCC);
 
         let request = DeploySignedReq {
+            containers: None,
             contract: main_contract.clone(),
             system: Some(system_contract.clone()),
         };
@@ -590,6 +828,7 @@ mod tests {
         let service = make_service(read, write);
 
         let request = DeploySignedReq {
+            containers: None,
             contract: dummy_signed_code(0x01),
             system: None,
         };
@@ -614,6 +853,7 @@ mod tests {
         let service = make_service(read, write);
 
         let request = DeploySignedReq {
+            containers: None,
             contract: dummy_signed_code(0x01),
             system: Some(dummy_signed_code(0x02)),
         };
@@ -640,6 +880,7 @@ mod tests {
         let service = make_service(read, write.clone());
 
         let request = DeploySignedReq {
+            containers: None,
             contract: dummy_signed_code(0xDD),
             system: None,
         };

@@ -39,6 +39,8 @@ struct DeployWorkflowTemplate {
     sig: Vec<u8>,
     definition_json: String,
     definition_hash: String,
+    #[template(direct)]
+    deployment_bindings: String,
 
     #[template(direct)]
     system_channels: Vec<&'static str>,
@@ -66,6 +68,15 @@ pub fn render(
     workflow: &WorkflowDefinition,
     deploy: RegistryDeploy,
     agent_codes: &AgentCodes,
+) -> anyhow::Result<String> {
+    render_with_containers(workflow, deploy, agent_codes, &BTreeMap::new())
+}
+
+pub fn render_with_containers(
+    workflow: &WorkflowDefinition,
+    deploy: RegistryDeploy,
+    agent_codes: &AgentCodes,
+    bindings: &BTreeMap<String, String>,
 ) -> anyhow::Result<String> {
     let definition = workflow.parsed();
     let names = definition
@@ -110,6 +121,7 @@ pub fn render(
             incoming.get(&node.id).map_or(0, BTreeSet::len),
             &names,
             agent_codes,
+            bindings,
         )?);
         contracts.push(render_router_contract(
             definition, node, node_names, &names,
@@ -147,13 +159,14 @@ pub fn render(
         sig: deploy.signature,
         definition_json: workflow.json_ref().to_owned(),
         definition_hash: workflow.definition_hash(),
+        deployment_bindings: serde_json::to_string(bindings)?,
         system_channels: system_channels(definition),
         private_channels,
         initializers,
         contracts,
         starts,
         guard_dispatch: render_guard_dispatch(definition)?,
-        activity_dispatch: render_activity_dispatch(definition, agent_codes)?,
+        activity_dispatch: render_activity_dispatch(definition, agent_codes, bindings)?,
     }
     .render()
     .map_err(Into::into)
@@ -176,7 +189,7 @@ impl NodeNames {
     }
 }
 
-fn system_channels(definition: &Definition) -> Vec<&'static str> {
+pub(crate) fn system_channels(definition: &Definition) -> Vec<&'static str> {
     let mut result = BTreeSet::new();
     for node in definition.nodes.values() {
         if let NodeKind::Activity { activity } = &node.kind {
@@ -213,8 +226,35 @@ fn render_node_contract(
     incoming_count: usize,
     all_names: &BTreeMap<String, NodeNames>,
     agent_codes: &AgentCodes,
+    bindings: &BTreeMap<String, String>,
 ) -> anyhow::Result<String> {
-    let body = render_node_body(definition, node, names, all_names, agent_codes)?;
+    let body = if let Some(uri) = bindings.get(&node.id) {
+        let completion = match &node.kind {
+            NodeKind::Activity {
+                activity:
+                    ActivityReference::Agent {
+                        protocol: AgentProtocol::StructuredV1,
+                        ..
+                    },
+            } => format!(
+                "{}!(result.getOrElse(\"output\", Nil), result.getOrElse(\"disposition\", \"completed\"), context)",
+                names.route
+            ),
+            _ => format!("{}!(result, \"completed\", context)", names.route),
+        };
+        container_call(
+            uri,
+            &node.id,
+            "$value",
+            &completion,
+            &format!(
+                r#"{}!("Deployment container is unavailable", "failed", context)"#,
+                names.route
+            ),
+        )?
+    } else {
+        render_node_body(definition, node, names, all_names, agent_codes)?
+    };
     let contract = match &node.join {
         None | Some(JoinPolicy::Each { .. }) => format!(
             "contract {}(@value, @context, @source) = {{\n{}\n}}",
@@ -347,7 +387,7 @@ fn render_node_body(
                             format!(
                                 "{}!($value, context, {})",
                                 target.node,
-                                rho_string(&node.label)
+                                rho_string(node.output_key())
                             )
                         })
                         .with_context(|| {
@@ -465,9 +505,10 @@ fn render_guard_dispatch(definition: &Definition) -> anyhow::Result<String> {
     ))
 }
 
-fn render_activity_dispatch(
+pub(crate) fn render_activity_dispatch(
     definition: &Definition,
     agent_codes: &AgentCodes,
+    bindings: &BTreeMap<String, String>,
 ) -> anyhow::Result<String> {
     let cases = definition
         .nodes
@@ -477,7 +518,12 @@ fn render_activity_dispatch(
             _ => None,
         })
         .map(|(node, activity)| {
-            render_activity_host(node, activity, agent_codes).map(|body| (node.id.clone(), body))
+            let body = if let Some(uri) = bindings.get(&node.id) {
+                container_call(uri, &node.id, "input", "return!(result)", r#"return!({"disposition":"failed","error":"Deployment container is unavailable"})"#)
+            } else {
+                render_activity_host(node, activity, agent_codes)
+            }?;
+            Ok((node.id.clone(), body))
         })
         .collect::<anyhow::Result<Vec<_>>>()?;
     Ok(render_dispatch(
@@ -705,7 +751,7 @@ fn render_send(
     let target = names
         .get(&transition.target_node_id)
         .with_context(|| format!("transition {} target has no runtime channel", transition.id))?;
-    let source_label = rho_string(&source.label);
+    let source_label = rho_string(source.output_key());
     Ok(match &transition.loop_policy {
         Some(LoopPolicy::Bounded { max_iterations }) => {
             let id = rho_string(&transition.id);
@@ -940,4 +986,21 @@ mod tests {
         assert!(!rho.contains(" /\\ "));
         assert!(!rho.contains(" \\/ "));
     }
+}
+
+fn container_call(
+    uri: &str,
+    node_id: &str,
+    input: &str,
+    completion: &str,
+    failure: &str,
+) -> anyhow::Result<String> {
+    Ok(format!(
+        "new containerLookup(`rho:registry:lookup`), foundContainer, containerResult in {{ containerLookup!({}, *foundContainer) | for(@entry <- foundContainer) {{ match entry {{ (_, container) => {{ @container!(\"activity\", {}, {}, *containerResult) | for(@result <- containerResult) {{ {} }} }} _ => {{ {} }} }} }} }}",
+        rho_uri(uri)?,
+        rho_string(node_id),
+        input,
+        completion,
+        failure
+    ))
 }

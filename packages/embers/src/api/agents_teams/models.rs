@@ -284,6 +284,7 @@ pub struct DeployAgentsTeam {
     pub address: Stringified<WalletAddress>,
     /// The registry claim authorizing publication under the target URI.
     pub deploy: RegistryDeploy,
+    pub container_deploys: Option<std::collections::BTreeMap<String, RegistryDeploy>>,
 }
 
 /// Compile and deploy a raw graphl term.
@@ -293,6 +294,7 @@ pub struct DeployGraph {
     pub graph: Stringified<models::Graph>,
     /// The registry claim authorizing publication under the target URI.
     pub deploy: RegistryDeploy,
+    pub container_deploys: Option<std::collections::BTreeMap<String, RegistryDeploy>>,
 }
 
 #[derive(Debug, Clone, Hash, Union)]
@@ -310,10 +312,22 @@ impl From<DeployAgentsTeamReq> for models::DeployReq {
                 version: deploy.version,
                 address: deploy.address.0,
                 deploy: deploy.deploy.into(),
+                container_deploys: deploy.container_deploys.map(|items| {
+                    items
+                        .into_iter()
+                        .map(|(id, claim)| (id, claim.into()))
+                        .collect()
+                }),
             },
             DeployAgentsTeamReq::Graph(deploy) => Self::Graph {
                 graph: deploy.graph.0,
                 deploy: deploy.deploy.into(),
+                container_deploys: deploy.container_deploys.map(|items| {
+                    items
+                        .into_iter()
+                        .map(|(id, claim)| (id, claim.into()))
+                        .collect()
+                }),
             },
         }
     }
@@ -322,6 +336,7 @@ impl From<DeployAgentsTeamReq> for models::DeployReq {
 #[derive(Debug, Clone, Hash, StructuralConvert, Object)]
 #[convert(from(models::DeployResp))]
 pub struct DeployAgentsTeamResp {
+    pub containers: Vec<PreparedContainer>,
     /// The unsigned compiled team contract bytes to sign.
     pub contract: PreparedContract,
     /// The unsigned record-update contract bytes; present only when the
@@ -329,9 +344,18 @@ pub struct DeployAgentsTeamResp {
     pub system: Option<PreparedContract>,
 }
 
+#[derive(Debug, Clone, Hash, StructuralConvert, Object)]
+#[convert(from(models::PreparedContainer))]
+pub struct PreparedContainer {
+    pub id: String,
+    pub uri: Stringified<Uri>,
+    pub contract: PreparedContract,
+}
+
 #[derive(Debug, Clone, StructuralConvert, Object)]
 #[convert(into(models::DeploySignedReq))]
 pub struct DeploySignedAgentsTeamReq {
+    pub containers: Option<Vec<SignedContract>>,
     /// The signed compiled team contract.
     pub contract: SignedContract,
     /// The signed record-update contract; present exactly when prepare

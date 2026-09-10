@@ -14,6 +14,12 @@ use crate::node_events::DeployEvent;
 /// which uses HTTP / explore-deploy under the hood. Extracting a trait
 /// enables unit-testing domain logic with lightweight test doubles.
 pub trait ReadNode: Clone + Send + Sync + 'static {
+    /// Canonical observer status: false = success, true = failed, None = unsettled.
+    fn deploy_finalization(
+        &self,
+        deploy_id: &DeployId,
+    ) -> impl Future<Output = Result<Option<bool>, ReadNodeError>> + Send;
+
     fn get_data<T: serde::de::DeserializeOwned + Send>(
         &self,
         rholang_code: String,

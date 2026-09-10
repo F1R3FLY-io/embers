@@ -162,7 +162,7 @@ fn node_label<'a>(nodes: &BTreeMap<Vertex<'a>, Node<'a>>, vertex: &Vertex<'a>) -
 
 /// `"Summarize"` -> `"summarize"`, `"My Agent!"` -> `"myAgent"`. Falls back to
 /// `"agent"` so a name made entirely of punctuation still yields a usable key.
-fn lower_camel_case(name: &str) -> String {
+pub(super) fn lower_camel_case(name: &str) -> String {
     let mut result = String::with_capacity(name.len());
     let mut capitalize = false;
 

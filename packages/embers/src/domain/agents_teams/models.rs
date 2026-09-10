@@ -119,21 +119,32 @@ pub enum DeployReq {
         version: String,
         address: WalletAddress,
         deploy: RegistryDeploy,
+        container_deploys: Option<std::collections::BTreeMap<String, RegistryDeploy>>,
     },
     Graph {
         graph: Graph,
         deploy: RegistryDeploy,
+        container_deploys: Option<std::collections::BTreeMap<String, RegistryDeploy>>,
     },
 }
 
 #[derive(Debug, Clone)]
+pub struct PreparedContainer {
+    pub id: String,
+    pub uri: Uri,
+    pub contract: PreparedContract,
+}
+
+#[derive(Debug, Clone)]
 pub struct DeployResp {
+    pub containers: Vec<PreparedContainer>,
     pub contract: PreparedContract,
     pub system: Option<PreparedContract>,
 }
 
 #[derive(Debug, Clone)]
 pub struct DeploySignedReq {
+    pub containers: Option<Vec<SignedCode>>,
     pub contract: SignedCode,
     pub system: Option<SignedCode>,
 }

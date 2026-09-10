@@ -145,6 +145,18 @@ impl MockReadNode {
 }
 
 impl ReadNode for MockReadNode {
+    async fn deploy_finalization(
+        &self,
+        deploy_id: &DeployId,
+    ) -> Result<Option<bool>, ReadNodeError> {
+        match self.find_response(&format!("deploy-finalization:{}", deploy_id.as_ref())) {
+            Ok(value) => serde_json::from_value(value)
+                .map_err(|error| ReadNodeError::Deserialization(error.into())),
+            Err(ReadNodeError::ReturnValueMissing) => Ok(None),
+            Err(error) => Err(error),
+        }
+    }
+
     async fn get_data<T: serde::de::DeserializeOwned + Send>(
         &self,
         rholang_code: String,
@@ -306,7 +318,7 @@ impl NodeEventSource for MockNodeEventSource {
     fn wait_for_deploy(
         &self,
         deploy_id: &DeployId,
-        _max_wait: Duration,
+        max_wait: Duration,
     ) -> impl std::future::Future<Output = Option<bool>> + Send {
         let result = self
             .wait_results
@@ -314,7 +326,11 @@ impl NodeEventSource for MockNodeEventSource {
             .unwrap()
             .get(&deploy_id.to_string())
             .copied()
-            .unwrap_or(Some(false));
+            .unwrap_or(if max_wait.is_zero() {
+                None
+            } else {
+                Some(false)
+            });
         async move { result }
     }
 

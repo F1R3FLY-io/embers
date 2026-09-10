@@ -1024,11 +1024,37 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
         &self,
         deploy_id: DeployId,
     ) -> anyhow::Result<T> {
-        let code = GetDeployResult { deploy_id }.render()?;
-        self.read_client
-            .get_data_with_retry(code, 5, Duration::from_millis(500))
-            .await
-            .map_err(Into::into)
+        let code = GetDeployResult {
+            deploy_id: deploy_id.clone(),
+        }
+        .render()?;
+        // Finalization events can precede the observer's readable state. Use
+        // the configured finalization budget for visibility as well, rather
+        // than failing an otherwise successful activity after a few seconds.
+        let deadline = tokio::time::Instant::now() + self.deploy_finalization_timeout;
+        loop {
+            let result =
+                tokio::time::timeout_at(deadline, self.read_client.get_data(code.clone())).await;
+            match result {
+                Ok(Ok(value)) => return Ok(value),
+                Ok(Err(firefly_client::errors::ReadNodeError::ReturnValueMissing)) => {
+                    if tokio::time::Instant::now() >= deadline {
+                        anyhow::bail!(
+                            "Finalized activity {deploy_id} is not yet readable on the observer; recovery will retry the same activity."
+                        );
+                    }
+                    tokio::time::sleep_until(std::cmp::min(
+                        deadline,
+                        tokio::time::Instant::now() + Duration::from_millis(500),
+                    ))
+                    .await;
+                }
+                Ok(Err(error)) => return Err(error.into()),
+                Err(_) => anyhow::bail!(
+                    "Timed out waiting for finalized activity {deploy_id} to become readable on the observer; recovery will retry the same activity."
+                ),
+            }
+        }
     }
 
     async fn checkpoint_and_advance(

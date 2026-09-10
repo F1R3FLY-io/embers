@@ -275,6 +275,35 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsApi<R, W, N> {
         >,
         Data(agents_teams): Data<&AgentsTeamsService<R, W, N>>,
     ) -> ApiResult<SendResp> {
+        let prepared = &body.prepare_response;
+        let signed = body.request.containers.as_deref().unwrap_or_default();
+        let main = &body.request.contract;
+        let system_matches = match (&body.request.system, &prepared.system) {
+            (None, None) => true,
+            (Some(signed), Some(prepared)) => {
+                signed.contract == prepared.0 && signed.deployer == main.deployer
+            }
+            _ => false,
+        };
+        if main.contract != prepared.contract.0 || !system_matches {
+            return Err::<SendResp, _>(anyhow::anyhow!(
+                "Signed team deployment or record differs from the prepared deployment."
+            ))
+            .into();
+        }
+        if signed.len() != prepared.containers.len()
+            || signed
+                .iter()
+                .zip(&prepared.containers)
+                .any(|(signed, prepared)| {
+                    signed.contract != prepared.contract.0 || signed.deployer != main.deployer
+                })
+        {
+            return Err::<SendResp, _>(anyhow::anyhow!(
+                "Signed deployment containers differ from the prepared deployment."
+            ))
+            .into();
+        }
         agents_teams
             .deploy_signed_deploy(body.request.into())
             .await

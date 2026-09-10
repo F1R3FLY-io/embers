@@ -264,7 +264,10 @@ impl ContinuationEnvelope {
                 token.value = observation.output;
                 token.disposition = observation.disposition;
                 token.phase = TokenPhase::Route;
-                token.source_label = pending.request.node_label;
+                token.source_label = pending
+                    .request
+                    .output_key
+                    .unwrap_or(pending.request.node_label);
                 if token.disposition == "completed" {
                     if let Some(compensation) = pending.compensation {
                         self.compensations.push(CompensationRecord {
@@ -590,6 +593,7 @@ impl ContinuationEnvelope {
             execution_id: self.execution_id.clone(),
             node_id: record.node_id.clone(),
             node_label: format!("compensation:{}", record.node_id),
+            output_key: None,
             activity: record.activity.clone(),
             input: json!({"forwardInput": record.input, "forwardOutput": record.output}),
             input_hash: String::new(),
@@ -818,7 +822,7 @@ impl ContinuationEnvelope {
             NodeKind::Input | NodeKind::Gateway | NodeKind::Transform { .. } => {
                 token.phase = TokenPhase::Route;
                 "completed".clone_into(&mut token.disposition);
-                token.source_label.clone_from(&node.label);
+                token.source_label = node.output_key().to_owned();
                 self.queue.push_back(token);
             }
             NodeKind::Output => {
@@ -1004,6 +1008,7 @@ impl ContinuationEnvelope {
             execution_id: self.execution_id.clone(),
             node_id: node.id.clone(),
             node_label: node.label.clone(),
+            output_key: node.output_key.clone(),
             activity,
             input: token.value,
             input_hash: String::new(),
@@ -1409,7 +1414,7 @@ impl ContinuationEnvelope {
                         child.phase = TokenPhase::Enter;
                         child.joined = false;
                         child.source_transition_id = Some(transition.id.clone());
-                        child.source_label.clone_from(&node.label);
+                        child.source_label = node.output_key().to_owned();
                         let wait_id = format!("yield:{}:{}", child.id, transition.id);
                         self.pending_waits.insert(
                             wait_id.clone(),
@@ -1436,7 +1441,7 @@ impl ContinuationEnvelope {
             child.phase = TokenPhase::Enter;
             child.joined = false;
             child.source_transition_id = Some(transition.id.clone());
-            child.source_label.clone_from(&node.label);
+            child.source_label = node.output_key().to_owned();
             self.event(
                 "transitionTaken",
                 Some(node.id.clone()),
@@ -1640,6 +1645,8 @@ pub struct EffectRequest {
     pub execution_id: String,
     pub node_id: String,
     pub node_label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_key: Option<String>,
     pub activity: ActivityReference,
     pub input: Value,
     pub input_hash: String,

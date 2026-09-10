@@ -21,13 +21,19 @@ spec.loader.exec_module(graph_module)
 
 @pytest.mark.slow
 @pytest.mark.parametrize("funded_wallet", [100_000_000], indirect=True)
-@pytest.mark.parametrize("case", FIXTURES["cases"], ids=lambda case: case["name"])
+@pytest.mark.parametrize("case", [*FIXTURES["cases"], {**FIXTURES["cases"][0], "name": "nested-deployment", "nested": True}], ids=lambda case: case["name"])
 def test_red_blue_decision_brief(client: ApiClient, funded_wallet: Wallet, case: dict):
     agents = {}
     for name, code in FIXTURES["agents"].items():
         record = client.agents.create(funded_wallet, name=name, code=code).wait_for_sync().first.json["response"]
         agents[name] = (record["id"], record["version"])
     definition = graph_module.build_definition(agents)
+    if case.get("nested"):
+        for container in definition["deploymentContainers"].values():
+            container["parentId"] = "OuterDeployment"
+        definition["deploymentContainers"]["OuterDeployment"] = {
+            "id": "OuterDeployment", "label": "Engineering Review", "nodeIds": [], "target": "current",
+        }
     record = client.agents_teams.create(
         funded_wallet, name="RedBlueDecisionReview", definition=definition
     ).wait_for_sync().first.json["response"]

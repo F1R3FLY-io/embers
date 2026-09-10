@@ -40,6 +40,7 @@ pub mod continuation_store;
 mod create;
 mod delete;
 mod deploy;
+mod deployment_containers;
 mod get;
 mod get_run;
 mod grants;

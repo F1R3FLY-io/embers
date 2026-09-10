@@ -633,6 +633,7 @@ fn compiled_workflow() -> String {
         &corpus_workflow(),
         fixture_registry_deploy(),
         &corpus_agent_codes(),
+        &std::collections::BTreeMap::new(),
     )
     .expect("the corpus workflow renders")
 }
@@ -642,16 +643,17 @@ fn compiled_workflow() -> String {
 // -------------------------------------------------------
 
 fn corpus_dir() -> PathBuf {
-    std::env::var_os("CARGO_TARGET_DIR").map_or_else(
-        || {
-            Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("..")
-                .join("..")
-                .join("target")
-        },
-        PathBuf::from,
-    )
-    .join("rendered-corpus")
+    std::env::var_os("CARGO_TARGET_DIR")
+        .map_or_else(
+            || {
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("..")
+                    .join("..")
+                    .join("target")
+            },
+            PathBuf::from,
+        )
+        .join("rendered-corpus")
 }
 
 fn rho_map(entries: &[(&str, &str)]) -> RhoValue {
@@ -765,9 +767,7 @@ fn render_corpus_writes_all_templates() {
     push(
         "agents_deploy_agent",
         AgentsDeployAgent {
-            code: Inline::from(
-                "contract main(@input, return) = { return!(input) }".to_owned(),
-            ),
+            code: Inline::from("contract main(@input, return) = { return!(input) }".to_owned()),
             handle: "agent:agent-1:v1".into(),
         }
         .render(),

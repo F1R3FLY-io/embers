@@ -14,6 +14,7 @@ in {
         return!({
             "definition": {{ definition_json }},
             "definitionHash": {{ definition_hash }},
+            "deploymentBindings": {{ deployment_bindings }},
             "protocol": "embers-agent-team-control-v1"
         })
     } |

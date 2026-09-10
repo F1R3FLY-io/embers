@@ -274,6 +274,44 @@ impl ReadNodeClient {
 }
 
 impl ReadNode for ReadNodeClient {
+    async fn deploy_finalization(
+        &self,
+        deploy_id: &crate::models::DeployId,
+    ) -> Result<Option<bool>, ReadNodeError> {
+        #[derive(serde::Deserialize)]
+        struct Status {
+            state: State,
+        }
+        #[derive(serde::Deserialize)]
+        enum State {
+            Finalized,
+            Failed,
+            Pending,
+            Expired,
+        }
+        let response = self
+            .client
+            .get(format!(
+                "{}/api/deploy-finalization-status/{}",
+                self.url.trim_end_matches('/'),
+                deploy_id.as_ref()
+            ))
+            .send()
+            .await?;
+        if !response.status().is_success() {
+            return Err(ReadNodeError::Api(
+                response.status(),
+                response.text().await?,
+            ));
+        }
+        let status: Status = response.json().await?;
+        Ok(match status.state {
+            State::Finalized => Some(false),
+            State::Failed => Some(true),
+            State::Pending | State::Expired => None,
+        })
+    }
+
     async fn get_data<T: serde::de::DeserializeOwned + Send>(
         &self,
         rholang_code: String,
@@ -319,6 +357,42 @@ mod tests {
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
     use super::*;
+
+    #[tokio::test]
+    async fn reads_canonical_deploy_status_and_rejects_unknown_states() {
+        let server = MockServer::start().await;
+        let client = ReadNodeClient::new(server.uri());
+        for (state, expected) in [
+            ("Finalized", Some(false)),
+            ("Failed", Some(true)),
+            ("Pending", None),
+            ("Expired", None),
+        ] {
+            Mock::given(method("GET"))
+                .and(path(format!("/api/deploy-finalization-status/{state}")))
+                .respond_with(ResponseTemplate::new(200).set_body_json(json!({"state": state})))
+                .mount(&server)
+                .await;
+            assert_eq!(
+                client
+                    .deploy_finalization(&crate::models::DeployId::from(state.to_owned()))
+                    .await
+                    .unwrap(),
+                expected
+            );
+        }
+        Mock::given(method("GET"))
+            .and(path("/api/deploy-finalization-status/unknown"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({"state": "Unknown"})))
+            .mount(&server)
+            .await;
+        assert!(
+            client
+                .deploy_finalization(&crate::models::DeployId::from("unknown".to_owned()))
+                .await
+                .is_err()
+        );
+    }
 
     /// Helper: returns a valid explore-deploy JSON response wrapping a string expr.
     fn string_expr_response(data: &str) -> serde_json::Value {

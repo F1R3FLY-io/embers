@@ -83,6 +83,8 @@ fn canonicalize(value: Value) -> Value {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Definition {
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub deployment_containers: BTreeMap<String, DeploymentContainer>,
     pub schema_version: String,
     pub entry_scope_id: String,
     pub interface: WorkflowInterface,
@@ -95,6 +97,23 @@ pub struct Definition {
     pub types: BTreeMap<String, PortableType>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct DeploymentContainer {
+    pub id: String,
+    pub label: String,
+    pub node_ids: Vec<String>,
+    pub target: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent_id: Option<String>,
+}
+
+impl WorkflowNode {
+    pub fn output_key(&self) -> &str {
+        self.output_key.as_deref().unwrap_or(&self.label)
+    }
+}
+
 impl Definition {
     /// Protects serialization invariants while allowing incomplete drafts.
     pub fn validate_draft(&self) -> anyhow::Result<()> {
@@ -103,6 +122,88 @@ impl Definition {
             "unsupported workflow schema {}; expected 2.0",
             self.schema_version
         );
+        validate_map_ids(
+            "deployment container",
+            &self.deployment_containers,
+            |item| &item.id,
+        )?;
+        let mut assigned = BTreeSet::new();
+        for container in self.deployment_containers.values() {
+            ensure!(
+                !container.label.trim().is_empty(),
+                "deployment container name is required"
+            );
+            ensure!(
+                container.target == "current",
+                "unsupported deployment target {}",
+                container.target
+            );
+            ensure!(
+                !self.nodes.contains_key(&container.id),
+                "deployment container id conflicts with workflow node"
+            );
+            let mut ancestors = BTreeSet::from([container.id.as_str()]);
+            let mut parent = container.parent_id.as_deref();
+            while let Some(id) = parent {
+                ensure!(
+                    ancestors.insert(id),
+                    "deployment container hierarchy contains a cycle at {id}"
+                );
+                if let Some(parent_container) = self.deployment_containers.get(id) {
+                    parent = parent_container.parent_id.as_deref();
+                } else {
+                    ensure!(
+                        self.nodes
+                            .get(id)
+                            .is_some_and(|node| matches!(node.kind, NodeKind::Scope { .. })),
+                        "deployment container {} has invalid parent {id}",
+                        container.id
+                    );
+                    parent = self
+                        .deployment_containers
+                        .values()
+                        .find(|candidate| candidate.node_ids.iter().any(|member| member == id))
+                        .map(|candidate| candidate.id.as_str());
+                }
+            }
+            for id in &container.node_ids {
+                ensure!(
+                    self.nodes.contains_key(id),
+                    "container {} references missing node {id}",
+                    container.id
+                );
+                ensure!(
+                    assigned.insert(id),
+                    "node {id} belongs to multiple deployment containers"
+                );
+            }
+        }
+        for node in self.nodes.values() {
+            ensure!(
+                !node.output_key().trim().is_empty(),
+                "node {} has an empty output key",
+                node.id
+            );
+            if node.join.is_some() {
+                let producers: BTreeSet<_> = self
+                    .transitions
+                    .values()
+                    .filter(|t| t.target_node_id == node.id)
+                    .map(|t| &t.source_node_id)
+                    .collect();
+                let mut keys = BTreeSet::new();
+                for id in producers {
+                    if let Some(producer) = self.nodes.get(id) {
+                        ensure!(
+                            keys.insert(producer.output_key()),
+                            "join {} has duplicate producer key {}",
+                            node.id,
+                            producer.output_key()
+                        );
+                    }
+                }
+            }
+        }
         validate_map_ids("node", &self.nodes, |node| &node.id)?;
         validate_map_ids("scope", &self.scopes, |scope| &scope.id)?;
         validate_map_ids("route group", &self.route_groups, |group| &group.id)?;
@@ -869,6 +970,8 @@ pub struct NodePresentation {
 pub struct WorkflowNode {
     pub id: String,
     pub label: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_key: Option<String>,
     pub scope_id: String,
     pub join: Option<JoinPolicy>,
     #[serde(default)]

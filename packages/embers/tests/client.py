@@ -489,6 +489,17 @@ class AgentsTeamsApi:
             "address": wallet.address,
             "deploy": deploy,
         }
+        if agents_team.definition and agents_team.definition.get("deploymentContainers"):
+            from datetime import UTC, datetime, timedelta
+            from tests.conftest import insert_signed_deploy
+            prepare_request["container_deploys"] = {
+                container_id: insert_signed_deploy(
+                    SECP256k1.generate(),
+                    datetime.fromtimestamp(int(deploy["timestamp"]) // 1000, UTC) + timedelta(milliseconds=int(deploy["timestamp"]) % 1000 + index + 1),
+                    wallet, version=0,
+                )
+                for index, container_id in enumerate(agents_team.definition["deploymentContainers"])
+            }
         resp = self._client.post("/ai-agents-teams/deploy/prepare", json=prepare_request)
         assert resp.status == 200, resp.body
 
@@ -499,6 +510,7 @@ class AgentsTeamsApi:
                 "prepare_request": prepare_request,
                 "prepare_response": resp.json["response"],
                 "request": {
+                    "containers": [sing_contract(wallet, item["contract"]) for item in resp.json["response"].get("containers", [])],
                     "contract": sing_contract(wallet, resp.json["response"]["contract"]),
                     "system": sing_contract(wallet, resp.json["response"]["system"])
                     if resp.json["response"].get("system") is not None

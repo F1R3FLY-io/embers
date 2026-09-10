@@ -59,12 +59,50 @@ struct FlatGraph<'a> {
     bindings_reverse: BTreeMap<Vertex<'a>, BTreeSet<Name<'a>>>,
     edges: BTreeSet<(Name<'a>, Name<'a>)>,
     contexts: BTreeMap<Name<'a>, &'a str>,
+    subgraphs: BTreeMap<&'a str, BTreeSet<Vertex<'a>>>,
+    subgraph_descendants: BTreeMap<&'a str, BTreeSet<&'a str>>,
 }
 
 #[derive(Debug, Clone)]
 struct Visitor;
 
 impl<'a> graphl_parser::Visitor<'a, FlatGraph<'a>, anyhow::Error> for Visitor {
+    fn visit_subgraph(
+        &self,
+        mut acc: FlatGraph<'a>,
+        group: &'a graphl_parser::ast::GraphBinding,
+    ) -> anyhow::Result<FlatGraph<'a>> {
+        struct Members;
+        impl<'a> graphl_parser::Visitor<'a, BTreeSet<Vertex<'a>>, anyhow::Error> for Members {
+            fn visit_vertex(
+                &self,
+                mut nodes: BTreeSet<Vertex<'a>>,
+                vertex: &'a graphl_parser::ast::GVertex,
+            ) -> anyhow::Result<BTreeSet<Vertex<'a>>> {
+                nodes.insert((&vertex.vertex.name).try_into()?);
+                Ok(nodes)
+            }
+        }
+        let members =
+            graphl_parser::Walker::new(&group.graph_1).try_visit(BTreeSet::new(), Members)?;
+        struct Descendants;
+        impl<'a> graphl_parser::Visitor<'a, BTreeSet<&'a str>, anyhow::Error> for Descendants {
+            fn visit_subgraph(
+                &self,
+                mut groups: BTreeSet<&'a str>,
+                group: &'a graphl_parser::ast::GraphBinding,
+            ) -> anyhow::Result<BTreeSet<&'a str>> {
+                groups.insert(&group.var);
+                Ok(groups)
+            }
+        }
+        let descendants =
+            graphl_parser::Walker::new(&group.graph_1).try_visit(BTreeSet::new(), Descendants)?;
+        acc.subgraph_descendants.insert(&group.var, descendants);
+        acc.subgraphs.insert(&group.var, members);
+        Ok(acc)
+    }
+
     fn visit_vertex(
         &self,
         mut acc: FlatGraph<'a>,
@@ -438,6 +476,131 @@ pub fn references_agent(graph: &Graph, agent_id: &str) -> anyhow::Result<bool> {
     }))
 }
 
+/// Lower actual legacy deployment groups to the same executable packaging model
+/// as Workflow v2. State scopes are never inferred from deployment groups.
+pub fn lower_deployment_containers(
+    graph: &Graph,
+) -> anyhow::Result<Option<super::super::workflow::WorkflowDefinition>> {
+    use serde_json::json;
+    let flat = graph.try_visit(FlatGraph::default(), Visitor)?;
+    let groups = flat
+        .subgraphs
+        .iter()
+        .filter_map(|(id, members)| {
+            let context = flat.contexts.get(&Name(id))?;
+            let value: serde_json::Value = serde_json::from_str(context).ok()?;
+            (value["type"] == "deploy-container").then_some((*id, members, value))
+        })
+        .collect::<Vec<_>>();
+    if groups.is_empty() {
+        return Ok(None);
+    }
+    let mut nodes = serde_json::Map::new();
+    let mut initial = Vec::new();
+    for &vertex in &flat.vertexes {
+        let id = vertex.to_string();
+        let (label, kind, activity, output_key) = match resolve_context(&flat, vertex)? {
+            NodeContext::Input => {
+                initial.push(id.clone());
+                ("Input".to_owned(), "input", None, "input".to_owned())
+            }
+            NodeContext::Output => ("Output".to_owned(), "output", None, "output".to_owned()),
+            NodeContext::Agent {
+                agent_id,
+                agent_version,
+                agent_name,
+            } => {
+                let key = super::rendering::lower_camel_case(&agent_name);
+                (
+                    agent_name,
+                    "activity",
+                    Some(
+                        json!({"kind": "agent", "agentId": agent_id, "agentVersion": agent_version, "protocol": "simple-v1"}),
+                    ),
+                    key,
+                )
+            }
+            context => {
+                let (name, key) = match context {
+                    NodeContext::Compress => ("compress", "compress"),
+                    NodeContext::TextModel => ("text-model", "textModel"),
+                    NodeContext::TTIModel => ("tti-model", "ttiModel"),
+                    NodeContext::TTSModel => ("tts-model", "ttsModel"),
+                    _ => unreachable!(),
+                };
+                (
+                    key.to_owned(),
+                    "activity",
+                    Some(json!({"kind": "builtin", "name": name})),
+                    key.to_owned(),
+                )
+            }
+        };
+        let mut node = json!({"id": id, "label": label, "outputKey": output_key, "kind": kind, "scopeId": "root"});
+        if let Some(activity) = activity {
+            node["activity"] = activity;
+        }
+        nodes.insert(id, node);
+    }
+    let mut transitions = serde_json::Map::new();
+    let mut routes = serde_json::Map::new();
+    let mut incoming = BTreeMap::<String, usize>::new();
+    for (index, (source, target)) in flat.edges.iter().enumerate() {
+        let source = flat
+            .bindings
+            .get(source)
+            .context("legacy source binding missing")?
+            .to_string();
+        let target = flat
+            .bindings
+            .get(target)
+            .context("legacy target binding missing")?
+            .to_string();
+        *incoming.entry(target.clone()).or_default() += 1;
+        let id = format!("legacy-edge-{index}");
+        transitions.insert(id.clone(), json!({"id": id, "sourceNodeId": source, "targetNodeId": target, "trigger": "completed", "priority": 0, "routeGroupId": source}));
+        routes.insert(
+            source.clone(),
+            json!({"id": source, "mode": "allMatches", "noMatch": "fail"}),
+        );
+    }
+    for (id, count) in incoming {
+        if count > 1 {
+            nodes.get_mut(&id).context("legacy target missing")?["join"] =
+                json!({"mode": "all", "correlation": {"kind": "root"}});
+        }
+    }
+    let mut containers = serde_json::Map::new();
+    for (id, members, context) in &groups {
+        let parent = groups
+            .iter()
+            .filter(|(other, _, _)| flat.subgraph_descendants[other].contains(id))
+            .min_by_key(|(other, _, _)| flat.subgraph_descendants[other].len())
+            .map(|(id, _, _)| *id);
+        let members = members
+            .iter()
+            .filter(|member| {
+                !groups.iter().any(|(other, child, _)| {
+                    flat.subgraph_descendants[id].contains(other) && child.contains(member)
+                })
+            })
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let mut container = json!({"id": id, "label": context.get("containerId").and_then(|value| value.as_str()).unwrap_or(id), "nodeIds": members, "target": "current"});
+        if let Some(parent) = parent {
+            container["parentId"] = json!(parent);
+        }
+        containers.insert((*id).to_owned(), container);
+    }
+    super::super::workflow::WorkflowDefinition::from_json(json!({
+        "schemaVersion": "2.0", "entryScopeId": "root", "nodes": nodes,
+        "scopes": {"root": {"id": "root", "label": "Root", "kind": "root", "initialNodeIds": initial, "entryActivities": [], "exitActivities": [], "history": "none"}},
+        "transitions": transitions, "routeGroups": routes, "deploymentContainers": containers,
+        "interface": {"inputs": {"input": {"kind": "string"}}, "outputs": {"output": {"kind": "legacy"}}},
+        "types": {}, "policies": {"defaultExecution": "bounded", "visibility": "private"}, "presentation": {"nodes": {}, "edges": {}}
+    }).to_string()).map(Some)
+}
+
 pub fn parse(graph: &Graph) -> anyhow::Result<Code<'_>> {
     record_trace!(graph);
 
@@ -527,6 +690,38 @@ mod tests {
         format!(
             r#"0 * {{context "{{\"type\":\"input-node\"}}" for input1 in let input1 = < input1 > in < input1 > | {{context "{agent_context}" for model1 in let model1 = < model1 > in < model1 > | {{context "{{\"type\":\"output-node\"}}" for output1 in let output1 = < output1 > in < output1 > | 0}}}}}} * {{(let input1 = < input1 > in 0, let model1 = < model1 > in 0) * {{(let model1 = < model1 > in 0, let output1 = < output1 > in 0) * 0}}}}"#
         )
+    }
+
+    fn group(id: &str, contents: &str) -> String {
+        let context = serde_json::json!({"type":"deploy-container","containerId":id}).to_string();
+        let quoted = serde_json::to_string(&context).unwrap();
+        format!("{{context {quoted} for {id} in let {id} = {contents} in 0}}")
+    }
+
+    #[test]
+    fn lowers_nested_legacy_groups_without_collapsing_equal_memberships() {
+        let body = group("Outer", &group("Inner", &agent_team_graphl()));
+        let graph = Graph::new(body).unwrap();
+        let definition = lower_deployment_containers(&graph).unwrap().unwrap();
+        let parsed = definition.parsed();
+        assert_eq!(
+            parsed.deployment_containers["Inner"].parent_id.as_deref(),
+            Some("Outer")
+        );
+        assert!(parsed.deployment_containers["Outer"].node_ids.is_empty());
+        assert_eq!(parsed.deployment_containers["Inner"].node_ids.len(), 3);
+        assert_eq!(parsed.nodes["model1"].output_key(), "summarize");
+        assert_eq!(parsed.transitions.len(), 2);
+        assert_eq!(parsed.scopes.len(), 1);
+    }
+
+    #[test]
+    fn legacy_graph_without_containers_keeps_its_existing_compiler() {
+        assert!(
+            lower_deployment_containers(&Graph::new(agent_team_graphl()).unwrap())
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]
