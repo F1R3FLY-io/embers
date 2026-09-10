@@ -74,3 +74,15 @@ def test_runbook_and_deterministic_fixture_use_authoritative_calculators():
         assert "getOrElse(\"input-node\"" not in source
     for name in ("ReviewCapacity", "EmergencyReviewPolicy"):
         assert fixtures["agents"][name] == (DEMO / "agents" / f"{name}.rho").read_text()
+
+
+def test_decision_writer_keeps_calculator_evidence_when_model_omits_it():
+    source = (DEMO / "agents/DecisionWriter.rho").read_text()
+    # Replace only the model boundary; run the actual writer composition on-chain.
+    source = source.replace("gpt4(`rho:ai:gpt4`)", "gpt4")
+    source = source.replace("answerCh in {", 'answerCh in { contract gpt4(@prompt, answer) = { answer!("Model summary") } |')
+    term = 'new ret, main in { ' + source + ' | main!({"input":"brief","blueResponder":"reviewed plan","reviewCapacity":{"summary":"Capacity: 240 minutes"},"emergencyReviewPolicy":{"summary":"Two reviewers unavailable"}}, *ret) }'
+    response = requests.post(os.environ.get("EMBERS_TEST_READ_HTTP", "http://localhost:40413") + "/api/explore-deploy", json={"term": term}, timeout=60)
+    response.raise_for_status()
+    result = decode(response.json()["expr"][0])
+    assert result == "Model summary Calculator evidence (editable scenario assumptions): Capacity: 240 minutes Two reviewers unavailable"
