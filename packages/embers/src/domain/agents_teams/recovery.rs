@@ -14,18 +14,17 @@ use super::runtime::{ContinuationEnvelope, ResumeCommand};
 use super::workflow::WorkflowDefinition;
 
 impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
-    pub async fn run_recovery_loop(self, poll_interval: Duration) {
-        let mut interval = tokio::time::interval(poll_interval);
+    pub async fn run_recovery_loop(self, poll_interval: Duration, scan_client: R) {
         loop {
-            interval.tick().await;
-            if let Err(error) = self.recover_runs_once().await {
+            if let Err(error) = self.recover_runs_once(&scan_client).await {
                 tracing::error!(error = %error, "Agent Teams recovery scan failed");
             }
+            tokio::time::sleep(poll_interval).await;
         }
     }
 
-    pub(crate) async fn recover_runs_once(&self) -> anyhow::Result<()> {
-        let runs = self.list_runs().await?;
+    pub(crate) async fn recover_runs_once(&self, scan_client: &R) -> anyhow::Result<()> {
+        let runs = self.list_runs(scan_client).await?;
         for run in runs {
             if run.definition_hash.is_none()
                 || !matches!(run.status.as_str(), "running" | "resuming" | "suspended")
@@ -230,6 +229,27 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn enumeration_uses_the_scan_client_without_changing_owner_reads() {
+        let dir = tempfile::tempdir().unwrap();
+        let read = MockReadNode::new().on_code_containing("getRun", serde_json::Value::Null);
+        let scan =
+            MockReadNode::new().on_code_containing("listRuns", json!([run("done", "completed")]));
+        let service = service(read.clone(), dir.path());
+        service.recover_runs_once(&scan).await.unwrap();
+        assert!(
+            service
+                .get_run_metadata("absent".into())
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(scan.calls().len(), 1);
+        assert_eq!(read.calls().len(), 1);
+        assert!(scan.calls()[0].contains("listRuns"));
+        assert!(read.calls()[0].contains("getRun"));
+    }
+
+    #[tokio::test]
     async fn terminal_runs_with_missing_checkpoints_do_not_break_recovery() {
         let dir = tempfile::tempdir().unwrap();
         let read = MockReadNode::new().on_code_containing(
@@ -241,7 +261,7 @@ mod tests {
             ]),
         );
         let service = service(read.clone(), dir.path());
-        service.recover_runs_once().await.unwrap();
+        service.recover_runs_once(&read).await.unwrap();
         assert_eq!(
             read.calls().len(),
             1,
@@ -260,7 +280,7 @@ mod tests {
             .on_code_containing("\"first\"", run("first", "running"))
             .on_code_containing("\"second\"", run("second", "running"));
         let service = service(read.clone(), dir.path());
-        service.recover_runs_once().await.unwrap();
+        service.recover_runs_once(&read).await.unwrap();
         let calls = read.calls();
         assert!(calls.iter().any(|code| code.contains("\"first\"")));
         assert!(calls.iter().any(|code| code.contains("\"second\"")));

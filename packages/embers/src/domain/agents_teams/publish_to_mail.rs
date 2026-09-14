@@ -229,8 +229,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .await
             .map_err(anyhow::Error::from)?;
         match self
-            .observer_node_events
-            .wait_for_deploy(&deploy_id, self.deploy_finalization_timeout)
+            .wait_for_deploy_finalization(&deploy_id, self.deploy_finalization_timeout)
             .await
         {
             Some(false) => {}
@@ -336,8 +335,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .await
             .map_err(anyhow::Error::from)?;
         match self
-            .observer_node_events
-            .wait_for_deploy(&deploy_id, self.deploy_finalization_timeout)
+            .wait_for_deploy_finalization(&deploy_id, self.deploy_finalization_timeout)
             .await
         {
             Some(false) => {}

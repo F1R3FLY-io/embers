@@ -37,8 +37,15 @@ Implementation: `packages/embers/src/main.rs` and `packages/embers/src/app.rs`
    (registered as Nil), or **LOST** (was present, now unreadable) — an operational
    signal that the on-chain registry is intact.
 5. **Spawn the durable recovery scheduler** (background): `run_recovery_loop` polls
-   every `recovery_poll_millis` (default 1000 ms) for durable runs that need to be
-   advanced or resumed. This is the task that makes agent-team runs survive restarts;
+   for durable runs that need to be advanced or resumed, waiting
+   `recovery_poll_millis` (default 1000 ms) after each scan finishes. Run enumeration
+   uses a dedicated observer client with `recovery_scan_timeout_millis` (default
+   300000 ms); configure it with
+   `EMBERS__CONTINUATION_STORE__RECOVERY_SCAN_TIMEOUT_MILLIS`. This registry-wide
+   read can exceed the ordinary request timeout as run history grows. The measured
+   92-run scan on the demo stack took 134 seconds, beyond the 60-second ordinary
+   read deadline. The timeout is positive and finite; ordinary owner reads keep
+   their existing transport bounds. This is the task that makes agent-team runs survive restarts;
    its timing invariants are formalized in
    [TimersRecovery](../formal/tla/TimersRecovery.tla).
 6. **Generate the per-process JWT secret** — a fresh random 20-character alphanumeric
@@ -56,9 +63,16 @@ Implementation: `packages/embers/src/main.rs` and `packages/embers/src/app.rs`
 | Task | Cadence | Purpose |
 | ---- | ------- | ------- |
 | Registry health check | 60 s | Log the reachability of the system URI and each domain env (OK / Nil / LOST). Observability only — it does not mutate state. |
-| Durable recovery scheduler | `recovery_poll_millis` (default 1 s) | Advance/resume durable agent-team runs; the mechanism behind restart survival. |
+| Durable recovery scheduler | `recovery_poll_millis` after completion (default 1 s); enumeration deadline `recovery_scan_timeout_millis` (default 300 s) | Advance/resume durable agent-team runs; the mechanism behind restart survival. |
 
 ## Restart semantics
+
+Agent-team deployment barriers await both the observer's finalization event and
+its deployment-status endpoint, polling status once per second within the same
+finite deadline. A missed event therefore does not leave an already finalized
+checkpoint waiting until timeout. Execution errors remain errors, and a pending
+status never counts as success. The observer must preserve the terminal status
+of deployments after their submission validity window ends.
 
 Because the JWT secret is per-process, restarting embers invalidates every
 in-flight `prepare`. This is safe: a `send` carrying a stale token is simply

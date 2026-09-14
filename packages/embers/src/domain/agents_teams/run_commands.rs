@@ -126,8 +126,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .deploy_signed_contract(request.contract)
             .await?;
         match self
-            .observer_node_events
-            .wait_for_deploy(&deploy_id, self.deploy_finalization_timeout)
+            .wait_for_deploy_finalization(&deploy_id, self.deploy_finalization_timeout)
             .await
         {
             Some(false) => {}
@@ -297,8 +296,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .deploy(&self.service_key, DeployData::builder(code).build())
             .await?;
         match self
-            .observer_node_events
-            .wait_for_deploy(&deploy_id, self.deploy_finalization_timeout)
+            .wait_for_deploy_finalization(&deploy_id, self.deploy_finalization_timeout)
             .await
         {
             Some(false) => {

@@ -475,8 +475,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .deploy_signed_contract(contract)
             .await?;
         anyhow::ensure!(
-            self.observer_node_events
-                .wait_for_deploy(&id, self.deploy_finalization_timeout)
+            self.wait_for_deploy_finalization(&id, self.deploy_finalization_timeout)
                 .await
                 == Some(false),
             "{stage} did not finalize successfully; later deployment stages were not submitted. Retry to reuse stages already finalized on the observer."

@@ -43,6 +43,7 @@ mod deploy;
 mod deployment_containers;
 mod get;
 mod get_run;
+mod finalization;
 mod grants;
 mod list;
 mod list_versions;

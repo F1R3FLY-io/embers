@@ -75,10 +75,16 @@ pub struct ContinuationStore {
     pub max_object_bytes: Option<u64>,
     #[serde(default = "default_recovery_poll_millis")]
     pub recovery_poll_millis: u64,
+    #[serde(default = "default_recovery_scan_timeout_millis")]
+    pub recovery_scan_timeout_millis: u64,
 }
 
 const fn default_recovery_poll_millis() -> u64 {
     1_000
+}
+
+const fn default_recovery_scan_timeout_millis() -> u64 {
+    300_000
 }
 
 const fn default_deploy_timeout_millis() -> u64 {
@@ -97,6 +103,10 @@ pub fn collect_config() -> anyhow::Result<Config> {
     anyhow::ensure!(
         config.continuation_store.recovery_poll_millis > 0,
         "continuation recovery poll interval must be positive"
+    );
+    anyhow::ensure!(
+        config.continuation_store.recovery_scan_timeout_millis > 0,
+        "continuation recovery scan timeout must be positive"
     );
     anyhow::ensure!(
         config.finalization.deploy_timeout_millis > 0,
@@ -169,6 +179,10 @@ mod tests {
             let config = collect_config().expect("a complete valid environment must load");
             // Defaults fill in where the environment is silent.
             assert_eq!(config.continuation_store.recovery_poll_millis, 1_000);
+            assert_eq!(
+                config.continuation_store.recovery_scan_timeout_millis,
+                300_000
+            );
             assert_eq!(config.finalization.deploy_timeout_millis, 120_000);
             assert_eq!(config.continuation_store.max_object_bytes, None);
             Ok(())
@@ -193,6 +207,31 @@ mod tests {
             jail.set_env("EMBERS__CONTINUATION_STORE__RECOVERY_POLL_MILLIS", "0");
             let error = collect_config().expect_err("a zero recovery poll interval must fail");
             assert!(error.to_string().contains("positive"), "{error}");
+            Ok(())
+        });
+    }
+
+    #[test]
+    fn recovery_scan_timeout_is_configurable_and_must_be_positive() {
+        Jail::expect_with(|jail| {
+            set_full_valid_env(jail);
+            jail.set_env(
+                "EMBERS__CONTINUATION_STORE__RECOVERY_SCAN_TIMEOUT_MILLIS",
+                "180000",
+            );
+            assert_eq!(
+                collect_config()
+                    .expect("valid recovery timeout")
+                    .continuation_store
+                    .recovery_scan_timeout_millis,
+                180_000
+            );
+            jail.set_env(
+                "EMBERS__CONTINUATION_STORE__RECOVERY_SCAN_TIMEOUT_MILLIS",
+                "0",
+            );
+            let error = collect_config().expect_err("an unbounded scan must be rejected");
+            assert!(error.to_string().contains("scan timeout must be positive"));
             Ok(())
         });
     }

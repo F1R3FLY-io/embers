@@ -77,13 +77,13 @@ def xrpc_post(method: str, body: dict, token: str | None = None) -> dict:
     return response.json()
 
 
-def create_mention_post(bot_handle: str, bot_did: str) -> dict:
+def create_mention_post(bot_handle: str, bot_did: str, prompt: str = "customer-demo-echo") -> dict:
     session = xrpc_post(
         "com.atproto.server.createSession",
         {"identifier": "user1.test", "password": "password123"},
     )
     mention = f"@{bot_handle}"
-    text = f"{mention} customer-demo-echo"
+    text = f"{mention} {prompt}"
     return xrpc_post(
         "com.atproto.repo.createRecord",
         {

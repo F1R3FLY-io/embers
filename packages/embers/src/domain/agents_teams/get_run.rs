@@ -87,12 +87,13 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
 
     pub(crate) async fn list_runs(
         &self,
+        scan_client: &R,
     ) -> anyhow::Result<Vec<crate::domain::agents_teams::models::RunState>> {
         let code = ListRuns {
             env_uri: self.uri.clone(),
         }
         .render()?;
-        let states: Vec<models::RunState> = self.read_client.get_data(code).await?;
+        let states: Vec<models::RunState> = scan_client.get_data(code).await?;
         Ok(states.into_iter().map(Into::into).collect())
     }
 

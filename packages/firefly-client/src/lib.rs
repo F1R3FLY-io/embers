@@ -10,6 +10,6 @@ mod write_node_client;
 
 pub use communication_service::CommunicationService;
 pub use node_events::NodeEvents;
-pub use read_node_client::ReadNodeClient;
+pub use read_node_client::{ReadNodeClient, ReadNodeConfig};
 pub use traits::{NodeEventSource, ReadNode, WriteNode};
 pub use write_node_client::WriteNodeClient;

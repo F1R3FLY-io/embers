@@ -125,7 +125,7 @@ GATED_WORKFLOW_V2 = {
 }
 
 
-def _run(client: ApiClient, wallet: Wallet, prompt: str, uri: str) -> tuple[str, object]:
+def _run(client: ApiClient, wallet: Wallet, prompt: str, uri: str, timeout: int = RUN_TIMEOUT) -> tuple[str, object]:
     """Two-phase run that also captures the run id.
 
     The client's ``run`` helper returns only the send response, but the run id
@@ -137,6 +137,7 @@ def _run(client: ApiClient, wallet: Wallet, prompt: str, uri: str) -> tuple[str,
     prepared = http.post("/ai-agents-teams/run/prepare", json=prepare_request)
     assert prepared.status == 200, prepared.body
     run_id = prepared.json["response"]["run_id"]
+    print(f"Run started: {run_id}", flush=True)
     sent = http.post(
         "/ai-agents-teams/run/send",
         json={
@@ -145,7 +146,7 @@ def _run(client: ApiClient, wallet: Wallet, prompt: str, uri: str) -> tuple[str,
             "request": sing_contract(wallet, prepared.json["response"]["contract"]),
             "token": prepared.json["token"],
         },
-        timeout=RUN_TIMEOUT,
+        timeout=timeout,
     )
     assert sent.status == 200, sent.body
     return run_id, sent.json

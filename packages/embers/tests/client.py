@@ -774,6 +774,7 @@ class AgentsTeamsApi:
         prompt: str,
         uri: str,
         reply_to: dict[str, Any] | None = None,
+        timeout: int = DEFAULT_TIMEOUT,
     ) -> UpdateResponce:
         prepare_request = {"prompt": prompt, "agents_team": uri}
         resp = self._client.post("/ai-agents-teams/run-on-firesky/prepare", json=prepare_request)
@@ -790,6 +791,7 @@ class AgentsTeamsApi:
                 },
                 "token": resp.json["token"],
             },
+            timeout=timeout,
         )
         assert resp_next.status == 200, resp_next.body
 

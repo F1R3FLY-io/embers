@@ -17,7 +17,7 @@ use std::time::Duration;
 
 use anyhow::Context;
 use firefly_client::models::Uri;
-use firefly_client::{NodeEvents, ReadNodeClient, WriteNodeClient};
+use firefly_client::{NodeEvents, ReadNodeClient, ReadNodeConfig, WriteNodeClient};
 use poem::Server;
 use poem::listener::TcpListener;
 use secp256k1::rand;
@@ -63,6 +63,15 @@ async fn main() -> anyhow::Result<()> {
         )
         .init();
 
+    let recovery_read_client = ReadNodeClient::with_config(
+        config.mainnet.observer_url.clone(),
+        ReadNodeConfig {
+            request_timeout: Duration::from_millis(
+                config.continuation_store.recovery_scan_timeout_millis,
+            ),
+            ..ReadNodeConfig::default()
+        },
+    );
     let read_client = ReadNodeClient::new(config.mainnet.observer_url);
     let validator_node_events = NodeEvents::new(&config.mainnet.validator_ws_api_url);
     let observer_node_events = NodeEvents::new(&config.mainnet.observer_ws_api_url);
@@ -275,7 +284,7 @@ async fn main() -> anyhow::Result<()> {
     {
         let recovery_service = agents_teams_service.clone();
         let poll_interval = Duration::from_millis(config.continuation_store.recovery_poll_millis);
-        tokio::spawn(recovery_service.run_recovery_loop(poll_interval));
+        tokio::spawn(recovery_service.run_recovery_loop(poll_interval, recovery_read_client));
         tracing::info!(
             ?poll_interval,
             "Agent Teams durable recovery scheduler started"

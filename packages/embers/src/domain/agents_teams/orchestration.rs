@@ -964,15 +964,9 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             outbox.operation_id == operation_id,
             "effect outbox identity mismatch"
         );
-        let deploy_id = self
-            .write_client
-            .clone()
-            .deploy_signed_contract(outbox.signed_deploy)
+        let (deploy_id, finalized) = self
+            .submit_and_finalize_effect(outbox.signed_deploy, timeout)
             .await?;
-        let finalized = self
-            .observer_node_events
-            .wait_for_deploy(&deploy_id, timeout)
-            .await;
         match finalized {
             Some(true) => Ok(SubmitOutcome::Errored(deploy_id)),
             Some(false) => Ok(SubmitOutcome::Finalized(deploy_id)),
@@ -1162,8 +1156,7 @@ impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> 
             .deploy(&self.service_key, DeployData::builder(code).build())
             .await?;
         match self
-            .observer_node_events
-            .wait_for_deploy(&deploy_id, self.deploy_finalization_timeout)
+            .wait_for_deploy_finalization(&deploy_id, self.deploy_finalization_timeout)
             .await
         {
             Some(false) => {
