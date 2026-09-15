@@ -459,6 +459,36 @@ mod tests {
     /// this same handle, so the client's post-login handle check passes.
     const TEST_HANDLE: &str = "embers-team.test";
 
+    #[test]
+    fn publication_handle_errors_preserve_the_rejection_reason() {
+        for (message, code, advice) in [
+            ("Handle too long", "handle_too_long", "18 characters"),
+            ("Handle too short", "handle_too_short", "3 characters"),
+            ("Reserved handle", "handle_unavailable", "reserved"),
+            (
+                "Not a supported handle domain",
+                "handle_domain_rejected",
+                "suffix",
+            ),
+            (
+                "Invalid characters in handle",
+                "handle_rejected",
+                "characters",
+            ),
+        ] {
+            let upstream: atrium_api::com::atproto::server::create_account::Error =
+                serde_json::from_value(json!({"error": "InvalidHandle", "message": message}))
+                    .expect("PDS error response");
+            let error = super::publication_error(&format!("xrpc response error: 400 {upstream}"));
+            assert_eq!(error.code, code, "{message}");
+            assert!(error.fields.contains_key("handle"));
+            assert!(error.description.contains(advice), "{}", error.description);
+            if message == "Handle too long" || message == "Handle too short" {
+                assert!(!error.description.contains("Include one of the suffixes"));
+            }
+        }
+    }
+
     /// Build a hermetic service backed by the mock nodes and a real temp-backed
     /// continuation store, with a read node that answers the deployed-team read.
     fn service_with(
@@ -715,6 +745,7 @@ pub async fn discover_pds(pds_url: &str) -> anyhow::Result<serde_json::Value> {
 
 fn publication_error(message: &str) -> crate::domain::validation::ValidationError {
     use crate::domain::validation::ValidationError;
+    let message = message.to_lowercase();
     let (field, code, text) = if message.contains("email") {
         (
             "email",
@@ -733,17 +764,44 @@ fn publication_error(message: &str) -> crate::domain::validation::ValidationErro
             "invite_rejected",
             "The invitation code is missing, invalid, or already used.",
         )
-    } else if message.contains("taken") || message.contains("already") {
+    } else if message.contains("handle too long") {
+        (
+            "handle",
+            "handle_too_long",
+            "The username before the domain is too long. Shorten it; the demo PDS allows at most 18 characters before the suffix.",
+        )
+    } else if message.contains("handle too short") {
+        (
+            "handle",
+            "handle_too_short",
+            "The username before the domain is too short. Lengthen it; the demo PDS requires at least 3 characters before the suffix.",
+        )
+    } else if message.contains("reserved") && message.contains("handle") {
+        (
+            "handle",
+            "handle_unavailable",
+            "This handle is reserved by the PDS. Choose another username.",
+        )
+    } else if message.contains("taken")
+        || message.contains("already")
+        || message.contains("handlenotavailable")
+    {
         (
             "handle",
             "handle_unavailable",
             "This handle is already registered. Choose Use existing account and enter its password, or choose another handle.",
         )
-    } else if message.contains("handle") || message.contains("domain") {
+    } else if message.contains("domain") || message.contains("tld") {
+        (
+            "handle",
+            "handle_domain_rejected",
+            "The PDS rejected this handle. Include one of the suffixes advertised by this PDS, such as .test on the demo server.",
+        )
+    } else if message.contains("handle") {
         (
             "handle",
             "handle_rejected",
-            "The PDS rejected this handle. Include one of the suffixes advertised by this PDS, such as .test on the demo server.",
+            "The PDS rejected this handle. Check the username's characters and the server's naming policy, or choose another username.",
         )
     } else {
         (
