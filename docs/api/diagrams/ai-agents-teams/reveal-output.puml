@@ -1,0 +1,73 @@
+@startuml
+title POST /api/ai-agents-teams/runs/{run_id}/output/prepare + /send — owner-only output reveal
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Run owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.revealOutput(runId)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+participant "Continuation store\n(encrypted artifacts)" as Store #E8DDF5
+
+Owner -> SDK : revealOutput(runId)
+
+group Phase 1 — prepare (no body; deploys nothing)
+SDK -> API : POST .../runs/{run_id}/output/prepare
+API -> Domain : prepare reveal
+Domain -> Chain : getRun(run_id) — owner-scrubbed record
+alt no run record
+Domain --> API : 404 — run capability not found
+else no output hashes on the record
+Domain --> API : 409 — run has no recorded output\n(running, suspended, resuming, or legacy)
+else terminal run with committed output hashes
+Domain -> Store : locate the Output artifact and verify\nits hashes against the on-chain record
+Domain -> Domain : mint reveal_id (UUIDv7); render the\nclaimOutputReveal contract
+Domain --> API : RevealOutputResp { reveal_id, contract,\n  issued_at, output hashes }
+API --> SDK : PrepareResponse { response, token }\n(the token binds the path run id)
+end
+end
+
+group Sign and send
+SDK -> SDK : sign the contract locally (secp256k1);\nthe wallet key never leaves the client
+SDK -> API : POST .../runs/{run_id}/output/send\n{ prepare_request: run_id, prepare echo,\n  signed contract, token }
+API -> Domain : deploy signed reveal
+Domain -> Chain : deploy claimOutputReveal(run_id, reveal_id)
+note right of Chain #FFF6C9
+The clause is the verifier of record: the ledger
+scrubs owner from every read, so only the chain
+can adjudicate this claim. On success it appends
+an actor-less outputRevealed event and
+acknowledges { revealId, output hashes } over
+the deploy-id channel.
+end note
+alt claim aborts on chain
+Chain --> Domain : deploy errored
+Domain -> Chain : re-read the run to name the cause
+Domain --> API : 403 unauthorized signer\n(404 / 409 if the record itself explains it)
+API --> SDK : refusal — nothing was disclosed
+else claim lands
+Chain --> Domain : positive acknowledgment read back\n(no acknowledgment — pre-clause chain — fails closed)
+Domain -> Domain : verify ack reveal_id and hashes against\nthe prepare echo
+Domain -> Store : locate + decrypt the Output artifact\nchecked against the acknowledged hashes
+Domain --> API : the run's final output value
+API --> SDK : 200 — output JSON over the\nsigner's channel only
+SDK --> Owner : full response value
+end
+end
+
+note over API #FFF0C7
+The public run ledger records that a reveal happened
+(outputRevealed) — never the value, and never who
+revealed: publishing the actor would de-anonymize the
+owner the ledger deliberately scrubs.
+end note
+@enduml

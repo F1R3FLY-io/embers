@@ -1,0 +1,62 @@
+@startuml
+title POST /api/ai-agents-teams/{address}/{id}/unpublish-mail/prepare + /send — reversible deactivation
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Team owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.unpublishMail(id)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Owner -> SDK : unpublishMail(id)
+
+group Phase 1 — prepare (no body; deploys nothing)
+SDK -> API : POST .../{address}/{id}/unpublish-mail/prepare
+API -> Domain : prepare deactivation
+Domain -> Chain : getChannelBindingsForTeam(id) —\nfind the ACTIVE mail binding
+alt no active mail binding
+Domain --> API : 404 {code: binding_not_found}
+else active binding found
+Domain --> API : UnpublishMailResp { address, contract }\n(setChannelBindingActive false)
+API --> SDK : PrepareResponse { response, token }
+end
+end
+
+group Sign and send
+SDK -> SDK : sign with the team owner's wallet key
+SDK -> API : POST .../unpublish-mail/send\n{ prepare_request: id, echo, signed, token }
+API -> Domain : deploy signed deactivation
+Domain -> Chain : deploy setChannelBindingActive("mail",\naddress, false)
+note right of Chain #FFF0C7
+Owner-only: any other signer aborts
+"binding update requires the team owner".
+The record is KEPT — deactivation flips
+active off, and publishing again
+reactivates the same address.
+end note
+alt clause aborts
+Chain --> Domain : deploy errored
+Domain -> Chain : re-read bindings to name the cause
+alt binding exists (signer was not the owner)
+Domain --> API : 403 {code: binding_unauthorized}
+else binding gone
+Domain --> API : 404 {code: binding_not_found}
+end
+else clause lands
+Chain --> Domain : finalized; acknowledged
+Domain -> Chain : readback: the binding must be observably\ninactive before the owner is told
+Domain --> API : deploy id
+API --> SDK : 200 SendResp { deployId }
+SDK --> Owner : address deactivated; the mail bridge's next\nrefresh drops it from RCPT (550); the DEK\nsurvives, so republishing skips provisioning
+end
+end
+@enduml

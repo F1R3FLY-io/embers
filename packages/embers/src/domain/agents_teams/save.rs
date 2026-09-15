@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use uuid::Uuid;
 
 use crate::domain::agents_teams::AgentsTeamsService;
@@ -19,9 +20,10 @@ struct Save {
     shard: Option<String>,
     logo: Option<String>,
     graph: Option<String>,
+    definition: Option<String>,
 }
 
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -48,6 +50,9 @@ impl AgentsTeamsService {
             shard: request.shard,
             logo: request.logo,
             graph: request.graph.map(Graph::graphl),
+            definition: request
+                .definition
+                .map(super::workflow::WorkflowDefinition::json),
         }
         .render()?;
 
@@ -74,7 +79,7 @@ impl AgentsTeamsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
-        write_client.propose().await?;
+
         Ok(deploy_id)
     }
 }

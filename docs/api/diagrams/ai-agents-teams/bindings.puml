@@ -1,0 +1,39 @@
+@startuml
+title GET /api/ai-agents-teams/bindings/by-channel/{channel} — the channel's public binding set
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Operator / UI" as Caller #FFD8C2
+participant "AgentsTeamsApiSdk\n.bindingsByChannel(channel)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "Observer\n(exploratory read)" as Obs #FFF1CC
+participant "F1R3Mail bridge\n(the primary consumer)" as Bridge #F7D9E3
+
+Caller -> SDK : bindingsByChannel("mail" | "chat")
+SDK -> API : GET .../bindings/by-channel/{channel}
+API -> Domain : list bindings
+Domain -> Obs : render listChannelBindings(channel);\nexploratory deploy (costs nothing,\nfinalizes nothing)
+Obs -> Obs : filterEntriesByField over the public\nbindings map: channel == requested
+Obs --> Domain : [binding records]
+Domain --> API : [ChannelBinding] — active and inactive,\nflagged; no key material anywhere
+API --> SDK : 200 [ChannelBinding]
+SDK --> Caller : binding table
+
+Bridge -> Obs : the SAME clause, read directly from the\nobserver on its refresh loop — the HTTP\nmirror never sits in the mail consume path
+note right of Bridge #FFF0C7
+Chain-read-first: the bridge's TeamDirectory
+(RCPT-time accept/450/550) is fed by observer
+reads of this binding set, replaced wholesale
+each refresh so deactivated bindings never
+resurrect.
+end note
+@enduml

@@ -1,0 +1,41 @@
+name: Docs
+run-name: "Docs check — ${{ github.ref_name }}"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The main Embers workflow paths-ignores docs/**; this workflow is the inverse — it
+# runs the documentation checks precisely when docs or diagrams change (GitHub's
+# paths filters are per-workflow, so a separate file is the clean way to scope it).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "packages/**/README.md"
+      - "README.md"
+  pull_request:
+    paths:
+      - "docs/**"
+      - "packages/**/README.md"
+      - "README.md"
+
+jobs:
+  docs-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Install python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.13
+
+      - name: Install PlantUML
+        run: sudo apt-get update && sudo apt-get install -y plantuml
+
+      # Internal-link resolution + every diagram .puml re-renders to its committed
+      # .svg byte-for-byte and is not an error image.
+      - name: Check docs (links + diagram staleness)
+        run: bash docs/scripts/check-docs.sh

@@ -1,5 +1,6 @@
 use firefly_client::models::{Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::blockchain::agents::models;
 use crate::domain::agents::AgentsService;
@@ -13,7 +14,7 @@ struct List {
     address: WalletAddress,
 }
 
-impl AgentsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -29,12 +30,13 @@ impl AgentsService {
             address,
         }
         .render()?;
-        self.read_client
-            .get_data(code)
-            .await
-            .map(|agents: Vec<models::AgentHeader>| Agents {
-                agents: agents.into_iter().map(Into::into).collect(),
-            })
-            .map_err(Into::into)
+        let agents: Vec<models::AgentHeader> = self
+            .read_client
+            .get_data_or_none(code)
+            .await?
+            .unwrap_or_default();
+        Ok(Agents {
+            agents: agents.into_iter().map(Into::into).collect(),
+        })
     }
 }

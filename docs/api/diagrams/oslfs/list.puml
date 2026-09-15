@@ -1,0 +1,35 @@
+@startuml
+title GET /api/oslfs/{address} — list a wallet's OSLF documents (headers, latest versions)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Document owner" as Owner #FFD8C2
+participant "OslfsApiSdk\n.get()" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "OslfsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Owner -> SDK : get()
+SDK -> SDK : address = privateKey\n  .getPublicKey().getAddress()
+SDK -> API : GET /api/oslfs/{address}
+API -> Domain : list(address)
+Domain -> Chain : explore-deploy list.rho\n(registry env URI, address)
+Chain --> Domain : OslfHeader[] or nothing
+Domain --> API : Oslfs { oslfs }\n(empty list when the wallet has none)
+API --> SDK : 200 Oslfs
+SDK --> Owner : headers
+
+note over Domain #FFF0C7
+Headers carry id, version, created_at, name,
+and description — not the query body. Fetch one
+version to obtain the OSLF expression itself.
+end note
+@enduml

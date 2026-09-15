@@ -1,0 +1,27 @@
+@startuml 44-event-journal-merge
+' Order-preserving merge of the durable + on-chain audit sequences.
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+skinparam activity {
+  BackgroundColor #D0E0E3
+  BorderColor #294C60
+  DiamondBackgroundColor #FFF1CC
+  DiamondBorderColor #294C60
+}
+
+title Event-journal merge (merge_event_sequences) — rightmost-anchor alignment
+
+start
+:inputs: durable[] (checkpoint journal),\non_chain[] (ledger);
+partition "Find anchors (durable right-to-left)" {
+  :for each durable[i] from the end, find the RIGHTMOST\non_chain match before the previous anchor (rposition)\n→ repeated ledger events align with the latest\nsuccessful claim, not an earlier rejected attempt;
+}
+partition "Emit block-wise (anchors left-to-right)" {
+  :per anchor: durable segment, then on_chain segment,\nthen the shared anchor ONCE;
+  :append the durable and on_chain tails;
+}
+:merged event history\n(INV-D8: both inputs remain subsequences —\nmechanized in rocq/MergeJournal.v);<<#D5E8D4>>
+stop
+@enduml

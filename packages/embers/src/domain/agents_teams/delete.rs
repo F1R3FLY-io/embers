@@ -1,5 +1,6 @@
 use firefly_client::models::{DeployId, SignedCode, Uri};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::models::DeleteResp;
@@ -12,7 +13,7 @@ struct Delete {
     id: String,
 }
 
-impl AgentsTeamsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(level = "info", skip(self), err(Debug), ret(Debug, level = "trace"))]
     pub async fn prepare_delete_contract(&self, id: String) -> anyhow::Result<DeleteResp> {
         let contract = Delete {
@@ -43,7 +44,6 @@ impl AgentsTeamsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
-        write_client.propose().await?;
         Ok(deploy_id)
     }
 }

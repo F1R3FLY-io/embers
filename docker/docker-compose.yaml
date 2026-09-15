@@ -1,18 +1,23 @@
 services:
   firefly:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyindustries/f1r3fly-rust-node:latest
     pull_policy: always
     user: root
     env_file:
       - .env
     ports:
       - 14401:40401 # deploy service
-      - 14402:40402 # propose service
       - 14403:40403 # rest api
     volumes:
       - ./mainnet/genesis:/var/lib/rnode/genesis
       - ./certs/node.key.pem:/var/lib/rnode/node.key.pem:ro
       - ./certs/node.certificate.pem:/var/lib/rnode/node.certificate.pem:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:40403/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
     command:
       - run
       - -s
@@ -21,36 +26,52 @@ services:
       - --no-upnp
       - --allow-private-addresses
       - --synchrony-constraint-threshold=0.0
+      - --heartbeat-enabled
+      - --fault-tolerance-threshold=0.0
       - --protocol-port=40400
       - --discovery-port=40404
       - --tls-key-path=/var/lib/rnode/node.key.pem
       - --tls-certificate-path=/var/lib/rnode/node.certificate.pem
 
   firefly-read:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyindustries/f1r3fly-rust-node:latest
     pull_policy: always
     user: root
     ports:
       - 14413:40403 # rest api
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:40403/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
     command:
       - run
       - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly?protocol=40400&discovery=40404
       - --host=firefly-read
       - --no-upnp
       - --allow-private-addresses
+      - --synchrony-constraint-threshold=0.0
+      - --fork-choice-stale-threshold=30s
+      - --fork-choice-check-if-stale-interval=10s
 
   firefly-testnet:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyindustries/f1r3fly-rust-node:latest
     pull_policy: always
     user: root
     ports:
       - 15401:40401 # deploy service
-      - 15402:40402 # propose service
       - 15403:40403 # rest api
     volumes:
       - ./testnet/genesis:/var/lib/rnode/genesis
       - ./certs/node.key.pem:/var/lib/rnode/node.key.pem:ro
       - ./certs/node.certificate.pem:/var/lib/rnode/node.certificate.pem:ro
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:40403/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
     command:
       - run
       - -s
@@ -59,23 +80,34 @@ services:
       - --no-upnp
       - --allow-private-addresses
       - --synchrony-constraint-threshold=0.0
+      - --heartbeat-enabled
+      - --fault-tolerance-threshold=0.0
       - --protocol-port=40400
       - --discovery-port=40404
       - --tls-key-path=/var/lib/rnode/node.key.pem
       - --tls-certificate-path=/var/lib/rnode/node.certificate.pem
 
   firefly-read-testnet:
-    image: f1r3flyindustries/f1r3fly-scala-node:latest
+    image: f1r3flyindustries/f1r3fly-rust-node:latest
     pull_policy: always
     user: root
     ports:
       - 15413:40403 # rest api
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:40403/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
     command:
       - run
       - --bootstrap=rnode://ebffd419dea60220734ccea8875e86d87bac10a7@firefly-testnet?protocol=40400&discovery=40404
       - --host=firefly-read-testnet
       - --no-upnp
       - --allow-private-addresses
+      - --synchrony-constraint-threshold=0.0
+      - --fork-choice-stale-threshold=30s
+      - --fork-choice-check-if-stale-interval=10s
 
   state-sync-init:
     build:
@@ -92,7 +124,7 @@ services:
     command:
       - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
-      - --propose-service-url=http://firefly:40402
+
       - --service-id=docker-pds
       - init
 
@@ -112,7 +144,7 @@ services:
     command:
       - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
-      - --propose-service-url=http://firefly:40402
+
       - --service-id=docker-pds
       - upload
       - --db-url=postgresql://postgres@postgresql:5432
@@ -131,7 +163,7 @@ services:
     command:
       - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
-      - --propose-service-url=http://firefly:40402
+
       - --service-id=docker-pds
       - init
 
@@ -153,7 +185,7 @@ services:
     command:
       - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
-      - --propose-service-url=http://firefly:40402
+
       - --service-id=docker-pds
       - listen
       - --communication-service-api-addr=0.0.0.0:8082
@@ -177,7 +209,7 @@ services:
     command:
       - --wallet-key=232DADA5BBAFC0799D5F370DA04AF70CE438F69F954512B26D6FB5B560B81DFE
       - --deploy-service-url=http://firefly:40401
-      - --propose-service-url=http://firefly:40402
+
       - --service-id=docker-pds
       - push
       - --events-source-url=ws://host.docker.internal:2583/xrpc/com.atproto.sync.subscribeRepos

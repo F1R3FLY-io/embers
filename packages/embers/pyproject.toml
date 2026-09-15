@@ -8,6 +8,7 @@ dependencies = [
     "python-zbase32 (>=0.1,<0.2.0)",
     "requests (>=2.32,<3.0.0)",
     "websocket-client (>=1.9,<2.0.0)",
+    "pycryptodome (>=3.23.0,<4.0.0)",
 ]
 name = "embers-tests"
 requires-python = ">=3.13,<4"
@@ -19,6 +20,9 @@ requires      = ["poetry-core>=2.0.0,<3.0.0"]
 
 [tool.poetry]
 package-mode = false
+
+[tool.uv]
+package = false
 
 [tool.poetry.group.dev.dependencies]
 grpcio-tools = "^1.76"
@@ -33,8 +37,11 @@ target-version = "py313"
 [tool.ruff.lint]
 ignore = [
     "ANN401",  # typing.Any
+    "COM812",  # formatter owns trailing-comma layout
+    "CPY001",  # repository copyright is recorded centrally, not per test file
     "D",       # docstrings
     "PLR0913", # Too many arguments
+    "PLR0917", # test clients mirror multi-field HTTP request contracts
     "PLR2004", # magic value
     "S101",    # assert
     "S311",    # suspicious-non-cryptographic-random-usage
@@ -48,3 +55,16 @@ suppress-none-returning = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# L3 (remote) tests are excluded by default; they call real external services and
+# are additionally guarded in conftest (see pytest_runtest_setup). --strict-markers
+# turns any unregistered marker into an error so the taxonomy below stays honest.
+addopts = "--strict-markers -m 'not remote'"
+markers = [
+    "devnet: needs the local loopback dev-net stack (f1r3node validator+observer, f1r3drive, embers). Auto-applied to every tests/api/** test by conftest.",
+    "pds: additionally needs the local f1r3sky PDS at http://localhost:2583.",
+    "chroma: additionally needs ChromaDB at http://localhost:8000.",
+    "gpt: exercises the node's rho:ai GPT paths; on L2 these are served by the local OpenAI stub at http://127.0.0.1:8571, never the real API.",
+    "remote: L3 only — real remote services and real ChatGPT. NEVER run locally; requires EMBERS_L3_CONFIRM=1 and a non-loopback EMBERS_API_URL.",
+    "recovery: restarts/kills the embers systemd unit; needs EMBERS_SERVICE_UNIT set and that unit active.",
+    "slow: long-running acceptance flow.",
+]

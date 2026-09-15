@@ -8,7 +8,7 @@ pub struct ServiceApi;
 #[allow(clippy::unused_async)]
 #[OpenApi(prefix_path = "/service", tag = ApiTags::Service)]
 impl ServiceApi {
-    #[oai(path = "/ready", method = "get")]
+    #[oai(path = "/ready", method = "get", operation_id = "service_ready")]
     async fn ready(&self) -> poem::Result<()> {
         Ok(())
     }

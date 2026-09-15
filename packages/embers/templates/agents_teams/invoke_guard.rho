@@ -1,0 +1,11 @@
+new deployId(`rho:rchain:deployId`), rl(`rho:registry:lookup`),
+    agentsTeamCh, guardReturn
+in {
+    rl!({{ agents_team }}, *agentsTeamCh) |
+    for(@(_, agentsTeam) <- agentsTeamCh) {
+        @agentsTeam!("control", "guard", {{ transition_id }}, {{ value }}, {{ input }}, {{ state }}, *guardReturn) |
+        for(@result <- guardReturn) {
+            @(*deployId).toString()!(result)
+        }
+    }
+}

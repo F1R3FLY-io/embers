@@ -1,0 +1,47 @@
+@startuml
+title GET /api/ai-agents-teams/{address}/referencing/{agent_id} — which teams a deletion would break
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Agent owner" as Owner #FFD8C2
+participant "Client\n(generated AIAgentsTeamsApi)" as Client #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Owner -> Client : agentsTeamsReferencingTeams
+Client -> API : GET .../{address}/referencing/{agent_id}
+API -> Domain : referencing_teams(address, agent_id)
+Domain -> Chain : list the wallet's teams
+Chain --> Domain : team headers
+loop every team, bounded concurrency
+  Domain -> Chain : read the team's LATEST version
+  Chain --> Domain : serializations
+  Domain -> Domain : parse; does it reference the agent?
+end
+alt every team readable
+  Domain --> API : ReferencingTeam[]\n{ id, name, version, published,\n  published_handle? }
+  API --> Client : 200 (possibly empty array)
+  Client --> Owner : what deletion would break
+else any team unreadable
+  API <-- Domain : error — a partial list would\nunder-report the breakage
+  Client <-- API : 500 InternalError
+end
+
+note over Domain #FFF0C7
+Latest versions only, deliberately: a team whose
+newest version no longer uses the agent is not
+broken going forward. The check exists because a
+deleted referent leaves a team permanently
+undeployable while its canvas still draws the
+node by name — there is no dangling edge to see.
+end note
+@enduml

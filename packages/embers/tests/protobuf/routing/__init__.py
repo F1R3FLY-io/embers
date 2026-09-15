@@ -37,7 +37,9 @@ betterproto2.check_compiler_version(_COMPILER_VERSION)
 
 @dataclass(eq=False, repr=False)
 class Ack(betterproto2.Message):
-    header: "Header | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    header: "Header | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("routing", "Ack", Ack)
@@ -52,9 +54,13 @@ class Chunk(betterproto2.Message):
         - content:
     """
 
-    header: "ChunkHeader | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True, group="content")
+    header: "ChunkHeader | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True, group="content"
+    )
 
-    data: "ChunkData | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True, group="content")
+    data: "ChunkData | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True, group="content"
+    )
 
 
 default_message_pool.register_message("routing", "Chunk", Chunk)
@@ -70,7 +76,9 @@ default_message_pool.register_message("routing", "ChunkData", ChunkData)
 
 @dataclass(eq=False, repr=False)
 class ChunkHeader(betterproto2.Message):
-    sender: "Node | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    sender: "Node | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     type_id: "str" = betterproto2.field(2, betterproto2.TYPE_STRING)
 
@@ -94,7 +102,9 @@ default_message_pool.register_message("routing", "Disconnect", Disconnect)
 
 @dataclass(eq=False, repr=False)
 class Header(betterproto2.Message):
-    sender: "Node | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    sender: "Node | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
     network_id: "str" = betterproto2.field(2, betterproto2.TYPE_STRING)
 
@@ -123,7 +133,9 @@ class InternalServerError(betterproto2.Message):
     error: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("routing", "InternalServerError", InternalServerError)
+default_message_pool.register_message(
+    "routing", "InternalServerError", InternalServerError
+)
 
 
 @dataclass(eq=False, repr=False)
@@ -159,21 +171,29 @@ class Protocol(betterproto2.Message):
         - message:
     """
 
-    header: "Header | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    header: "Header | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
-    heartbeat: "Heartbeat | None" = betterproto2.field(2, betterproto2.TYPE_MESSAGE, optional=True, group="message")
+    heartbeat: "Heartbeat | None" = betterproto2.field(
+        2, betterproto2.TYPE_MESSAGE, optional=True, group="message"
+    )
 
     protocol_handshake: "ProtocolHandshake | None" = betterproto2.field(
         3, betterproto2.TYPE_MESSAGE, optional=True, group="message"
     )
 
-    protocol_handshake_response: "ProtocolHandshakeResponse | None" = betterproto2.field(
-        4, betterproto2.TYPE_MESSAGE, optional=True, group="message"
+    protocol_handshake_response: "ProtocolHandshakeResponse | None" = (
+        betterproto2.field(4, betterproto2.TYPE_MESSAGE, optional=True, group="message")
     )
 
-    packet: "Packet | None" = betterproto2.field(5, betterproto2.TYPE_MESSAGE, optional=True, group="message")
+    packet: "Packet | None" = betterproto2.field(
+        5, betterproto2.TYPE_MESSAGE, optional=True, group="message"
+    )
 
-    disconnect: "Disconnect | None" = betterproto2.field(6, betterproto2.TYPE_MESSAGE, optional=True, group="message")
+    disconnect: "Disconnect | None" = betterproto2.field(
+        6, betterproto2.TYPE_MESSAGE, optional=True, group="message"
+    )
 
 
 default_message_pool.register_message("routing", "Protocol", Protocol)
@@ -192,12 +212,16 @@ class ProtocolHandshakeResponse(betterproto2.Message):
     nonce: "bytes" = betterproto2.field(1, betterproto2.TYPE_BYTES)
 
 
-default_message_pool.register_message("routing", "ProtocolHandshakeResponse", ProtocolHandshakeResponse)
+default_message_pool.register_message(
+    "routing", "ProtocolHandshakeResponse", ProtocolHandshakeResponse
+)
 
 
 @dataclass(eq=False, repr=False)
 class TlRequest(betterproto2.Message):
-    protocol: "Protocol | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True)
+    protocol: "Protocol | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True
+    )
 
 
 default_message_pool.register_message("routing", "TLRequest", TlRequest)
@@ -212,7 +236,9 @@ class TlResponse(betterproto2.Message):
         - payload:
     """
 
-    ack: "Ack | None" = betterproto2.field(1, betterproto2.TYPE_MESSAGE, optional=True, group="payload")
+    ack: "Ack | None" = betterproto2.field(
+        1, betterproto2.TYPE_MESSAGE, optional=True, group="payload"
+    )
 
     internal_server_error: "InternalServerError | None" = betterproto2.field(
         2, betterproto2.TYPE_MESSAGE, optional=True, group="payload"

@@ -1,0 +1,55 @@
+@startuml 46-two-layer-continuations
+' Where each kind of continuation lives: the RSpace continuation (on-chain, in
+' f1r3node) vs the embers continuation (off-chain, checkpointed in F1r3drive).
+title Two layers, two continuations — where each kind of continuation lives
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam componentStyle rectangle
+skinparam component {
+  BorderColor #294C60
+  ArrowColor #294C60
+}
+skinparam package {
+  BackgroundColor #F8FBFF
+  BorderColor #6A92AA
+}
+skinparam ArrowColor #294C60
+
+package "embers process — off-chain orchestration" as P1 {
+  [Agent-Teams kernel\nruntime.rs — deterministic durable engine\nmicrostep loop run_until_blocked] as kernel #CDEACC
+  [ContinuationEnvelope\nthe EMBERS continuation\nqueue · joins · scopes · history\npending_effects · pending_waits · events] as env #CDEACC
+  kernel --> env : checkpoints
+}
+
+package "F1r3drive — encrypted, owner-isolated FUSE mount" as P2 {
+  [continuation store\nAES-256-GCM objects, capability-named] as store #E8DACB
+  note bottom of store #FFF0C7
+    The embers continuation is persisted here,
+    encrypted, as the "Continuation" artifact —
+    beside RunRequest, Command, EffectOutbox,
+    Observation, and Output.
+  end note
+}
+
+package "f1r3node — replicated consensus state" as P3 {
+  [RSpace tuple space\ndata + waiting Rholang continuations\nthe RSPACE continuation\nfor (x <- chan) { P }] as rspace #FFE4A6
+  [agent contract (deployed Rholang)\nruns what each agent computes] as agent #FFE4A6
+  [run register (agentsTeams)\nhashes · pointers · status · waits\ndeadlines · grants · event types\n(no plaintext)] as register #FFF1CC
+  agent --> rspace : reduces on-chain
+}
+
+[model API\nrho:ai:gpt4 / dalle3 / tts] as model #F8CECC
+
+kernel --> agent : invoke_activity / invoke_guard\n(deploy Rholang → the node runs the agent)
+agent ..> model : node-side effect
+env --> store : put / get\n(encrypted artifacts)
+kernel --> register : advance_run\n(only hashes / pointers / status)
+
+note right of model #FFF0C7
+  The node holds the model key and performs
+  the call; embers never sees it. In L2 the
+  base URL points at a loopback stub.
+end note
+
+@enduml

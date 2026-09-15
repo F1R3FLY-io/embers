@@ -4,6 +4,13 @@ index.scip
 .DS_Store
 *.pyc
 schema.json
+.pgmcp.toml
 
 docker/.env
 docker/**/default.conf
+docker/docker-compose.override.yaml
+docker/embers-staging.secrets.env
+
+# Claude Code local state (session-local; not project config)
+.claude/settings.local.json
+.claude/worktrees/

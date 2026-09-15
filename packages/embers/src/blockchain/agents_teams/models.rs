@@ -33,8 +33,35 @@ impl<'de> Deserialize<'de> for Graph {
     where
         D: serde::Deserializer<'de>,
     {
-        let graphl = String::deserialize(deserializer)?;
-        models::Graph::new(graphl)
+        let raw = String::deserialize(deserializer)?;
+        // The Rholang tuplespace stores string content without unescaping
+        // escape sequences. Undo the escape_rho_string() level that was added
+        // when embedding the graphl string in Rholang source code.
+        let graphl = crate::blockchain::common::unescape_rho_string(&raw);
+        models::Graph::new(graphl.clone()).map(Self).map_err(|e| {
+            tracing::error!(
+                error = %e,
+                graphl_len = graphl.len(),
+                graphl_prefix = %&graphl[..graphl.len().min(200)],
+                raw_prefix = %&raw[..raw.len().min(200)],
+                "DIAG: graphl_parser::parse_to_ast failed during Graph deserialization"
+            );
+            de::Error::custom(e)
+        })
+    }
+}
+
+#[derive(Debug, Clone, Into)]
+pub struct WorkflowDefinition(models::WorkflowDefinition);
+
+impl<'de> Deserialize<'de> for WorkflowDefinition {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let raw = String::deserialize(deserializer)?;
+        let json = crate::blockchain::common::unescape_rho_string(&raw);
+        models::WorkflowDefinition::from_json(json)
             .map(Self)
             .map_err(de::Error::custom)
     }
@@ -53,6 +80,62 @@ pub struct AgentsTeam {
     pub shard: Option<String>,
     pub logo: Option<String>,
     pub graph: Option<Graph>,
+    #[serde(default)]
+    pub definition: Option<WorkflowDefinition>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::RunState))]
+pub struct RunState {
+    pub run_id: String,
+    pub agents_team: Uri,
+    #[serde(default)]
+    pub grant_id: Option<String>,
+    pub created_at: DateTime,
+    pub status: String,
+    pub events: Vec<RunEvent>,
+    #[serde(default)]
+    pub definition_hash: Option<String>,
+    #[serde(default)]
+    pub revision: u64,
+    #[serde(default)]
+    pub request_content_hash: Option<String>,
+    #[serde(default)]
+    pub request_capability_hash: Option<String>,
+    #[serde(default)]
+    pub continuation_content_hash: Option<String>,
+    #[serde(default)]
+    pub continuation_capability_hash: Option<String>,
+    #[serde(default)]
+    pub command_id: Option<String>,
+    #[serde(default)]
+    pub command_content_hash: Option<String>,
+    #[serde(default)]
+    pub command_capability_hash: Option<String>,
+    #[serde(default)]
+    pub command_actor: Option<String>,
+    #[serde(default)]
+    pub command_class: Option<String>,
+    #[serde(default)]
+    pub command_wait_id: Option<String>,
+    #[serde(default)]
+    pub approval_authority_grants: Vec<String>,
+    #[serde(default)]
+    pub wait_ids: Vec<String>,
+    #[serde(default)]
+    pub due_at: Option<DateTime>,
+    #[serde(default)]
+    pub output_content_hash: Option<String>,
+    #[serde(default)]
+    pub output_capability_hash: Option<String>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::RunEvent))]
+pub struct RunEvent {
+    pub sequence: u64,
+    #[serde(rename = "type")]
+    pub event_type: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -61,6 +144,21 @@ pub struct FireskyCredentials {
     pub pds_url: String,
     pub email: String,
     pub token: String,
+    /// The handle and DID the team was published under.
+    ///
+    /// Optional so that records written before these were recorded stay readable.
+    /// This payload is encrypted and stored on chain, which is append-only, so a
+    /// required field would make every earlier publish fail to decrypt and vanish
+    /// from `firesky_accounts` — taking the ability to run those teams with it.
+    ///
+    /// Without them a published team can be recognised but not described, so
+    /// nothing can check whether the account it names still exists. That is the gap
+    /// that let a wiped dev-env leave the interface claiming a team was published
+    /// when its account had been destroyed.
+    #[serde(default)]
+    pub handle: Option<String>,
+    #[serde(default)]
+    pub did: Option<String>,
 }
 
 #[derive(Debug, Clone, StructuralConvert, Deserialize)]
@@ -68,4 +166,194 @@ pub struct FireskyCredentials {
 pub struct EncryptedMsg {
     pub ciphertext: Hex,
     pub nonce: Hex,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::Grant))]
+pub struct Grant {
+    pub grant_id: String,
+    pub grantor: String,
+    pub grantee: String,
+    pub channel: String,
+    pub channel_principal: String,
+    pub agents_team: Uri,
+    pub caps: GrantCaps,
+    pub authority: GrantAuthority,
+    #[serde(default)]
+    pub require_token_hash: Option<String>,
+    pub min_auth: String,
+    pub created_at: DateTime,
+    pub revoked: bool,
+    pub runs_today: GrantRunsToday,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::GrantCaps))]
+pub struct GrantCaps {
+    #[serde(default)]
+    pub max_runs_per_day: Option<i64>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::GrantAuthority))]
+pub struct GrantAuthority {
+    pub reveal: bool,
+    pub commands: Vec<String>,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::GrantRunsToday))]
+pub struct GrantRunsToday {
+    pub day: i64,
+    pub count: i64,
+}
+
+#[derive(Debug, Clone, StructuralConvert, Deserialize)]
+#[convert(into(models::ChannelBinding))]
+pub struct ChannelBinding {
+    pub channel: String,
+    pub address: String,
+    pub agents_team: Uri,
+    pub team_id: String,
+    pub owner: String,
+    pub active: bool,
+    pub created_at: DateTime,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::domain::agents_teams::models::Graph;
+
+    /// Simulate `escape_rho_string` from `firefly_client::rendering`.
+    fn escape_rho_string(s: &str) -> String {
+        s.replace('\\', "\\\\").replace('"', "\\\"")
+    }
+
+    /// Simulate the unescape performed by the Graph deserializer.
+    /// This reverses `escape_rho_string` — the same operation the
+    /// deserializer applies to strings returned from the tuplespace.
+    fn undo_escape_rho_string(s: &str) -> String {
+        s.replace("\\\"", "\"").replace("\\\\", "\\")
+    }
+
+    #[test]
+    fn graphl_round_trip_simple() {
+        // A minimal graphl context annotation (no JSON, no escapes).
+        let original = r#"context "foo" for f in 0"#;
+        let ast = Graph::new(original.to_owned()).expect("original should parse");
+
+        let graphl = ast.graphl();
+        let re_parsed = Graph::new(graphl.clone()).expect("serialized form should re-parse");
+        let re_serialized = re_parsed.graphl();
+        assert_eq!(
+            graphl, re_serialized,
+            "graphl round-trip must be idempotent"
+        );
+    }
+
+    #[test]
+    fn graphl_round_trip_through_rho_escaping() {
+        // 1. Start with a graphl string containing a context annotation with JSON.
+        //    The graphl format uses `\"` inside string literals, so the raw graphl
+        //    looks like: context "{\"type\":\"deploy-container\"}" for f in 0
+        let original = r#"context "{\"type\":\"deploy-container\"}" for f in 0"#;
+        let ast = Graph::new(original.to_owned()).expect("original should parse");
+
+        // 2. Serialize back to graphl (simulates Graph::graphl()).
+        let graphl = ast.graphl();
+
+        // 3. Apply escape_rho_string (simulates Rholang template embedding).
+        //    This is what gets stored in the tuplespace — Rholang does NOT
+        //    unescape, so the stored string retains the extra escaping.
+        let stored = escape_rho_string(&graphl);
+
+        // 4. The stored string should NOT parse directly (it has extra escaping).
+        assert!(
+            Graph::new(stored.clone()).is_err(),
+            "escaped string should not parse without unescaping"
+        );
+
+        // 5. Apply undo_escape_rho_string (what the deserializer does).
+        let unescaped = undo_escape_rho_string(&stored);
+
+        // 6. Verify the unescaped string equals the original graphl.
+        assert_eq!(
+            graphl, unescaped,
+            "undo_escape_rho_string should recover the original graphl"
+        );
+
+        // 7. Re-parse the unescaped string.
+        let re_parsed = Graph::new(unescaped).expect("unescaped string should parse");
+
+        // 8. Verify AST equality via re-serialization.
+        let re_serialized = re_parsed.graphl();
+        assert_eq!(
+            graphl, re_serialized,
+            "ASTs should produce identical graphl"
+        );
+    }
+
+    #[test]
+    fn graphl_round_trip_complex_json_context() {
+        // A more complex context annotation with nested JSON.
+        let original =
+            r#"context "{\"agents\":[{\"name\":\"bot\",\"model\":\"gpt-4\"}]}" for x in 0"#;
+        let ast = Graph::new(original.to_owned()).expect("original should parse");
+        let graphl = ast.graphl();
+
+        // Stored in tuplespace with extra escaping (Rholang does NOT unescape).
+        let stored = escape_rho_string(&graphl);
+        let unescaped = undo_escape_rho_string(&stored);
+
+        assert_eq!(graphl, unescaped);
+
+        let re_parsed = Graph::new(unescaped).expect("unescaped string should parse");
+        assert_eq!(graphl, re_parsed.graphl());
+    }
+
+    #[test]
+    fn graphl_round_trip_with_vertex_and_edge() {
+        // A graph with vertices, bindings, edges, AND a context annotation.
+        let original = r#"< a > | { context "{\"k\":\"v\"}" for a in 0 }"#;
+        let ast = Graph::new(original.to_owned()).expect("original should parse");
+        let graphl = ast.graphl();
+
+        // Stored in tuplespace with extra escaping (Rholang does NOT unescape).
+        let stored = escape_rho_string(&graphl);
+        let unescaped = undo_escape_rho_string(&stored);
+
+        assert_eq!(graphl, unescaped);
+        let re_parsed = Graph::new(unescaped).expect("unescaped string should parse");
+        assert_eq!(graphl, re_parsed.graphl());
+    }
+
+    #[test]
+    fn graphl_parser_is_thread_safe_under_mutex() {
+        // The C parser uses global state; this test verifies the mutex
+        // serializes concurrent access correctly.
+        let inputs = [
+            r#"context "foo" for f in 0"#,
+            r#"context "{\"type\":\"deploy-container\"}" for x in 0"#,
+            r#"< a > | { context "{\"k\":\"v\"}" for a in 0 }"#,
+            r#"context "{\"agents\":[{\"name\":\"bot\"}]}" for y in 0"#,
+        ];
+
+        std::thread::scope(|s| {
+            let mut handles = Vec::new();
+            for _ in 0..4 {
+                for input in &inputs {
+                    handles.push(s.spawn(|| {
+                        let ast = Graph::new(input.to_string()).expect("parse should succeed");
+                        let graphl = ast.graphl();
+                        let re_parsed =
+                            Graph::new(graphl.clone()).expect("re-parse should succeed");
+                        assert_eq!(graphl, re_parsed.graphl());
+                    }));
+                }
+            }
+            for handle in handles {
+                handle.join().expect("thread should not panic");
+            }
+        });
+    }
 }

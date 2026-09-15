@@ -59,12 +59,50 @@ struct FlatGraph<'a> {
     bindings_reverse: BTreeMap<Vertex<'a>, BTreeSet<Name<'a>>>,
     edges: BTreeSet<(Name<'a>, Name<'a>)>,
     contexts: BTreeMap<Name<'a>, &'a str>,
+    subgraphs: BTreeMap<&'a str, BTreeSet<Vertex<'a>>>,
+    subgraph_descendants: BTreeMap<&'a str, BTreeSet<&'a str>>,
 }
 
 #[derive(Debug, Clone)]
 struct Visitor;
 
 impl<'a> graphl_parser::Visitor<'a, FlatGraph<'a>, anyhow::Error> for Visitor {
+    fn visit_subgraph(
+        &self,
+        mut acc: FlatGraph<'a>,
+        group: &'a graphl_parser::ast::GraphBinding,
+    ) -> anyhow::Result<FlatGraph<'a>> {
+        struct Members;
+        impl<'a> graphl_parser::Visitor<'a, BTreeSet<Vertex<'a>>, anyhow::Error> for Members {
+            fn visit_vertex(
+                &self,
+                mut nodes: BTreeSet<Vertex<'a>>,
+                vertex: &'a graphl_parser::ast::GVertex,
+            ) -> anyhow::Result<BTreeSet<Vertex<'a>>> {
+                nodes.insert((&vertex.vertex.name).try_into()?);
+                Ok(nodes)
+            }
+        }
+        let members =
+            graphl_parser::Walker::new(&group.graph_1).try_visit(BTreeSet::new(), Members)?;
+        struct Descendants;
+        impl<'a> graphl_parser::Visitor<'a, BTreeSet<&'a str>, anyhow::Error> for Descendants {
+            fn visit_subgraph(
+                &self,
+                mut groups: BTreeSet<&'a str>,
+                group: &'a graphl_parser::ast::GraphBinding,
+            ) -> anyhow::Result<BTreeSet<&'a str>> {
+                groups.insert(&group.var);
+                Ok(groups)
+            }
+        }
+        let descendants =
+            graphl_parser::Walker::new(&group.graph_1).try_visit(BTreeSet::new(), Descendants)?;
+        acc.subgraph_descendants.insert(&group.var, descendants);
+        acc.subgraphs.insert(&group.var, members);
+        Ok(acc)
+    }
+
     fn visit_vertex(
         &self,
         mut acc: FlatGraph<'a>,
@@ -164,6 +202,16 @@ enum NodeContext {
     TTIModel,
     #[serde(rename = "tts-model")]
     TTSModel,
+    /// A user-defined agent, referenced by id and version. The agent's Rholang
+    /// is fetched from agents storage at deploy time and spliced into the team.
+    /// `agent_name` is the label the author gave it; it names this agent's entry
+    /// when a downstream node joins several inputs into a map.
+    #[serde(rename = "agent", rename_all = "camelCase")]
+    Agent {
+        agent_id: String,
+        agent_version: String,
+        agent_name: String,
+    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -183,10 +231,31 @@ pub struct Output<'a> {
 
 #[derive(Debug, Clone)]
 pub enum Node<'a> {
-    Compress { from: Vec<Vertex<'a>>, output: bool },
-    TextModel { from: Vertex<'a>, output: bool },
-    TTIModel { from: Vertex<'a>, output: bool },
-    TTSModel { from: Vertex<'a>, output: bool },
+    Compress {
+        from: Vec<Vertex<'a>>,
+        output: bool,
+    },
+    TextModel {
+        from: Vertex<'a>,
+        output: bool,
+    },
+    TTIModel {
+        from: Vertex<'a>,
+        output: bool,
+    },
+    TTSModel {
+        from: Vertex<'a>,
+        output: bool,
+    },
+    /// Like `Compress`, an agent may take several incoming edges: they are
+    /// joined and delivered as a map. A single edge is delivered as the value.
+    Agent {
+        agent_id: String,
+        agent_version: String,
+        agent_name: String,
+        from: Vec<Vertex<'a>>,
+        output: bool,
+    },
 }
 
 impl Node<'_> {
@@ -196,14 +265,63 @@ impl Node<'_> {
             Node::TextModel { output, .. } => *output,
             Node::TTIModel { output, .. } => *output,
             Node::TTSModel { output, .. } => *output,
+            Node::Agent { output, .. } => *output,
         }
     }
+}
+
+/// Identifies a specific version of a user-defined agent referenced by a team.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AgentRef {
+    pub id: String,
+    pub version: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct Code<'a> {
     pub nodes: BTreeMap<Vertex<'a>, Node<'a>>,
     pub output: Option<Output<'a>>,
+}
+
+impl Code<'_> {
+    /// Every agent version this team references. Deduplicated, so an agent used
+    /// by two nodes is fetched once.
+    /// The author-facing name of a referenced agent, when the graph records one.
+    ///
+    /// `AgentRef` stays pure identity -- it keys the resolved-code map, so folding a
+    /// name into it would split one agent into two entries if a graph ever carried
+    /// differing names for the same id. The name is looked up separately instead, so
+    /// an error can say "Refine" rather than a pair of uuids.
+    pub fn agent_name(&self, wanted: &AgentRef) -> Option<&str> {
+        self.nodes.values().find_map(|node| match node {
+            Node::Agent {
+                agent_id,
+                agent_version,
+                agent_name,
+                ..
+            } if *agent_id == wanted.id && *agent_version == wanted.version => {
+                Some(agent_name.as_str())
+            }
+            _ => None,
+        })
+    }
+
+    pub fn agent_refs(&self) -> BTreeSet<AgentRef> {
+        self.nodes
+            .values()
+            .filter_map(|node| match node {
+                Node::Agent {
+                    agent_id,
+                    agent_version,
+                    ..
+                } => Some(AgentRef {
+                    id: agent_id.clone(),
+                    version: agent_version.clone(),
+                }),
+                _ => None,
+            })
+            .collect()
+    }
 }
 
 fn resolve_context<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result<NodeContext> {
@@ -217,11 +335,76 @@ fn resolve_context<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result
 
     let context = match (contexts.next(), contexts.next()) {
         (Some(context), None) => context,
-        (None, _) => return Err(anyhow!("node {node} is missing context")),
+        (None, _) => return Err(missing_context_error(flat, node)),
         (Some(_), Some(_)) => return Err(anyhow!("node {node} has multiple contexts")),
     };
 
     serde_json::from_str(context).with_context(|| format!("node {node} has invalid context"))
+}
+
+/// Explains a vertex that edges refer to but nothing defines.
+///
+/// The bare identifier alone is close to useless to the person who has to act on it:
+/// it names an internal id, in a process they are not looking at, for a node that by
+/// definition has no label. Naming the neighbours the broken edges lead to, and
+/// stating the remedy, is what makes the message actionable — the graph is repaired
+/// simply by opening it in the editor and saving, because the editor drops edges
+/// whose endpoints it cannot resolve.
+///
+/// See `docs/post-mortems/AGENT_TEAM_EDITOR_GRAPH_CORRUPTION.md` in embers-frontend.
+fn missing_context_error(flat: &FlatGraph<'_>, node: Vertex<'_>) -> anyhow::Error {
+    let names = flat.bindings_reverse.get(&node);
+
+    // Every edge with this vertex at either end, described by the *other* end, which
+    // — unlike this one — usually does have a context to name it by.
+    let mut neighbours: Vec<String> = flat
+        .edges
+        .iter()
+        .filter_map(|(from, to)| {
+            let names = names?;
+            match (names.contains(from), names.contains(to)) {
+                (true, false) => Some(format!("-> {}", describe_vertex(flat, *to))),
+                (false, true) => Some(format!("{} ->", describe_vertex(flat, *from))),
+                _ => None,
+            }
+        })
+        .collect();
+    neighbours.sort();
+    neighbours.dedup();
+
+    if neighbours.is_empty() {
+        return anyhow!(
+            "node {node} is missing context: the graph refers to it but never defines it"
+        );
+    }
+
+    anyhow!(
+        "node {node} is missing context: {} edge(s) refer to it but the graph never \
+         defines it ({}). This is what a node deleted without its edges leaves behind. \
+         Open the team in the editor and save it — that drops the stale connections and \
+         produces a graph that deploys.",
+        neighbours.len(),
+        neighbours.join(", "),
+    )
+}
+
+/// A vertex named the way its author would recognise it: an agent's own name where
+/// there is one, else the node kind, else the raw identifier.
+fn describe_vertex(flat: &FlatGraph<'_>, name: Name<'_>) -> String {
+    let Some(context) = flat.contexts.get(&name) else {
+        return name.to_string();
+    };
+
+    match serde_json::from_str::<NodeContext>(context) {
+        Ok(NodeContext::Agent { agent_name, .. }) => agent_name,
+        Ok(NodeContext::Input) => "Input".to_owned(),
+        Ok(NodeContext::Output) => "Output".to_owned(),
+        Ok(NodeContext::Compress) => "Compress".to_owned(),
+        Ok(NodeContext::TextModel) => "Text model".to_owned(),
+        Ok(NodeContext::TTIModel) => "TTI model".to_owned(),
+        Ok(NodeContext::TTSModel) => "TTS model".to_owned(),
+        Err(_) => name.to_string(),
+    }
 }
 
 fn resolve_froms<'a>(
@@ -271,7 +454,154 @@ fn has_output<'a>(flat: &FlatGraph<'a>, node: Vertex<'a>) -> anyhow::Result<bool
     err(Debug),
     ret(Debug, level = "trace")
 )]
-pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
+/// Whether a graph names the given agent anywhere.
+///
+/// Deliberately does **not** go through `parse`. A team whose graph is semantically
+/// broken -- a dangling edge, say -- still uses whatever agents its contexts name,
+/// and a team that cannot be scanned must not silently drop out of a deletion
+/// warning: reporting "no teams affected" when a team is affected is precisely the
+/// silent failure this guards against. Collecting contexts succeeds on graphs that
+/// `parse` rejects, so the answer stays available.
+///
+/// Precise rather than a substring search: each context is deserialized, so an
+/// identifier appearing in some other field cannot masquerade as a reference.
+pub fn references_agent(graph: &Graph, agent_id: &str) -> anyhow::Result<bool> {
+    let flat = graph.try_visit(FlatGraph::default(), Visitor)?;
+
+    Ok(flat.contexts.values().any(|context| {
+        matches!(
+            serde_json::from_str::<NodeContext>(context),
+            Ok(NodeContext::Agent { agent_id: ref id, .. }) if id == agent_id
+        )
+    }))
+}
+
+/// Lower actual legacy deployment groups to the same executable packaging model
+/// as Workflow v2. State scopes are never inferred from deployment groups.
+pub fn lower_deployment_containers(
+    graph: &Graph,
+) -> anyhow::Result<Option<super::super::workflow::WorkflowDefinition>> {
+    use serde_json::json;
+    let flat = graph.try_visit(FlatGraph::default(), Visitor)?;
+    let groups = flat
+        .subgraphs
+        .iter()
+        .filter_map(|(id, members)| {
+            let context = flat.contexts.get(&Name(id))?;
+            let value: serde_json::Value = serde_json::from_str(context).ok()?;
+            (value["type"] == "deploy-container").then_some((*id, members, value))
+        })
+        .collect::<Vec<_>>();
+    if groups.is_empty() {
+        return Ok(None);
+    }
+    let mut nodes = serde_json::Map::new();
+    let mut initial = Vec::new();
+    for &vertex in &flat.vertexes {
+        let id = vertex.to_string();
+        let (label, kind, activity, output_key) = match resolve_context(&flat, vertex)? {
+            NodeContext::Input => {
+                initial.push(id.clone());
+                ("Input".to_owned(), "input", None, "input".to_owned())
+            }
+            NodeContext::Output => ("Output".to_owned(), "output", None, "output".to_owned()),
+            NodeContext::Agent {
+                agent_id,
+                agent_version,
+                agent_name,
+            } => {
+                let key = super::rendering::lower_camel_case(&agent_name);
+                (
+                    agent_name,
+                    "activity",
+                    Some(
+                        json!({"kind": "agent", "agentId": agent_id, "agentVersion": agent_version, "protocol": "simple-v1"}),
+                    ),
+                    key,
+                )
+            }
+            context => {
+                let (name, key) = match context {
+                    NodeContext::Compress => ("compress", "compress"),
+                    NodeContext::TextModel => ("text-model", "textModel"),
+                    NodeContext::TTIModel => ("tti-model", "ttiModel"),
+                    NodeContext::TTSModel => ("tts-model", "ttsModel"),
+                    _ => unreachable!(),
+                };
+                (
+                    key.to_owned(),
+                    "activity",
+                    Some(json!({"kind": "builtin", "name": name})),
+                    key.to_owned(),
+                )
+            }
+        };
+        let mut node = json!({"id": id, "label": label, "outputKey": output_key, "kind": kind, "scopeId": "root"});
+        if let Some(activity) = activity {
+            node["activity"] = activity;
+        }
+        nodes.insert(id, node);
+    }
+    let mut transitions = serde_json::Map::new();
+    let mut routes = serde_json::Map::new();
+    let mut incoming = BTreeMap::<String, usize>::new();
+    for (index, (source, target)) in flat.edges.iter().enumerate() {
+        let source = flat
+            .bindings
+            .get(source)
+            .context("legacy source binding missing")?
+            .to_string();
+        let target = flat
+            .bindings
+            .get(target)
+            .context("legacy target binding missing")?
+            .to_string();
+        *incoming.entry(target.clone()).or_default() += 1;
+        let id = format!("legacy-edge-{index}");
+        transitions.insert(id.clone(), json!({"id": id, "sourceNodeId": source, "targetNodeId": target, "trigger": "completed", "priority": 0, "routeGroupId": source}));
+        routes.insert(
+            source.clone(),
+            json!({"id": source, "mode": "allMatches", "noMatch": "fail"}),
+        );
+    }
+    for (id, count) in incoming {
+        if count > 1 {
+            nodes.get_mut(&id).context("legacy target missing")?["join"] =
+                json!({"mode": "all", "correlation": {"kind": "root"}});
+        }
+    }
+    let mut containers = serde_json::Map::new();
+    for (id, members, context) in &groups {
+        let parent = groups
+            .iter()
+            .filter(|(other, _, _)| flat.subgraph_descendants[other].contains(id))
+            .min_by_key(|(other, _, _)| flat.subgraph_descendants[other].len())
+            .map(|(id, _, _)| *id);
+        let members = members
+            .iter()
+            .filter(|member| {
+                !groups.iter().any(|(other, child, _)| {
+                    flat.subgraph_descendants[id].contains(other) && child.contains(member)
+                })
+            })
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        let mut container = json!({"id": id, "label": context.get("containerId").and_then(|value| value.as_str()).unwrap_or(id), "nodeIds": members, "target": "current"});
+        if let Some(parent) = parent {
+            container["parentId"] = json!(parent);
+        }
+        containers.insert((*id).to_owned(), container);
+    }
+    super::super::workflow::WorkflowDefinition::from_json(json!({
+        "schemaVersion": "2.0", "entryScopeId": "root", "nodes": nodes,
+        "scopes": {"root": {"id": "root", "label": "Root", "kind": "root", "initialNodeIds": initial, "entryActivities": [], "exitActivities": [], "history": "none"}},
+        "transitions": transitions, "routeGroups": routes, "deploymentContainers": containers,
+        "interface": {"inputs": {"input": {"kind": "string"}}, "outputs": {"output": {"kind": "legacy"}}},
+        "types": {}, "policies": {"defaultExecution": "bounded", "visibility": "private"}, "presentation": {"nodes": {}, "edges": {}}
+    }).to_string()).map(Some)
+}
+
+pub fn parse(graph: &Graph) -> anyhow::Result<Code<'_>> {
     record_trace!(graph);
 
     let flat = graph.try_visit(FlatGraph::default(), Visitor)?;
@@ -315,6 +645,24 @@ pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
                     let output = has_output(&flat, node)?;
                     partial.nodes.insert(node, Node::TTSModel { from, output });
                 }
+                NodeContext::Agent {
+                    agent_id,
+                    agent_version,
+                    agent_name,
+                } => {
+                    let from = resolve_froms(&flat, node)?.collect();
+                    let output = has_output(&flat, node)?;
+                    partial.nodes.insert(
+                        node,
+                        Node::Agent {
+                            agent_id,
+                            agent_version,
+                            agent_name,
+                            from,
+                            output,
+                        },
+                    );
+                }
             }
 
             anyhow::Ok(partial)
@@ -327,5 +675,274 @@ pub fn parse<'a>(graph: &'a Graph) -> anyhow::Result<Code<'a>> {
             output,
         } => Ok(Code { nodes, output }),
         PartialCode { input: None, .. } => Err(anyhow!("input is missing")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::agents_teams::models::Graph;
+
+    /// The graphl an agent node produces, in the shape the editor emits: three
+    /// context-tagged vertices plus the edges wiring them together.
+    fn agent_team_graphl() -> String {
+        let agent_context = r#"{\"type\":\"agent\",\"agentId\":\"019f-abc\",\"agentName\":\"Summarize\",\"agentVersion\":\"019f-def\"}"#;
+        format!(
+            r#"0 * {{context "{{\"type\":\"input-node\"}}" for input1 in let input1 = < input1 > in < input1 > | {{context "{agent_context}" for model1 in let model1 = < model1 > in < model1 > | {{context "{{\"type\":\"output-node\"}}" for output1 in let output1 = < output1 > in < output1 > | 0}}}}}} * {{(let input1 = < input1 > in 0, let model1 = < model1 > in 0) * {{(let model1 = < model1 > in 0, let output1 = < output1 > in 0) * 0}}}}"#
+        )
+    }
+
+    fn group(id: &str, contents: &str) -> String {
+        let context = serde_json::json!({"type":"deploy-container","containerId":id}).to_string();
+        let quoted = serde_json::to_string(&context).unwrap();
+        format!("{{context {quoted} for {id} in let {id} = {contents} in 0}}")
+    }
+
+    #[test]
+    fn lowers_nested_legacy_groups_without_collapsing_equal_memberships() {
+        let body = group("Outer", &group("Inner", &agent_team_graphl()));
+        let graph = Graph::new(body).unwrap();
+        let definition = lower_deployment_containers(&graph).unwrap().unwrap();
+        let parsed = definition.parsed();
+        assert_eq!(
+            parsed.deployment_containers["Inner"].parent_id.as_deref(),
+            Some("Outer")
+        );
+        assert!(parsed.deployment_containers["Outer"].node_ids.is_empty());
+        assert_eq!(parsed.deployment_containers["Inner"].node_ids.len(), 3);
+        assert_eq!(parsed.nodes["model1"].output_key(), "summarize");
+        assert_eq!(parsed.transitions.len(), 2);
+        assert_eq!(parsed.scopes.len(), 1);
+    }
+
+    #[test]
+    fn legacy_graph_without_containers_keeps_its_existing_compiler() {
+        assert!(
+            lower_deployment_containers(&Graph::new(agent_team_graphl()).unwrap())
+                .unwrap()
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn parses_an_agent_node_from_editor_graphl() {
+        let graph = Graph::new(agent_team_graphl()).expect("graphl should parse");
+        let code = parse(&graph).expect("an agent node should compile");
+
+        let agent = code
+            .nodes
+            .values()
+            .find_map(|node| match node {
+                Node::Agent {
+                    agent_id,
+                    agent_version,
+                    agent_name,
+                    from,
+                    output,
+                } => Some((agent_id, agent_version, agent_name, from.len(), *output)),
+                _ => None,
+            })
+            .expect("the graph should yield an agent node");
+
+        assert_eq!(agent.0, "019f-abc", "agent id should survive the context");
+        assert_eq!(agent.1, "019f-def", "agent version should survive");
+        assert_eq!(agent.2, "Summarize", "agent name should survive");
+        assert_eq!(agent.3, 1, "this agent has a single incoming edge");
+        assert!(agent.4, "the agent feeds the output node");
+    }
+
+    #[test]
+    fn collects_agent_references_for_resolution() {
+        let graph = Graph::new(agent_team_graphl()).expect("graphl should parse");
+        let code = parse(&graph).expect("an agent node should compile");
+
+        let refs = code.agent_refs();
+        assert_eq!(refs.len(), 1);
+        let agent_ref = refs.iter().next().expect("one reference");
+        assert_eq!(agent_ref.id, "019f-abc");
+        assert_eq!(agent_ref.version, "019f-def");
+    }
+
+    // -------------------------------------------------------
+    // fan-out / fan-in: the red-team topology, end to end
+    // through the real graphl parser
+    // -------------------------------------------------------
+
+    /// Assembles graphl in the shape the editor emits: vertices nested inside
+    /// their contexts, then a right-nested tensor chain of anonymous edges.
+    fn graphl(nodes: &[(&str, String)], edges: &[(&str, &str)]) -> String {
+        let mut body = "0".to_owned();
+        for (name, json) in nodes.iter().rev() {
+            let escaped = json.replace('"', "\\\"");
+            body = format!(
+                "{{context \"{escaped}\" for {name} in let {name} = < {name} > in < {name} > | {body}}}"
+            );
+        }
+
+        let mut edge_chain = "0".to_owned();
+        for (from, to) in edges.iter().rev() {
+            edge_chain = format!(
+                "{{(let {from} = < {from} > in 0, let {to} = < {to} > in 0) * {edge_chain}}}"
+            );
+        }
+
+        format!("0 * {body} * {edge_chain}")
+    }
+
+    fn agent_context(name: &str) -> String {
+        format!(
+            r#"{{"type":"agent","agentId":"{name}-id","agentName":"{name}","agentVersion":"v1"}}"#
+        )
+    }
+
+    /// Input feeds every reasoning node; the hypothesis fans out to the three
+    /// critics and the refiner; the critics fan back into the refiner.
+    fn red_team_graphl() -> String {
+        graphl(
+            &[
+                ("aIn", r#"{"type":"input-node"}"#.to_owned()),
+                ("aHyp", agent_context("Hypothesize")),
+                ("aLog", agent_context("LogicCritic")),
+                ("aEvi", agent_context("EvidenceCritic")),
+                ("aFea", agent_context("FeasibilityCritic")),
+                ("aRef", agent_context("Refine")),
+                ("aCon", agent_context("Condense")),
+                ("aOut", r#"{"type":"output-node"}"#.to_owned()),
+            ],
+            &[
+                ("aIn", "aHyp"),
+                ("aIn", "aLog"),
+                ("aIn", "aEvi"),
+                ("aIn", "aFea"),
+                ("aIn", "aRef"),
+                ("aIn", "aCon"),
+                ("aHyp", "aLog"),
+                ("aHyp", "aEvi"),
+                ("aHyp", "aFea"),
+                ("aHyp", "aRef"),
+                ("aLog", "aRef"),
+                ("aEvi", "aRef"),
+                ("aFea", "aRef"),
+                ("aRef", "aCon"),
+                ("aCon", "aOut"),
+            ],
+        )
+    }
+
+    fn agent_arity(code: &Code<'_>, name: &str) -> usize {
+        code.nodes
+            .values()
+            .find_map(|node| match node {
+                Node::Agent {
+                    agent_name, from, ..
+                } if agent_name == name => Some(from.len()),
+                _ => None,
+            })
+            .unwrap_or_else(|| panic!("no agent node named {name}"))
+    }
+
+    #[test]
+    fn parses_fan_out_and_fan_in_arities() {
+        let graph = Graph::new(red_team_graphl()).expect("red-team graphl should parse");
+        let code = parse(&graph).expect("the red-team graph should compile");
+
+        assert_eq!(
+            code.nodes.len(),
+            6,
+            "six agent nodes, input and output aside"
+        );
+        assert_eq!(agent_arity(&code, "Hypothesize"), 1, "input only");
+        assert_eq!(agent_arity(&code, "LogicCritic"), 2, "input and hypothesis");
+        assert_eq!(agent_arity(&code, "EvidenceCritic"), 2);
+        assert_eq!(agent_arity(&code, "FeasibilityCritic"), 2);
+        assert_eq!(
+            agent_arity(&code, "Refine"),
+            5,
+            "input, hypothesis and all three critiques"
+        );
+        assert_eq!(agent_arity(&code, "Condense"), 2, "input and refinement");
+    }
+
+    #[test]
+    fn fan_out_reaches_every_target() {
+        let graph = Graph::new(red_team_graphl()).expect("red-team graphl should parse");
+        let code = parse(&graph).expect("the red-team graph should compile");
+
+        // The hypothesis vertex must appear as an input of all four of its
+        // targets; losing an edge here is exactly the failure a fan-out bug
+        // would produce.
+        let readers = code
+            .nodes
+            .values()
+            .filter(|node| match node {
+                Node::Agent {
+                    agent_name, from, ..
+                } => {
+                    agent_name != "Hypothesize"
+                        && from.iter().any(|vertex| *vertex.as_ref() == "aHyp")
+                }
+                _ => false,
+            })
+            .count();
+        assert_eq!(
+            readers, 4,
+            "the hypothesis feeds three critics and the refiner"
+        );
+    }
+
+    #[test]
+    fn every_referenced_agent_version_is_collected_once() {
+        let graph = Graph::new(red_team_graphl()).expect("red-team graphl should parse");
+        let code = parse(&graph).expect("the red-team graph should compile");
+
+        let refs = code.agent_refs();
+        assert_eq!(refs.len(), 6, "six distinct agents, each fetched once");
+        assert!(
+            refs.iter().all(|agent_ref| agent_ref.version == "v1"),
+            "versions should survive the context round-trip: {refs:?}"
+        );
+    }
+
+    #[test]
+    fn a_graph_without_agents_references_none() {
+        let graphl = r#"0 * {context "{\"type\":\"input-node\"}" for input1 in let input1 = < input1 > in < input1 > | {context "{\"type\":\"text-model\"}" for model1 in let model1 = < model1 > in < model1 > | {context "{\"type\":\"output-node\"}" for output1 in let output1 = < output1 > in < output1 > | 0}}} * {(let input1 = < input1 > in 0, let model1 = < model1 > in 0) * {(let model1 = < model1 > in 0, let output1 = < output1 > in 0) * 0}}"#;
+        let graph = Graph::new(graphl.to_owned()).expect("graphl should parse");
+        let code = parse(&graph).expect("a built-in only graph should compile");
+
+        assert!(code.agent_refs().is_empty());
+    }
+
+    #[test]
+    fn a_dangling_edge_is_reported_with_the_neighbours_it_connects() {
+        // What a node deleted without its edges leaves behind. The identifier alone
+        // tells the author nothing -- the node has no context, so it has no label --
+        // so the message has to describe the edges by their *other* end.
+        let graphl = graphl(
+            &[
+                ("aIn", r#"{"type":"input-node"}"#.to_owned()),
+                ("aCon", agent_context("Condense")),
+                ("aOut", r#"{"type":"output-node"}"#.to_owned()),
+            ],
+            &[("aIn", "aCon"), ("aCon", "aGhost"), ("aGhost", "aOut")],
+        );
+
+        let graph = Graph::new(graphl).expect("graphl should parse");
+        let error = parse(&graph).expect_err("a dangling edge must not compile");
+        let message = format!("{error:#}");
+
+        assert!(message.contains("is missing context"), "{message}");
+        // The neighbours, named as the author knows them rather than by id.
+        assert!(message.contains("Condense ->"), "{message}");
+        assert!(message.contains("-> Output"), "{message}");
+        // And the remedy, since the editor repairs this on load-and-save.
+        assert!(message.contains("save"), "{message}");
+    }
+
+    #[test]
+    fn a_well_formed_graph_reports_nothing() {
+        // Guards the diagnostic against firing on healthy input.
+        let graph = Graph::new(red_team_graphl()).expect("graphl should parse");
+
+        assert!(parse(&graph).is_ok());
     }
 }

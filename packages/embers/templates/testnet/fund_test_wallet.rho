@@ -10,7 +10,7 @@ new rl(`rho:registry:lookup`),
     transferOp,
     transferResultCh
 in {
-    rl!(`rho:rchain:revVault`, *revVaultCh) |
+    rl!(`rho:vault:system`, *revVaultCh) |
     rl!(`rho:lang:either`, *eitherCh) |
 
     contract okOrAbort(eitherCh, @log) = {

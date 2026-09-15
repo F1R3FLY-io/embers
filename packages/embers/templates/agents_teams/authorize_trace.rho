@@ -1,0 +1,23 @@
+new deployId(`rho:rchain:deployId`), rl(`rho:registry:lookup`),
+    abort(`rho:execution:abort`), envCh, before, acknowledged, forward
+in {
+    contract forward(@value, destination) = { destination!(value) } |
+    rl!({{ env_uri }}, *envCh) |
+    for(@(_, env) <- envCh) {
+        @env!("getRun", {{ run_id }}, *before) |
+        for(@run <- before) {
+            if (run == Nil) { abort!("trace run does not exist") } else {
+                // beginRun's EXISTING-record branch checks the deployer's
+                // ownership and leaves the entire run unchanged. In particular
+                // this does not invoke a team, finish a run, or claim a command.
+                @env!("beginRun", {{ run_id }}, run.get("agents_team"),
+                    run.get("created_at"), *acknowledged) |
+                for(@ok <- acknowledged) {
+                    if (ok) {
+                        forward!({"nonce": {{ nonce }}, "runId": {{ run_id }}}, (*deployId).toString())
+                    } else { abort!("trace ownership check failed") }
+                }
+            }
+        }
+    }
+}

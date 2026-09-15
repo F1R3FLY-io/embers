@@ -34,5 +34,13 @@ pub struct Agent {
     pub description: Option<String>,
     pub shard: Option<String>,
     pub logo: Option<String>,
+    // Reverse the Rholang string escaping the tuplespace preserves — otherwise
+    // code like `@Nil!("foo")` reads back as `@Nil!(\"foo\")`. This is also the
+    // form the agent-deploy path re-embeds as a Rholang term, so it must be
+    // unescaped here.
+    #[serde(
+        default,
+        deserialize_with = "crate::blockchain::common::deserialize_unescaped_opt"
+    )]
     pub code: Option<String>,
 }

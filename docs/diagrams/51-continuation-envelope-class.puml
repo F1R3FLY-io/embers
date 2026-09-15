@@ -1,0 +1,186 @@
+@startuml 51-continuation-envelope-class
+' The typed structure of the embers continuation (runtime.rs). Every member type
+' the envelope composes, so each symbol is defined before the prose uses it.
+title The embers continuation — ContinuationEnvelope and its member types (runtime.rs)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam defaultFontName "DejaVu Sans"
+skinparam class {
+  BackgroundColor #CDEACC
+  BorderColor #5B9E5B
+  ArrowColor #294C60
+}
+skinparam ArrowColor #294C60
+
+class ContinuationEnvelope {
+  -- identity & fence --
+  schema_version : String
+  run_id : String
+  execution_id : String
+  team_uri : String
+  definition_hash : String
+  revision : u64
+  -- work registers --
+  original_input : Value
+  state : Value
+  queue : VecDeque<Token>
+  joins : Map<String, JoinState>
+  scopes : Map<String, ScopeInstance>
+  history : Map<String, ScopeHistory>
+  compensations : Vec<CompensationRecord>
+  pending_effects : Map<String, PendingEffect>
+  pending_waits : Map<String, PendingWait>
+  nested_workflows : Map<String, ContinuationEnvelope>
+  guard_results : Map<String, bool>
+  outputs : Vec<SequencedValue>
+  events : Vec<KernelEvent>
+  -- determinism counters --
+  next_token_sequence : u64
+  next_scope_sequence : u64
+  next_event_sequence : u64
+  cancelling : bool
+}
+
+class Token {
+  id : String
+  node_id : String
+  value : Value
+  disposition : String
+  attempt : u32
+  joined : bool
+  epoch_stack : Vec<String>
+  scope_stack : Vec<String>
+  phase : TokenPhase
+  purpose : TokenPurpose
+}
+enum TokenPhase {
+  Enter
+  Route
+}
+enum TokenPurpose {
+  Normal
+  ScopeLifecycle
+}
+
+class JoinState {
+  expected : Set<String>
+  arrivals : Map<String, Token>
+  closed : bool
+  accumulator : Value
+}
+
+class ScopeInstance {
+  id : String
+  scope_id : String
+  kind : ScopeKind
+  history_mode : HistoryMode
+  active_tokens : usize
+  active_configuration : Map<String, usize>
+  result : Value
+}
+class ScopeHistory {
+  mode : HistoryMode
+  active_node_ids : Vec<String>
+}
+
+class CompensationRecord {
+  effect_key : String
+  node_id : String
+  activity : ActivityReference
+  input : Value
+  output : Value
+}
+
+class PendingEffect {
+  request : EffectRequest
+  purpose : EffectPurpose
+  retry : Option<RetryPolicy>
+  compensation : Option<ActivityReference>
+}
+enum EffectPurpose {
+  Node
+  Lifecycle
+  Compensation
+}
+class EffectRequest {
+  effect_key : String
+  node_id : String
+  activity : ActivityReference
+  input : Value
+  input_hash : String
+  attempt : u32
+  max_output_bytes : Option<u64>
+}
+class ActivityObservation {
+  effect_key : String
+  output : Value
+  output_hash : String
+  disposition : String
+  observed_at : DateTime
+  signature : String
+}
+
+class PendingWait {
+  id : String
+  node_id : String
+  kind : SuspensionKind
+  due_at : Option<DateTime>
+  token : Token
+  approval : Option<ApprovalState>
+}
+enum SuspensionKind {
+  Approval
+  DurableYield
+  Event
+  Retry
+  Signal
+  Timer
+}
+class ApprovalState {
+  policy_id : String
+  quorum : usize
+  approvers : Set<String>
+  decisions : Map<String, String>
+}
+
+class SequencedValue {
+  sequence : u64
+  value : Value
+}
+class KernelEvent {
+  sequence : u64
+  event_type : String
+  node_id : Option<String>
+  detail_hash : Option<String>
+}
+
+ContinuationEnvelope *-- "queue *" Token
+ContinuationEnvelope *-- "joins *" JoinState
+ContinuationEnvelope *-- "scopes *" ScopeInstance
+ContinuationEnvelope *-- "history *" ScopeHistory
+ContinuationEnvelope *-- "compensations *" CompensationRecord
+ContinuationEnvelope *-- "pending_effects *" PendingEffect
+ContinuationEnvelope *-- "pending_waits *" PendingWait
+ContinuationEnvelope *-- "outputs *" SequencedValue
+ContinuationEnvelope *-- "events *" KernelEvent
+ContinuationEnvelope *-- "nested_workflows *" ContinuationEnvelope
+
+Token --> TokenPhase
+Token --> TokenPurpose
+JoinState o-- "arrivals *" Token
+PendingEffect --> EffectRequest
+PendingEffect --> EffectPurpose
+PendingEffect ..> ActivityObservation : resolved by
+PendingWait --> SuspensionKind
+PendingWait --> ApprovalState
+PendingWait o-- Token
+
+note top of ContinuationEnvelope #FFF0C7
+  The whole envelope is serialized to JSON and encrypted at rest
+  (AES-256-GCM) in F1r3drive. Only its content/capability hashes,
+  revision, status, wait ids, deadline, approval grants, and
+  output hashes are committed on-chain by advance_run — never
+  these fields' plaintext.
+end note
+
+@enduml

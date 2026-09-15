@@ -1,0 +1,60 @@
+@startuml
+title Two-phase prepare, sign, send — the protocol behind every Embers mutation
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Wallet holder" as Holder #FFD8C2
+participant "Client (SDK / editor)" as Client #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "Domain service" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+group Phase 1 — prepare (deploys nothing)
+Client -> API : POST …/prepare {request R}
+API -> Domain : build contract for R
+Domain --> API : response C\n(unsigned contract bytes, minted identities)
+API -> API : H = h(R, tau_R, C, tau_C)\ntoken = JWT{exp: +1 day, hash: H}
+API --> Client : PrepareResponse {response C, token}
+end
+
+group Sign — the key never leaves the client
+Client -> Holder : show prepared contract
+Holder --> Client : signature over contract bytes
+Client -> Client : SignedContract\n{contract, sig, sigAlgorithm, deployer}
+end
+
+group Phase 2 — send (verify, deploy, read back)
+Client -> API : POST …/send\n{prepareRequest R, prepareResponse C,\nrequest: SignedContract, token}
+API -> API : decode token; recompute H over echoed R, C
+alt hash and expiry verify
+  API -> Domain : deploy signed contract
+  Domain -> Chain : deploy + await finality
+  Chain --> Domain : finalized; observer state
+  Domain --> API : deploy id / exact ledger readback
+  API --> Client : SendResp or run state
+else mismatch, expiry, or restarted backend
+  API --> Client : "invalid token or request payloads"\n(prepare again; nothing was deployed)
+end
+end
+
+note over API #FFF0C7
+The token binds send to one prepare exchange:
+<latex>H = h(R \parallel \tau_R \parallel C \parallel \tau_C)</latex>
+where <latex>\tau_R, \tau_C</latex> are the request and response
+type identities. An edited echo cannot verify.
+end note
+
+note over Chain #FFF0C7
+The chain independently verifies the deployer
+signature, so the HTTP layer is never the
+trust root for authorship.
+end note
+@enduml

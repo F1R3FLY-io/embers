@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
+<nta>
+<declaration>
+// timers_recovery.xml — durable timer / recovery scheduler (INV-T1, T3, T4).
+//
+// A suspended run carries a deadline D (relative to suspend). A scheduler polls
+// every P and, on finding the run due (t >= D), resumes it within a bound B. An
+// approval wait times out at Tap but is HELD (not abandoned), so a late decision is
+// still delivered (commit 4a8b791). D/P/B/Tap are concrete; the invariants are the
+// queries in queries.q. See ../README.md for the tool/verdict table.
+//
+// LICENSE NOTE: verifyta on this host reports "License does not cover verifier", so
+// this timed-automaton model is provided as a REFERENCE only. Because every timing
+// constant is an integer, the identical invariants are machine-checked by TLC in the
+// discrete-time model ../tla/TimersRecovery.tla, which IS the validated artifact in
+// `cargo make fv`. On a host with a verifier-covering UPPAAL license, run:
+//   /opt/uppaal/bin/verifyta -q timers_recovery.xml queries.q   (expect: 5x satisfied)
+const int D   = 10;   // suspend deadline, relative to suspend
+const int P   = 4;    // scheduler poll period
+const int B   = 2;    // max latency from a poll deciding to resume, to the resume
+const int Tap = 6;    // approval timeout
+
+clock t;    // time since the run suspended
+clock pc;   // scheduler poll clock
+clock rb;   // scheduler resume-latency clock
+clock ta;   // approval clock
+clock gc;   // startup clock: offsets the suspend instant from the poll phase
+
+bool suspended = false;   // the run is suspended awaiting its deadline
+bool early     = false;   // observer: a resume ever occurred before the deadline
+
+chan resume;
+chan decision;
+</declaration>
+
+<template>
+<name>Node</name>
+<location id="id0" x="0" y="0"><name>Idle0</name><label kind="invariant" x="0" y="16">gc &lt;= P</label></location>
+<location id="id1" x="160" y="0"><name>Suspended</name></location>
+<location id="id2" x="320" y="0"><name>Resumed</name></location>
+<init ref="id0"/>
+<transition>
+  <source ref="id0"/><target ref="id1"/>
+  <label kind="assignment" x="40" y="-16">t = 0, suspended = true</label>
+</transition>
+<transition>
+  <source ref="id1"/><target ref="id2"/>
+  <label kind="synchronisation" x="200" y="-16">resume?</label>
+  <label kind="assignment" x="200" y="0">suspended = false, early = early || (t &lt; D)</label>
+</transition>
+</template>
+
+<template>
+<name>Scheduler</name>
+<location id="id3" x="0" y="0"><name>Idle</name><label kind="invariant" x="0" y="16">pc &lt;= P</label></location>
+<location id="id4" x="200" y="0"><name>Resuming</name><label kind="invariant" x="200" y="16">rb &lt;= B &amp;&amp; pc &lt;= P</label></location>
+<init ref="id3"/>
+<transition>
+  <source ref="id3"/><target ref="id3"/>
+  <label kind="guard" x="-120" y="40">pc == P &amp;&amp; !(suspended &amp;&amp; t &gt;= D)</label>
+  <label kind="assignment" x="-120" y="56">pc = 0</label>
+  <nail x="-60" y="60"/><nail x="60" y="60"/>
+</transition>
+<transition>
+  <source ref="id3"/><target ref="id4"/>
+  <label kind="guard" x="20" y="-24">pc == P &amp;&amp; suspended &amp;&amp; t &gt;= D</label>
+  <label kind="assignment" x="20" y="-8">pc = 0, rb = 0</label>
+</transition>
+<transition>
+  <source ref="id4"/><target ref="id3"/>
+  <label kind="guard" x="60" y="40">rb &lt;= B</label>
+  <label kind="synchronisation" x="60" y="56">resume!</label>
+  <nail x="100" y="60"/>
+</transition>
+</template>
+
+<template>
+<name>Approval</name>
+<location id="id5" x="0" y="0"><name>Waiting</name><label kind="invariant" x="0" y="16">ta &lt;= Tap</label></location>
+<location id="id6" x="200" y="0"><name>Held</name></location>
+<location id="id7" x="200" y="120"><name>Decided</name></location>
+<init ref="id5"/>
+<transition>
+  <source ref="id5"/><target ref="id7"/>
+  <label kind="synchronisation" x="20" y="60">decision?</label>
+</transition>
+<transition>
+  <source ref="id5"/><target ref="id6"/>
+  <label kind="guard" x="60" y="-16">ta == Tap</label>
+</transition>
+<transition>
+  <source ref="id6"/><target ref="id7"/>
+  <label kind="synchronisation" x="210" y="60">decision?</label>
+</transition>
+</template>
+
+<template>
+<name>Approver</name>
+<location id="id8" x="0" y="0"><name>Ready</name></location>
+<init ref="id8"/>
+<transition>
+  <source ref="id8"/><target ref="id8"/>
+  <label kind="synchronisation" x="-40" y="60">decision!</label>
+  <nail x="-40" y="60"/><nail x="40" y="60"/>
+</transition>
+</template>
+
+<system>
+Node1 = Node();
+Sched = Scheduler();
+Appr  = Approval();
+Aver  = Approver();
+system Node1, Sched, Appr, Aver;
+</system>
+</nta>

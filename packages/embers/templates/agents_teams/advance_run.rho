@@ -1,0 +1,19 @@
+new rl(`rho:registry:lookup`), agentsTeamsCh, acknowledged in {
+    rl!({{ env_uri }}, *agentsTeamsCh) |
+    for(@(_, agentsTeams) <- agentsTeamsCh) {
+        @agentsTeams!("advanceRun",
+            {{ run_id }},
+            {{ expected_revision }},
+            {{ status }},
+            {{ definition_hash }},
+            {{ continuation_content_hash }},
+            {{ continuation_capability_hash }},
+            {{ wait_ids }},
+            {{ due_at }},
+            {{ approval_authority_grants }},
+            {{ output_content_hash }},
+            {{ output_capability_hash }},
+            {{ event_type }},
+            *acknowledged)
+    }
+}

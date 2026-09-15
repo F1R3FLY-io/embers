@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use firefly_client::models::{SignedCode, WalletAddress};
 
-use crate::domain::common::{PositiveNonZero, PreparedContract};
+use crate::domain::common::PreparedContract;
 
 #[derive(Debug, Clone)]
 pub struct Agents {
@@ -68,11 +68,9 @@ pub enum DeployReq {
         id: String,
         version: String,
         address: WalletAddress,
-        phlo_limit: PositiveNonZero<i64>,
     },
     Code {
         code: String,
-        phlo_limit: PositiveNonZero<i64>,
     },
 }
 

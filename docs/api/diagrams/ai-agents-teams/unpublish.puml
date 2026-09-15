@@ -1,0 +1,51 @@
+@startuml
+title POST /api/ai-agents-teams/{address}/{id}/unpublish — stop a published team answering mentions
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Caller" as Caller #FFD8C2
+participant "Client\n(generated AIAgentsTeamsApi)" as Client #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3sky\n(PDS)" as Firesky #FFDFC4
+
+Caller -> Client : agentsTeamsUnpublish
+Client -> API : POST .../{address}/{id}/unpublish\n(no body, no signature)
+API -> Domain : unpublish(address, id)
+Domain -> Domain : resolve the published deployment;\nload the SERVICE-HELD credential\nfor its URI
+alt team is published and credentials resolve
+  Domain -> Firesky : log in with the stored\nper-publication app password
+  Domain -> Firesky : delete the\ncom.f1r3sky.agentsteam.config record\n(repo addressed by did, falling back\nto handle)
+  Firesky --> Domain : record removed
+  Domain --> API : ok
+  API --> Client : 200, no body
+  Client --> Caller : the handle stops answering mentions
+else not published, credentials missing,\nor a legacy publication without did/handle
+  API <-- Domain : error
+  Client <-- API : 500 InternalError
+end
+
+note over API #FFF6C9
+This mutation sits OUTSIDE the two-phase signing
+protocol: the HTTP call is unauthenticated, and
+the PDS mutation is performed with credentials
+only the Embers service holds. The account and
+handle are kept — republishing reverses it.
+end note
+
+note over Domain #FFF0C7
+The on-chain credential stack exposes only push
+and toList: a publication is permanent history.
+What varies is the config record's presence,
+which is exactly what published-state reports
+as "active".
+end note
+@enduml

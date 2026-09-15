@@ -1,0 +1,18 @@
+# Detached from the embers workspace on purpose: this crate depends on the local
+# rholang-rs parser checkout (whose git remote is an SSH fork), which would break
+# the embers workspace's dependency-metadata resolution on any machine that does
+# not have that sibling checkout — including CI. The empty [workspace] table below
+# makes this crate its own workspace root so cargo never folds it into embers, and
+# embers/Cargo.toml additionally `exclude`s it. Run it explicitly:
+#   cargo test --manifest-path oracle/Cargo.toml   (or `cargo make oracle-test`)
+[workspace]
+
+[package]
+name    = "embers-rholang-oracle"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+rholang-parser = { path = "../../rholang-rs/rholang-parser" }
+validated      = "1.0.0"

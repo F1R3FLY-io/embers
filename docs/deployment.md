@@ -1,3 +1,19 @@
+# Deployment (moved)
+
+> **This document has moved and been rewritten.** The canonical deployment guide is
+> now [operations/deployment.md](operations/deployment.md). The version below was
+> written against an older embers (Scala nodes, `PROPOSE_SERVICE_URL` /
+> `READ_NODE_URL`, no continuation store or F1r3drive mount) and is **stale**; it is
+> preserved only for historical reference.
+
+See also: [configuration](operations/configuration.md) ·
+[Docker guide](operations/docker.md) · [local stack](operations/local-stack.md) ·
+[F1r3drive integration](integrations/f1r3drive.md) ·
+[key inventory](security/key-inventory.md).
+
+<details>
+<summary>Original (stale) setup guide — historical reference only</summary>
+
 # Embers Application Setup Guide
 
 This guide provides the necessary steps to set up and run the complete Embers application stack, which includes the f1r3fly clusters, the Embers backend, and the Embers frontend.
@@ -56,3 +72,5 @@ The frontend for the application is `embers-frontend`.
     ```
 
     You can now access the frontend by navigating to `http://localhost:8080` in your web browser.
+
+</details>

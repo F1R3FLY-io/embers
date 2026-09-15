@@ -1,0 +1,60 @@
+@startuml
+title GET /api/wallets/{address}/deploys — finalization event stream (WebSocket)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Wallet holder" as Holder #FFD8C2
+participant "EmbersEvents" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "WalletsService" as Domain #CDEACC
+participant "Validator node" as Validator #FFE4A6
+participant "Observer node" as Observer #FFDFC4
+
+group Connect — at EmbersApiSdk construction
+Events -> API : GET /api/wallets/{address}/deploys\nUpgrade: websocket
+API --> Events : 101 Switching Protocols
+API -> Domain : subscribe_to_deploys(address, socket)
+Domain -> Validator : subscribe for the address's deploys
+Domain -> Observer : subscribe for the address's deploys
+end
+
+group Stream — both node types, merged
+Validator --> Domain : Finalized { id, cost, errored }
+Domain --> Events : { type: "Finalized", deploy_id, cost,\n  errored, node_type: "Validator" }
+Events -> Events : node_type is not Observer:\nrecorded by no subscriber callback
+Observer --> Domain : Finalized { id, cost, errored }
+Domain --> Events : { type: "Finalized", deploy_id, cost,\n  errored, node_type: "Observer" }
+Events -> Events : resolve subscribeForDeploy(deploy_id);\nnotify subscribe() callbacks
+Events --> Holder : WalletEvent
+end
+
+group Reconnect — on close, forever
+Events -> Events : wait reconnectDelay\n(1 s, doubling to a 30 s cap;\nreset to 1 s on every successful open)
+Events -> API : GET .../deploys (upgrade again)
+API --> Events : 101
+end
+
+note over Events #FFF0C7
+The server streams every finalization for the
+address from both nodes; the client dispatches
+only Observer reports, because an observer
+confirmation is what makes a readback safe.
+Deploy identities are lowercase-hex contract
+signatures, the same value send returns as
+deploy_id.
+end note
+
+note over API #FFF6C9
+The upgrade carries no authentication: deploy
+finalization metadata for an address is public
+chain data, like the address's state readback.
+end note
+@enduml

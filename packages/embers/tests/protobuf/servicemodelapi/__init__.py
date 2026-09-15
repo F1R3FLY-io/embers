@@ -17,7 +17,9 @@ betterproto2.check_compiler_version(_COMPILER_VERSION)
 
 @dataclass(eq=False, repr=False)
 class ServiceError(betterproto2.Message):
-    messages: "list[str]" = betterproto2.field(1, betterproto2.TYPE_STRING, repeated=True)
+    messages: "list[str]" = betterproto2.field(
+        1, betterproto2.TYPE_STRING, repeated=True
+    )
 
 
 default_message_pool.register_message("servicemodelapi", "ServiceError", ServiceError)

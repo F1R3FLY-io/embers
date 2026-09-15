@@ -1,0 +1,23 @@
+@startuml 38-state-sync
+' state-sync: Postgres <-> Firefly checkpoint/restore.
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+
+title state-sync — PostgreSQL <-> Firefly checkpoint / restore
+
+database "PostgreSQL" as pg #CFE2F3
+rectangle "state-sync" as ss #D0E0E3
+rectangle "F1r3fly node" as node #A9D0F5
+
+ss -up-> pg   : upload: pg_dump\n(every --interval)
+ss -right-> node : upload: deploy the SQL dump,\nrecord its hash in the hash list
+node -left-> ss  : download --hash <block>:\nread hash list @ block, fetch dump
+ss -down-> pg    : download: restore the SQL snapshot
+
+note bottom
+  init: deploy the hash-list contract (once per --service-id).
+  pg_dump's snapshot gives each checkpoint a consistent point-in-time view.
+end note
+@enduml

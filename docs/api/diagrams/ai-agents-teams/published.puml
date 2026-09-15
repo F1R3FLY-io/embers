@@ -1,0 +1,50 @@
+@startuml
+title GET /api/ai-agents-teams/{address}/{id}/published — publication state, chain reconciled against the PDS
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Caller" as Caller #FFD8C2
+participant "Client\n(generated AIAgentsTeamsApi)" as Client #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+participant "F1r3sky\n(PDS)" as Firesky #FFDFC4
+
+Caller -> Client : agentsTeamsPublishedState
+Client -> API : GET .../{address}/{id}/published
+API -> Domain : published_state(address, id)
+Domain -> Chain : find the PUBLISHED deployment\n(keyed by deployment URI — often\nnot the newest deployment)
+alt some deployment of the team is published
+  Chain --> Domain : publication record (uri, version,\n  handle?, did?)
+  Domain -> Firesky : does the account still exist?\nis the config record present?
+  alt PDS answers
+    Firesky --> Domain : account_exists = true/false;\nactive = config present
+  else PDS unreachable or legacy record
+    Firesky --> Domain : unanswerable
+    Domain -> Domain : account_exists = absent\n(three-valued: not "missing")
+  end
+  Domain --> API : PublishedState { handle?, did?,\n  account_exists?, active?, uri,\n  published_version,\n  is_latest_deployment }
+  API --> Client : 200 PublishedState
+  Client --> Caller : reconciled state
+else no deployment of the team is published
+  API <-- Domain : none (not an error)
+  Client <-- API : 404, no body
+end
+
+note over Domain #FFF0C7
+account_exists is deliberately three-valued:
+false is a REAL divergence (the chain records a
+publication whose account was destroyed — what a
+wiped development PDS leaves behind); absent
+means the question could not be answered and
+must not be shown as "missing".
+end note
+@enduml

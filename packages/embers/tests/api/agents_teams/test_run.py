@@ -16,10 +16,9 @@ def test_run(client: ApiClient, funded_wallet: Wallet, graph: str):
     client.agents_teams.deploy_graph(
         funded_wallet,
         graph=graph,
-        phlo_limit=5_000_000,
         deploy=deploy,
-    )
+    ).wait_for_sync()
 
     agents_team = public_key_to_uri(private_key.public_key)
-    resp = client.agents_teams.run(funded_wallet, "echo", phlo_limit=5_000_000, agents_team=agents_team)
+    resp = client.agents_teams.run(funded_wallet, "echo", agents_team=agents_team)
     assert resp.json == "echo"

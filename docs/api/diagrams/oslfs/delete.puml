@@ -1,0 +1,59 @@
+@startuml
+title POST /api/oslfs/{id}/delete/prepare + /send — delete an OSLF document (tokenless flow)
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Document owner" as Owner #FFD8C2
+participant "OslfsApiSdk\n.delete(id)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "OslfsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Owner -> SDK : delete(id)
+
+group Prepare — bare contract, no token
+SDK -> API : POST /api/oslfs/{id}/delete/prepare\n(no body)
+API -> Domain : prepare_delete_contract(id)
+Domain -> Domain : render delete.rho(id)
+Domain -> Chain : get head block index
+Chain --> Domain : valid-after block number
+Domain --> API : DeleteOslfResp { contract }
+API --> SDK : 200 { contract }\n(no PrepareResponse wrapper, no token)
+end
+
+group Sign, subscribe, send — bare signed contract
+SDK -> SDK : signed = signContract(contract, privateKey)
+SDK -> Events : subscribeForDeploy(\n  hex(signed.sig).toLowerCase(), maxWait)
+SDK -> API : POST /api/oslfs/{id}/delete/send\nbody: SignedContract only
+API -> Domain : deploy signed contract
+Domain -> Chain : deploy
+Chain --> Domain : accepted
+API <-- Domain : deploy id
+SDK <-- API : 200 SendResp { deploy_id }
+SDK --> Owner : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed on the WebSocket
+Chain --> Events : Finalized { deploy_id, ...,\n  node_type: Observer }
+Events --> Owner : waitForFinalization resolves\n(or rejects after maxWait)
+end
+
+note over API #FFF6C9
+The delete flow predates the token discipline
+("one asymmetry", HTTP API spec): no JWT, no
+echoed exchange, no parity check at the HTTP
+boundary. The deletion contract is still
+signature-verified on chain, so authorship
+protection is intact; only the HTTP-level
+exchange binding is absent.
+end note
+@enduml

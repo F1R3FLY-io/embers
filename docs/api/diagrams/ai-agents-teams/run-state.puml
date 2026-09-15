@@ -1,0 +1,44 @@
+@startuml
+title GET /api/ai-agents-teams/runs/{run_id} — capability-scoped run inspection
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Run-URL holder" as Holder #FFD8C2
+participant "AgentsTeamsApiSdk\n.getRun(runId)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nread node" as Chain #FFE4A6
+
+Holder -> SDK : getRun(runId)
+SDK -> API : GET /api/ai-agents-teams/runs/{run_id}
+API -> Domain : get_run(run_id)
+Domain -> Chain : read the run ledger\n(retry until the finalized write with\nthe expected postcondition is visible —\nread nodes can briefly expose the\nprevious finalized revision)
+alt run exists
+  Chain --> Domain : ledger record + durable events
+  Domain -> Domain : merge the two ordered audit\nsequences (durable events and\nledger events) on the rightmost\ncompatible anchor
+  Domain --> API : RunState
+  API --> SDK : 200 RunState
+  SDK --> Holder : status, revision, events,\nwaits, grants, hashes
+else unknown run id
+  API <-- Domain : not found
+  SDK <-- API : 404, no body
+end
+
+note over API #FFF0C7
+Possession of the run URL is the read authority
+(UUIDv7 capability); it grants no command
+authority. The state is execution metadata only:
+status, revision, public wait identifiers,
+approval grants, event types, and content or
+capability hashes — never prompts, outputs,
+credentials, or artifacts.
+end note
+@enduml

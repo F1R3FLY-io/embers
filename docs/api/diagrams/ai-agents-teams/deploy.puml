@@ -1,0 +1,86 @@
+@startuml
+title POST /api/ai-agents-teams/deploy/prepare + /send — compile and deploy a team behind a registry URI
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Team owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.deploy(id, version, regV, regKey) |\n.deployGraph(graph, regV, regKey)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+group Before prepare — the registry signature, client-side
+Owner -> SDK : deploy(id, version,\n  registryVersion, registryKey)
+SDK -> SDK : timestamp = now;\nsig = insertSignedSignature(registryKey,\n  timestamp, wallet pubKey, registryVersion)\n— secp256k1 over blake2b-256 of the\nprotobuf Par (timestamp, deployer, version)
+end
+
+group Phase 1 — prepare (compile; deploys nothing)
+SDK -> API : POST /api/ai-agents-teams/deploy/prepare\n{ type: "AgentsTeam", id, version, address,\n  deploy: { timestamp, version,\n  uri_pub_key, signature } }\nor { type: "Graph", graph, deploy }
+API -> Domain : prepare_deploy_contract
+alt type = "AgentsTeam" — deploy a stored version
+  Domain -> Chain : read the stored team\n(retry 10 x 500 ms for observer lag)
+  Chain --> Domain : AgentsTeam { definition?, graph? }
+  Domain -> Domain : source := definition when present,\nelse legacy graph;\nstrict validate_publishable\nfor definitions
+  Domain -> Domain : render record_deploy.rho —\nsystem contract stamping last_deploy\nand the registry URI on the record
+else type = "Graph" — deploy a raw graphl term
+  Domain -> Domain : parse graphl; NO system contract;\nno wallet address — agent nodes\nare unresolvable and rejected
+end
+Domain -> Chain : read every referenced agent's code\n(fresh, pinned (id, version), retried)
+Chain --> Domain : agent sources
+Domain -> Domain : compile team + splice agent code;\nembed the registry insertSigned\noperation (uri_pub_key, signature)
+Domain --> API : DeployAgentsTeamResp\n{ contract, system? }\ncontract timestamp = deploy.timestamp
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign, subscribe, send
+SDK -> SDK : signContract(contract, privateKey)\nsignContract(system, privateKey) when present
+SDK -> Events : subscribeForDeploy(\n  hex(contract.sig).toLowerCase(), maxWait)
+SDK -> API : POST /api/ai-agents-teams/deploy/send\n{ prepare_request, prepare_response,\n  request: { contract, system? }, token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy_signed_deploy
+Domain -> Chain : deploy MAIN contract\n(registry insertSigned inside)
+Chain --> Domain : main deploy id
+alt system contract present (type = "AgentsTeam")
+  Domain -> Chain : deploy SYSTEM contract
+  Chain --> Domain : system deploy id
+  API <-- Domain : system deploy id (the barrier)
+else no system contract (type = "Graph")
+  API <-- Domain : main deploy id
+end
+SDK <-- API : 200 SendResp { deploy_id }
+SDK --> Owner : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed on the WebSocket
+Chain --> Events : Finalized { deploy_id: hex(contract.sig),\n  ..., node_type: Observer }
+Events --> Owner : waitForFinalization resolves\n(keyed on the MAIN contract)
+end
+
+note over SDK #FFF0C7
+Two keys, two purposes: the REGISTRY key signs
+the insertSigned tuple that claims the team's
+deterministic registry URI (derived from
+uri_pub_key); the WALLET key signs the deploys.
+The registry signature is computed before
+prepare and embedded in the request, which is
+why the contract's timestamp is the request's.
+end note
+
+note over Domain #FFF6C9
+Agent code is read fresh from the chain on every
+deploy at the referenced (id, version) pins —
+nothing is cached between deploys. Raw Graph
+deploys carry no wallet address: a graph that
+uses agent nodes must be deployed by team id
+and version instead.
+end note
+@enduml

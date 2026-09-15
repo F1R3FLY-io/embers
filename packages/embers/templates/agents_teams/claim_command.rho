@@ -1,0 +1,14 @@
+new rl(`rho:registry:lookup`), agentsTeamsCh, acknowledged in {
+    rl!({{ env_uri }}, *agentsTeamsCh) |
+    for(@(_, agentsTeams) <- agentsTeamsCh) {
+        @agentsTeams!("claimCommand",
+            {{ run_id }},
+            {{ expected_revision }},
+            {{ command_id }},
+            {{ command_class }},
+            {{ target_wait_id }},
+            {{ command_content_hash }},
+            {{ command_capability_hash }},
+            *acknowledged)
+    }
+}

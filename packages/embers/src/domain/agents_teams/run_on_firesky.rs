@@ -8,13 +8,16 @@ use atrium_api::record::KnownRecord;
 use atrium_api::types::string::{AtIdentifier, Datetime};
 use atrium_api::types::{Collection, TryIntoUnknown, Union};
 use atrium_xrpc_client::reqwest::ReqwestClient;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use futures::{StreamExt, stream};
 
 use crate::domain::agents_teams::AgentsTeamsService;
 use crate::domain::agents_teams::models::{DeploySignedRunOnFireskyReq, RunReq, RunResp};
 use crate::domain::common::upload_blob_from_url;
 
-impl AgentsTeamsService {
+const TERMINAL_REPLY_LIMIT: usize = 280;
+
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> AgentsTeamsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -43,6 +46,7 @@ impl AgentsTeamsService {
         &self,
         request: DeploySignedRunOnFireskyReq,
     ) -> anyhow::Result<()> {
+        let run_id = request.run_id.clone();
         let reply = request
             .reply_to
             .map(|reply_to| {
@@ -81,11 +85,15 @@ impl AgentsTeamsService {
             .ok_or_else(|| anyhow!("agents team is not connected to firesky"))?
             .clone();
 
-        let resp = self.deploy_signed_run_agents_team(request.contract).await?;
+        let resp = self.deploy_signed_run_agents_team(request.run).await?;
 
         let http_client = ReqwestClient::new(cred.pds_url);
         let session = CredentialSession::new(http_client, MemorySessionStore::default());
-        let did = session.login(cred.email, cred.token).await?.data.did;
+        let did = session
+            .login(cred.did.unwrap_or(cred.email), cred.token)
+            .await?
+            .data
+            .did;
 
         let agent = Agent::new(session);
 
@@ -97,7 +105,7 @@ impl AgentsTeamsService {
             .create_record(
                 create_record::InputData {
                     collection: feed::Post::nsid(),
-                    record: KnownRecord::from(
+                    record: KnownRecord::from(finalize_terminal_reply(
                         transform_to_post(
                             feed::post::RecordData {
                                 created_at: Datetime::now(),
@@ -114,7 +122,8 @@ impl AgentsTeamsService {
                             resp,
                         )
                         .await,
-                    )
+                        &run_id,
+                    ))
                     .try_into_unknown()?,
                     repo: AtIdentifier::Did(did),
                     rkey: None,
@@ -127,6 +136,40 @@ impl AgentsTeamsService {
 
         Ok(())
     }
+}
+
+fn finalize_terminal_reply(
+    mut post: feed::post::RecordData,
+    run_id: &str,
+) -> feed::post::RecordData {
+    let base = std::env::var("EMBERS__PUBLIC_RUN_URL")
+        .unwrap_or_else(|_| "http://localhost:5173/runs".to_owned());
+    let absolute_url = format!("{}/{run_id}", base.trim_end_matches('/'));
+    let run_url = if absolute_url.chars().count() + "Run: ".chars().count() <= TERMINAL_REPLY_LIMIT
+    {
+        absolute_url
+    } else {
+        format!("/runs/{run_id}")
+    };
+    let prefix = if post.text.is_empty() { "" } else { "\n" };
+    let suffix = format!("{prefix}Run: {run_url}");
+    let suffix_len = suffix.chars().count();
+
+    if post.text.chars().count() + suffix_len > TERMINAL_REPLY_LIMIT {
+        let text_budget = TERMINAL_REPLY_LIMIT.saturating_sub(suffix_len);
+        post.text = match text_budget {
+            0 => String::new(),
+            1 => "…".to_owned(),
+            _ => {
+                let mut text = post.text.chars().take(text_budget - 1).collect::<String>();
+                text.push('…');
+                text
+            }
+        };
+    }
+
+    post.text.push_str(&suffix);
+    post
 }
 
 async fn transform_to_post<S>(
@@ -191,5 +234,44 @@ where
                 })
                 .await
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use atrium_api::app::bsky::feed;
+    use atrium_api::types::string::Datetime;
+
+    use super::{TERMINAL_REPLY_LIMIT, finalize_terminal_reply};
+
+    fn post(text: String) -> feed::post::RecordData {
+        feed::post::RecordData {
+            created_at: Datetime::now(),
+            embed: None,
+            entities: None,
+            facets: None,
+            labels: None,
+            langs: None,
+            reply: None,
+            tags: None,
+            text,
+        }
+    }
+
+    #[test]
+    fn terminal_reply_is_bounded_and_preserves_run_link() {
+        let run_id = "0198fbe2-7cc7-7000-8000-000000000001";
+        let result = finalize_terminal_reply(post("α".repeat(400)), run_id);
+
+        assert_eq!(result.text.chars().count(), TERMINAL_REPLY_LIMIT);
+        assert!(result.text.ends_with(&format!("/runs/{run_id}")));
+        assert!(result.text.contains('…'));
+    }
+
+    #[test]
+    fn terminal_reply_with_only_an_embed_still_names_the_run() {
+        let result = finalize_terminal_reply(post(String::new()), "run-id");
+
+        assert_eq!(result.text, "Run: http://localhost:5173/runs/run-id");
     }
 }

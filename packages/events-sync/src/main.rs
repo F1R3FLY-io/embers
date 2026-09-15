@@ -1,28 +1,37 @@
-mod contracts;
+//! The `events-sync` binary: a thin CLI over the [`events_sync`] library.
+//!
+//! The `listen`, `push`, and `init` subcommands are orchestration over the
+//! reusable servers, subscribers, contract templates, and the [`pump_events`]
+//! merge loop exported by the library crate. See `src/lib.rs` and the package
+//! `README.md`.
 
-use std::fmt::Display;
 use std::net::SocketAddr;
-use std::pin::Pin;
 use std::time::Duration;
 
 use anyhow::Context;
-use base64::Engine;
-use base64::prelude::BASE64_STANDARD;
 use clap::{Parser, Subcommand};
-use contracts::{rho_init_events_channels, rho_subscribe_to_service, rho_unsubscribe_from_service};
-use firefly_client::CommunicationService;
-use firefly_client::models::{BlockId, DeployData};
+use events_sync::contracts::rho_init_events_channels;
+use events_sync::{
+    Entry,
+    NotifyMsg,
+    pump_events,
+    rho_notify_listeners,
+    rho_save_events,
+    spawn_atproto_server,
+    spawn_grpc_server,
+    subscribe_to_atproto_sync,
+    subscribe_to_event_source,
+    subscribe_to_firefly,
+};
+use firefly_client::models::DeployData;
 use futures::stream::select_all;
-use futures::{FutureExt, SinkExt, Stream, StreamExt, TryStreamExt, future};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use secp256k1::SecretKey;
-use serde::{Deserialize, Serialize};
+use tokio::net::TcpListener;
 use tokio::select;
 use tokio::signal::ctrl_c;
 use tokio::sync::{broadcast, mpsc};
-use tokio_tungstenite::tungstenite::Message;
-use tonic::transport::Server;
 use uuid::Uuid;
-use warp::Filter;
 
 #[derive(Debug, Parser)]
 struct Args {
@@ -33,10 +42,6 @@ struct Args {
     /// Firefly deploy service url
     #[arg(long)]
     deploy_service_url: String,
-
-    /// Firefly propose service url
-    #[arg(long)]
-    propose_service_url: String,
 
     /// Globally unique service identifier
     #[arg(long)]
@@ -90,10 +95,9 @@ enum Commands {
 async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
 
-    let mut client =
-        firefly_client::WriteNodeClient::new(args.deploy_service_url, args.propose_service_url)
-            .await
-            .context("failed to create firefly client")?;
+    let mut client = firefly_client::WriteNodeClient::new(args.deploy_service_url)
+        .await
+        .context("failed to create firefly client")?;
 
     match args.command {
         Commands::Listen {
@@ -105,11 +109,19 @@ async fn main() -> anyhow::Result<()> {
             let (tx_updates, rx_updates) = mpsc::channel::<NotifyMsg>(16);
             let (tx_events, _rx_events) = broadcast::channel::<Entry>(160);
 
-            let grpc = spawn_grpc_server(tx_updates, communication_service_api_addr);
-            let atproto = spawn_atproto_server(tx_events.clone(), sync_api_addr);
+            let grpc_listener = TcpListener::bind(communication_service_api_addr)
+                .await
+                .context("failed to bind communication service listener")?;
+            let sync_listener = TcpListener::bind(sync_api_addr)
+                .await
+                .context("failed to bind atproto sync listener")?;
+
+            let grpc = spawn_grpc_server(tx_updates, grpc_listener, ctrl_c().map(|_| ()));
+            let atproto =
+                spawn_atproto_server(tx_events.clone(), sync_listener, ctrl_c().map(|_| ()));
 
             let task = tokio::spawn(async move {
-                let mut all_sources = select_all([
+                let all_sources = select_all([
                     subscribe_to_firefly(
                         &args.wallet_key,
                         client,
@@ -122,19 +134,9 @@ async fn main() -> anyhow::Result<()> {
                     subscribe_to_atproto_sync(extra_sources).await,
                 ]);
 
-                let mut index = 0;
-                while let Some(Ok(msg)) = all_sources.next().await {
-                    let self_index = index;
-                    index += 1;
-
-                    tx_events
-                        .send(Entry {
-                            msg,
-                            index: self_index,
-                        })
-                        .expect("tx_events closed");
-                    println!("pushed to atproto");
-                }
+                pump_events(all_sources, tx_events)
+                    .await
+                    .expect("tx_events closed");
 
                 anyhow::Ok(())
             });
@@ -179,16 +181,16 @@ async fn main() -> anyhow::Result<()> {
                     println!("events: {}", events.len());
                     let rho_code = rho_save_events(channel_name, &events)?;
                     let deploy_data = DeployData::builder(rho_code).build();
-                    let hash = client
+                    let deploy_id = client
                         .full_deploy(&args.wallet_key, deploy_data)
                         .await
                         .context("failed save events")?;
-                    println!("events deployed");
+                    println!("events deployed: {deploy_id}");
 
                     let rho_code = rho_notify_listeners(
                         &args.service_id,
                         &NotifyMsg {
-                            block_hash: hash,
+                            deploy_id,
                             channel_name: channel_name.to_string(),
                         },
                     );
@@ -211,193 +213,13 @@ async fn main() -> anyhow::Result<()> {
         Commands::Init => {
             let rho_code = rho_init_events_channels(&args.service_id);
             let deploy_data = DeployData::builder(rho_code).build();
-            let hash = client
+            let deploy_id = client
                 .full_deploy(&args.wallet_key, deploy_data)
                 .await
                 .context("failed to init channels")?;
-            println!("{hash}");
+            println!("{deploy_id}");
         }
     }
 
     Ok(())
-}
-
-fn rho_save_events(
-    channel_name: impl Display,
-    entries: &[Entry],
-) -> Result<String, bitcode::Error> {
-    bitcode::serialize(&entries).map(|data| {
-        let value = format!(
-            r#"@"{channel_name}"!("{}".hexToBytes())"#,
-            hex::encode(data)
-        );
-        value
-    })
-}
-
-fn rho_notify_listeners(service_id: &str, msg: &NotifyMsg) -> String {
-    let json_msg = serde_json::to_string(msg).unwrap();
-    let json_msg = BASE64_STANDARD.encode(json_msg);
-    format!(r#"@"{service_id}-notify-listeners"!("{json_msg}")"#)
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Entry {
-    index: u64,
-    msg: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct NotifyMsg {
-    block_hash: BlockId,
-    channel_name: String,
-}
-
-fn spawn_atproto_server(
-    events: broadcast::Sender<Entry>,
-    sync_api_addr: SocketAddr,
-) -> tokio::task::JoinHandle<anyhow::Result<()>> {
-    tokio::spawn(async move {
-        let routes = warp::path!("xrpc" / "com.atproto.sync.subscribeRepos")
-            .and(warp::ws())
-            .map(move |ws: warp::ws::Ws| {
-                let mut receiver = events.subscribe();
-
-                ws.on_upgrade(move |websocket| async move {
-                    let (mut tx, mut rx) = websocket.split();
-
-                    tokio::spawn(async move { while rx.next().await.is_some() {} });
-
-                    while let Ok(entry) = receiver.recv().await {
-                        println!("sending ws event");
-
-                        if tx.send(warp::ws::Message::binary(entry.msg)).await.is_err() {
-                            return;
-                        }
-                    }
-                })
-            });
-
-        warp::serve(routes)
-            .bind(sync_api_addr)
-            .await
-            .graceful(ctrl_c().map(|_| ()))
-            .run()
-            .await;
-
-        println!("warp ended");
-
-        anyhow::Ok(())
-    })
-}
-
-fn spawn_grpc_server(
-    events: mpsc::Sender<NotifyMsg>,
-    communication_service_api_addr: SocketAddr,
-) -> tokio::task::JoinHandle<anyhow::Result<()>> {
-    tokio::spawn(async move {
-        let service = CommunicationService::new(move |msg: NotifyMsg| {
-            println!("got grpc notification: {msg:?}");
-            let events = events.clone();
-            async move {
-                events.send(msg).await.expect("events closed");
-                Ok(())
-            }
-        })
-        .into_service();
-
-        Server::builder()
-            .add_service(service)
-            .serve_with_shutdown(communication_service_api_addr, ctrl_c().map(|_| ()))
-            .await?;
-
-        println!("grpc ended");
-
-        anyhow::Ok(())
-    })
-}
-
-async fn subscribe_to_event_source(
-    events_source_url: &str,
-) -> Pin<Box<dyn Stream<Item = anyhow::Result<Vec<u8>>> + Send>> {
-    loop {
-        let Ok((binary_stream, _)) = tokio_tungstenite::connect_async(events_source_url).await
-        else {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            println!("failed to connect to ws");
-            continue;
-        };
-
-        return binary_stream
-            .try_filter_map(|event| {
-                future::ok(match event {
-                    Message::Binary(binary) => Some(binary.to_vec()),
-                    _ => None,
-                })
-            })
-            .map_err(Into::into)
-            .boxed();
-    }
-}
-
-async fn subscribe_to_firefly(
-    key: &SecretKey,
-    mut client: firefly_client::WriteNodeClient,
-    service_id: String,
-    external_hostname: &str,
-    grpc_port: u16,
-    mut rx_updates: mpsc::Receiver<NotifyMsg>,
-) -> anyhow::Result<Pin<Box<dyn Stream<Item = anyhow::Result<Vec<u8>>> + std::marker::Send>>> {
-    let self_id = Uuid::new_v4();
-
-    let rho_code = rho_subscribe_to_service(&service_id, self_id, external_hostname, grpc_port);
-    let deploy_data = DeployData::builder(rho_code).build();
-    client
-        .full_deploy(key, deploy_data)
-        .await
-        .context("failed subscribe to service failed")?;
-
-    let key = *key;
-    let mut client = scopeguard::guard(client, move |mut client| {
-        tokio::spawn(async move {
-            let rho_code = rho_unsubscribe_from_service(&service_id, self_id);
-            let deploy_data = DeployData::builder(rho_code).build();
-            client
-                .full_deploy(&key, deploy_data)
-                .await
-                .context("failed to unsubscribe from service")?;
-            println!("unsubscribed");
-            anyhow::Ok(())
-        });
-    });
-
-    Ok(async_stream::stream! {
-        while let Some(event) = rx_updates.recv().await {
-            let bytes: Vec<u8> = client
-                .get_channel_value(event.block_hash, event.channel_name)
-                .await
-                .context("failed to get events")?;
-
-            let events: Vec<Entry> =
-                bitcode::deserialize(&bytes).context("failed to deserialize events")?;
-
-            println!("got events from firefly: {:?}", events.len());
-
-            for event in events {
-                yield Ok(event.msg);
-            }
-        }
-    }
-    .boxed())
-}
-
-async fn subscribe_to_atproto_sync(
-    extra_sources: Vec<String>,
-) -> Pin<Box<dyn Stream<Item = anyhow::Result<Vec<u8>>> + std::marker::Send>> {
-    let streams: Vec<_> = futures::stream::iter(extra_sources)
-        .then(|source| async move { subscribe_to_event_source(&source).await })
-        .collect()
-        .await;
-
-    select_all(streams).boxed()
 }

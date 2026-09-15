@@ -1,0 +1,64 @@
+@startuml
+title POST /api/wallets/boost/prepare + /send — post-attributed transfer (tip) with finalization
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Wallet holder" as Holder #FFD8C2
+participant "WalletsApiSdk\n.boost(to, amount, postAuthorDid, ...)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "WalletsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Holder -> SDK : boost(to, amount, postAuthorDid,\n  description?, postId?)
+
+group Phase 1 — prepare (deploys nothing)
+SDK -> API : POST /api/wallets/boost/prepare\n{ from, to, amount, post_author_did,\n  post_id?, description? }
+API -> Domain : prepare_boost_contract
+Domain -> Domain : render boost.rho\n(vault transfer plus post attribution)
+Domain -> Chain : get head block index
+Chain --> Domain : valid-after block number
+Domain --> API : BoostResp { contract }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign — locally
+SDK -> SDK : signed = signContract(contract, privateKey)
+end
+
+group Subscribe before send
+SDK -> Events : subscribeForDeploy(\n  hex(signed.sig).toLowerCase(), maxWait)
+end
+
+group Phase 2 — send
+SDK -> API : POST /api/wallets/boost/send\n{ prepare_request, prepare_response,\n  request: signed, token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy_boost_transfer
+Domain -> Chain : deploy signed contract
+Chain --> Domain : accepted
+Domain --> API : deploy id
+API --> SDK : 200 SendResp { deploy_id }
+SDK --> Holder : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed, not returned
+Chain --> Events : Finalized { deploy_id, ...,\n  node_type: Observer }
+Events --> Holder : waitForFinalization resolves\n(or rejects after maxWait)
+end
+
+note over Domain #FFF0C7
+A boost is a value transfer bound to a F1r3sky
+post: post_author_did names the recipient's DID
+and post_id the boosted post. The attribution is
+recorded on chain and appears as a Boost entry
+in both wallets' history.
+end note
+@enduml

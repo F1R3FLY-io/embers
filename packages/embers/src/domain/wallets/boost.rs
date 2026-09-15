@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use firefly_client::models::{DeployId, SignedCode, Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::domain::common::{prepare_for_signing, record_trace};
 use crate::domain::wallets::WalletsService;
@@ -19,7 +20,7 @@ struct BoostContract {
     post_id: Option<String>,
 }
 
-impl WalletsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,
@@ -64,7 +65,6 @@ impl WalletsService {
         let mut write_client = self.write_client.clone();
 
         let deploy_id = write_client.deploy_signed_contract(contract).await?;
-        write_client.propose().await?;
         Ok(deploy_id)
     }
 }

@@ -1,4 +1,4 @@
 mod endpoints;
-mod models;
+pub(crate) mod models;
 
 pub use endpoints::*;

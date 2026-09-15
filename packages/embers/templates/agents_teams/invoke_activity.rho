@@ -1,0 +1,11 @@
+new deployId(`rho:rchain:deployId`), rl(`rho:registry:lookup`),
+    agentsTeamCh, activityReturn
+in {
+    rl!({{ agents_team }}, *agentsTeamCh) |
+    for(@(_, agentsTeam) <- agentsTeamCh) {
+        @agentsTeam!("control", "activity", {{ node_id }}, {{ input }}, *activityReturn) |
+        for(@result <- activityReturn) {
+            @(*deployId).toString()!(result)
+        }
+    }
+}

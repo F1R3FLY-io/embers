@@ -1,5 +1,6 @@
 use firefly_client::models::{Either, Uri, WalletAddress};
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 
 use crate::blockchain::wallets::models;
 use crate::domain::common::record_trace;
@@ -13,7 +14,7 @@ struct GetBalanceAndHistory {
     wallet_address: WalletAddress,
 }
 
-impl WalletsService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> WalletsService<R, W, N> {
     #[tracing::instrument(
         level = "info",
         skip_all,

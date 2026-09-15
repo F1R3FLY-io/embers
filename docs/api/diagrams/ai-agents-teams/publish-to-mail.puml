@@ -1,0 +1,69 @@
+@startuml
+title POST /api/ai-agents-teams/{address}/{id}/publish-to-mail/prepare + /send — owner-signed mail binding
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Team owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.publishToMail(id, req)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Owner -> SDK : publishToMail(id, {localPart, mailDomain})
+
+group Phase 1 — prepare (side-effect light: a render plus a uniqueness read)
+SDK -> API : POST .../{address}/{id}/publish-to-mail/prepare
+API -> Domain : prepare binding
+Domain -> Domain : conservative RFC 5321-compatible grammar;\ncanonical form is the lowercase address
+alt grammar fails
+Domain --> API : 422 {code: invalid_mail_address}
+else team unknown under the address
+Domain --> API : 404 {code: team_not_found}
+else team never deployed (no registry URI to bind)
+Domain --> API : 422 {code: team_not_deployed}
+else address actively bound to a DIFFERENT team
+Domain -> Chain : listChannelBindings("mail") — uniqueness read
+Domain --> API : 409 {code: binding_duplicate}
+else clear
+Domain --> API : PublishToMailResp { address, contract }\n— NO account creation, NO key material\n(mailbox DEKs are the mail bridge's, never embers')
+API --> SDK : PrepareResponse { response, token }
+end
+end
+
+group Sign and send
+SDK -> SDK : sign with the team owner's wallet key
+SDK -> API : POST .../publish-to-mail/send { echo, signed, token }
+API -> Domain : deploy signed binding
+Domain -> Chain : deploy saveChannelBinding("mail",\naddress, team URI, team_id)
+note right of Chain #FFF0C7
+Owner-adjudicated: the clause visits the
+signer's own team record. Binding key =
+channel|address. Re-publishing the same team
+reactivates; a different team aborts
+"binding address already in use".
+end note
+alt clause aborts
+Chain --> Domain : deploy errored
+Domain -> Chain : re-read bindings to name the cause
+alt address held by another team
+Domain --> API : 409 {code: binding_duplicate}
+else signer does not own the team
+Domain --> API : 403 {code: binding_unauthorized}
+end
+else clause lands
+Chain --> Domain : finalized; acknowledged
+Domain -> Chain : readback: the binding must be observably\nactive before the owner is told the team\nis reachable by mail
+Domain --> API : deploy id
+API --> SDK : 200 SendResp { deployId }
+SDK --> Owner : bound address; the mail bridge's refresh\npicks it up (450 while provisioning the DEK)
+end
+end
+@enduml

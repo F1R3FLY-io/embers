@@ -1,0 +1,7 @@
+// The read flakes (gives up without the value) with probability < 1e-3 at the
+// pessimistic defaults — the acceptance target.
+P=? [ F "flake" ];
+// The read eventually returns the value with high probability.
+P=? [ F "success" ];
+// Latency proxy: probability the value is returned within the first 5 attempts.
+P=? [ F<=5 "success" ];

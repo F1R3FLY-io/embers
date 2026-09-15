@@ -1,5 +1,6 @@
 use firefly_client::models::WalletAddress;
 use firefly_client::rendering::Render;
+use firefly_client::{NodeEventSource, ReadNode, WriteNode};
 use secp256k1::{PublicKey, Secp256k1, rand};
 
 use crate::domain::testnet::TestnetService;
@@ -15,7 +16,7 @@ struct FundTestWallet {
     amount: i64,
 }
 
-impl TestnetService {
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetService<R, W, N> {
     #[tracing::instrument(level = "info", skip_all, err(Debug), ret(Debug, level = "trace"))]
     pub async fn create_wallet(&self) -> anyhow::Result<CreateTestwalletResp> {
         let sk = Secp256k1::new();
@@ -33,7 +34,6 @@ impl TestnetService {
 
         let mut write_client = self.write_client.clone();
         write_client.deploy(&self.service_key, deploy_data).await?;
-        write_client.propose().await?;
 
         Ok(CreateTestwalletResp {
             key: test_account_secret_key,

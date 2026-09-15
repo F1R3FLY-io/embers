@@ -1,0 +1,67 @@
+@startuml
+title POST /api/ai-agents-teams/grants/{grant_id}/revoke/prepare + /send — delivery-only revocation
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Grantor" as Grantor #FFD8C2
+participant "AgentsTeamsApiSdk\n.revokeGrant(grantId)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Grantor -> SDK : revokeGrant(grantId)
+
+group Phase 1 — prepare (no body; deploys nothing)
+SDK -> API : POST .../grants/{grant_id}/revoke/prepare
+API -> Domain : prepare revocation
+Domain -> Chain : getGrant(grant_id) — fail fast on absence
+alt no grant record
+Domain --> API : 404 {code: grant_not_found}
+else grant exists (revoked or not)
+Domain --> API : RevokeGrantResp { contract }
+API --> SDK : PrepareResponse { response, token }
+end
+end
+
+group Sign and send
+SDK -> SDK : sign locally with the grantor's wallet key
+SDK -> API : POST .../grants/{grant_id}/revoke/send\n{ prepare_request: grant_id, echo, signed, token }
+API -> Domain : deploy signed revokeGrant
+Domain -> Chain : deploy
+note right of Chain #FFF0C7
+Grantor-only, idempotent: revoking a revoked
+grant re-acknowledges instead of aborting.
+Any other signer aborts
+"grant revocation requires the grantor".
+end note
+alt clause aborts
+Chain --> Domain : deploy errored
+Domain -> Chain : re-read the record to name the cause
+alt record absent
+Domain --> API : 404 {code: grant_not_found}
+else surviving unrevoked record
+Domain --> API : 403 {code: grant_unauthorized}\n(the signer is not the grantor)
+end
+else clause lands
+Chain --> Domain : finalized; acknowledged
+Domain -> Chain : revocation readback: disclosure authority\nmust be observably cut before the\ngrantor is told it is
+Domain --> API : deploy id
+API --> SDK : 200 SendResp { deployId }
+end
+end
+
+note over API, Chain #FFF0C7
+Delivery-only for in-flight runs: they complete for their
+owner, while the grantee's reveal and command claims fail
+from the moment of revocation. The grantor keeps cancel
+through the ordinary command envelope.
+end note
+@enduml

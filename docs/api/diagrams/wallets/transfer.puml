@@ -1,0 +1,68 @@
+@startuml
+title POST /api/wallets/transfer/prepare + /send — value transfer with finalization confirmation
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Wallet holder" as Holder #FFD8C2
+participant "WalletsApiSdk\n.transfer(to, amount, ...)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "WalletsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Holder -> SDK : transfer(to, amount, description?)
+
+group Phase 1 — prepare (deploys nothing)
+SDK -> API : POST /api/wallets/transfer/prepare\n{ from, to, amount, description? }
+API -> Domain : prepare_transfer_contract
+Domain -> Domain : render transfer.rho\n(vault transfer, server timestamp)
+Domain -> Chain : get head block index
+Chain --> Domain : valid-after block number
+Domain --> API : TransferResp { contract }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign — the wallet key never leaves the client
+SDK -> SDK : signed = signContract(contract, privateKey)\nsecp256k1 low-S over blake2b-256
+end
+
+group Subscribe before send — the deploy id is the signature
+SDK -> Events : subscribeForDeploy(\n  hex(signed.sig).toLowerCase(), maxWait)
+end
+
+group Phase 2 — send (deploy, fire-and-forget)
+SDK -> API : POST /api/wallets/transfer/send\n{ prepare_request, prepare_response,\n  request: signed, token }
+API -> API : decode token,\nverify the echo hash binding
+API -> Domain : deploy_signed_transfer
+Domain -> Chain : deploy signed contract
+Chain --> Domain : accepted
+Domain --> API : deploy id
+API --> SDK : 200 SendResp { deploy_id }
+SDK --> Holder : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed, not returned
+alt observer reports the deploy finalized
+  Chain --> Events : Finalized { deploy_id, cost,\n  errored, node_type: Observer }
+  Events --> Holder : waitForFinalization resolves
+else confirmation missing after maxWait (default 120 s)
+  Events --> Holder : rejects: "accepted but ... confirmation\ntimed out; may still finalize --\nverify the record before retrying"
+end
+end
+
+note over Events #FFF0C7
+Subscription happens before send, so a fast
+finalization cannot be missed. Validator events
+are received too but only the observer's report
+resolves the wait: the budget absorbs observer
+lag, matching the backend's deploy timeout.
+end note
+@enduml

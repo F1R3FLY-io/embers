@@ -1,8 +1,18 @@
+use core::marker::PhantomData;
+
+use firefly_client::{
+    NodeEventSource,
+    NodeEvents,
+    ReadNode,
+    ReadNodeClient,
+    WriteNode,
+    WriteNodeClient,
+};
 use poem::web::Data;
 use poem_openapi::OpenApi;
 use poem_openapi::payload::Json;
 
-use crate::api::common::{ApiTags, PrepareResponse, SendRequest};
+use crate::api::common::{ApiResult, ApiTags, PrepareResponse, SendRequest};
 use crate::api::testnet::models::{
     CreateTestwalletResp,
     DeploySignedTestReq,
@@ -12,44 +22,60 @@ use crate::api::testnet::models::{
 };
 use crate::domain::testnet::TestnetService;
 
-#[derive(Debug, Clone)]
-pub struct TestnetApi;
+pub struct TestnetApi<R = ReadNodeClient, W = WriteNodeClient, N = NodeEvents>(
+    PhantomData<(R, W, N)>,
+);
+
+impl<R, W, N> Default for TestnetApi<R, W, N> {
+    fn default() -> Self {
+        Self(PhantomData)
+    }
+}
 
 #[OpenApi(prefix_path = "/testnet", tag = ApiTags::Testnet)]
-impl TestnetApi {
-    #[oai(path = "/wallet", method = "post")]
+impl<R: ReadNode, W: WriteNode, N: NodeEventSource> TestnetApi<R, W, N> {
+    #[oai(
+        path = "/wallet",
+        method = "post",
+        operation_id = "testnet_create_wallet"
+    )]
     async fn create_wallet(
         &self,
-        Data(testnet): Data<&TestnetService>,
-    ) -> poem::Result<Json<CreateTestwalletResp>> {
-        let wallet = testnet.create_wallet().await?;
-        Ok(Json(wallet.into()))
+        Data(testnet): Data<&TestnetService<R, W, N>>,
+    ) -> ApiResult<CreateTestwalletResp> {
+        testnet.create_wallet().await.into()
     }
 
-    #[oai(path = "/deploy/prepare", method = "post")]
+    #[oai(
+        path = "/deploy/prepare",
+        method = "post",
+        operation_id = "testnet_prepare_deploy"
+    )]
     async fn prepare_deploy(
         &self,
         Json(body): Json<DeployTestReq>,
-        Data(testnet): Data<&TestnetService>,
+        Data(testnet): Data<&TestnetService<R, W, N>>,
         Data(encoding_key): Data<&jsonwebtoken::EncodingKey>,
-    ) -> poem::Result<Json<PrepareResponse<DeployTestResp>>> {
+    ) -> ApiResult<PrepareResponse<DeployTestResp>> {
         PrepareResponse::from_call(
             body,
             |body| testnet.prepare_test_contract(body.into()),
             encoding_key,
         )
         .await
-        .map(Json)
-        .map_err(Into::into)
+        .into()
     }
 
-    #[oai(path = "/deploy/send", method = "post")]
+    #[oai(
+        path = "/deploy/send",
+        method = "post",
+        operation_id = "testnet_send_deploy"
+    )]
     async fn deploy(
         &self,
         SendRequest(body): SendRequest<DeploySignedTestReq, DeployTestReq, DeployTestResp>,
-        Data(testnet): Data<&TestnetService>,
-    ) -> poem::Result<Json<DeploySignedTestResp>> {
-        let result = testnet.deploy_test_contract(body.request.into()).await?;
-        Ok(Json(result.into()))
+        Data(testnet): Data<&TestnetService<R, W, N>>,
+    ) -> ApiResult<DeploySignedTestResp> {
+        testnet.deploy_test_contract(body.request.into()).await.into()
     }
 }

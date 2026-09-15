@@ -1,0 +1,35 @@
+@startuml 33-env-registry
+' The version-gated insert_signed environment-init protocol (insert_signed.rho).
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam defaultFontName "DejaVu Sans"
+skinparam activity {
+  BackgroundColor #FDE9D9
+  BorderColor #294C60
+  DiamondBackgroundColor #FFF1CC
+  DiamondBorderColor #294C60
+}
+
+title Environment registry — version-gated signed init (insert_signed.rho)
+
+start
+:lookup env_uri on the registry\n(rl!(env_uri, *prevEnvCh));
+if (current value?) then (Nil — no env yet)
+  :initEnv;
+elseif ((version, _) with\nstored version < new version?) then (yes — upgrade)
+  :initEnv;
+else (stored version >= new)
+  :no-op — env already current;
+  stop
+endif
+:run the domain initialization block;
+:rs!(public_key, (version, bundle+{env}), sig, *uriCh)\n(registry insertSigned:secp256k1);
+if (insert result?) then (a URI)
+  :env registered / upgraded at env_uri;
+  stop
+else (Nil)
+  :abort!("failed to insert env");<<#F8CECC>>
+  stop
+endif
+@enduml

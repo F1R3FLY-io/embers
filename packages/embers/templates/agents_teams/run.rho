@@ -1,6 +1,19 @@
-new deployId(`rho:rchain:deployId`), rl(`rho:registry:lookup`), agentsTeamsCh in {
-    rl!({{ agents_team }}, *agentsTeamsCh) |
-    for(@(_, agentsTeams) <- agentsTeamsCh) {
-        @agentsTeams!({{ prompt }}, (*deployId).toString())
+new deployId(`rho:rchain:deployId`), rl(`rho:registry:lookup`),
+    agentsTeamCh, workflowEnvCh, runStarted, teamReturn, runFinished, forward
+in {
+    contract forward(@value, destination) = { destination!(value) } |
+    rl!({{ agents_team }}, *agentsTeamCh) |
+    rl!({{ env_uri }}, *workflowEnvCh) |
+    for(@(_, agentsTeam) <- agentsTeamCh; @(_, workflowEnv) <- workflowEnvCh) {
+        @workflowEnv!("beginRun", {{ run_id }}, {{ agents_team }}, {{ created_at }}, *runStarted) |
+        for(_ <- runStarted) {
+            @agentsTeam!({{ prompt }}, *teamReturn)
+        } |
+        for(@result <- teamReturn) {
+            @workflowEnv!("finishRun", {{ run_id }}, *runFinished) |
+            for(_ <- runFinished) {
+                forward!(result, (*deployId).toString())
+            }
+        }
     }
 }

@@ -6,17 +6,35 @@
 {%- filter indent(8) -%}
 
 new rl(`rho:registry:lookup`),
-    revAddress(`rho:rev:address`),
+    revAddress(`rho:vault:address`),
     devNull(`rho:io:devNull`),
     abort(`rho:execution:abort`),
     deployData(`rho:deploy:data`),
     treeHashMapCh,
+    runsCh,
+    grantsCh,
+    bindingsCh,
+    serviceDeployDataCh,
+    serviceDeployerAddressCh,
+    serviceAddressCh,
     agentsTeamsDeploysMapCh,
     tokensCh,
     listOpsCh,
     stackCh,
-    visit
+    visit,
+    registerRun,
+    all,
+    any,
+    filterEntriesByField
 in {
+    deployData!(*serviceDeployDataCh) |
+    for(_, @serviceDeployerId, _ <- serviceDeployDataCh) {
+        revAddress!("fromDeployerId", serviceDeployerId, *serviceDeployerAddressCh)
+    } |
+    for(@serviceAddress <- serviceDeployerAddressCh) {
+        serviceAddressCh!(serviceAddress)
+    } |
+
     rl!(`rho:lang:treeHashMap`, *treeHashMapCh) |
     for(treeHashMap <- treeHashMapCh) {
         treeHashMap!("init", 3, *treeHashMapCh) |
@@ -25,6 +43,10 @@ in {
             treeHashMapCh!(*treeHashMap, map)
         }
     } |
+
+    runsCh!({}) |
+    grantsCh!({}) |
+    bindingsCh!({}) |
 
     rl!(`rho:lang:listOps`, *listOpsCh) |
     for(@(_, listOps) <- listOpsCh) {
@@ -35,6 +57,62 @@ in {
     for(@(_, stack) <- stackCh) {
         @stack!("init", *tokensCh) |
         stackCh!(stack)
+    } |
+
+    contract all(@values, ret) = {
+        match values {
+            [] => ret!(true)
+            [head ...tail] => {
+                if (head) { all!(tail, *ret) } else { ret!(false) }
+            }
+        }
+    } |
+
+    contract any(@values, ret) = {
+        match values {
+            [] => ret!(false)
+            [head ...tail] => {
+                if (head) { ret!(true) } else { any!(tail, *ret) }
+            }
+        }
+    } |
+
+    contract filterEntriesByField(@entries, @field, @value, @acc, ret) = {
+        match entries {
+            [] => ret!(acc)
+            [head ...tail] => {
+                match head {
+                    (_, record) => {
+                        if (record.get(field) == value) {
+                            filterEntriesByField!(tail, field, value, acc ++ [record], *ret)
+                        } else {
+                            filterEntriesByField!(tail, field, value, acc, *ret)
+                        }
+                    }
+                }
+            }
+        }
+    } |
+
+    contract registerRun(@run_id, @new_run, verifyExisting, acknowledged) = {
+        for(@runs <- runsCh) {
+            if (runs.contains(run_id)) {
+                new verifiedCh in {
+                    verifyExisting!(runs.get(run_id), *verifiedCh) |
+                    for(@verified <- verifiedCh) {
+                        runsCh!(runs) |
+                        if (verified) {
+                            acknowledged!(true)
+                        } else {
+                            abort!("run identity conflict")
+                        }
+                    }
+                }
+            } else {
+                runsCh!(runs.set(run_id, new_run)) |
+                acknowledged!(true)
+            }
+        }
     } |
 
     contract visit(@"agentsTeams", @address, f, notFound) = {
@@ -63,7 +141,7 @@ in {
         }
     } |
 
-    contract agentsTeams(@"create", @id, @version, @created_at, @name, @description, @shard, @logo, @graph) = {
+    contract agentsTeams(@"create", @id, @version, @created_at, @name, @description, @shard, @logo, @graph, @definition) = {
         new deployDataCh, deployerAddressCh, valueCh, nilCh, errCh in {
             deployData!(*deployDataCh) |
 
@@ -105,6 +183,7 @@ in {
                                     "shard": shard,
                                     "logo": logo,
                                     "graph": graph,
+                                    "definition": definition,
                                 }, *devNull) |
                             treeHashMap!("set", agentsTeamVersions, "latest",
                                 {
@@ -117,6 +196,7 @@ in {
                                     "shard": shard,
                                     "logo": logo,
                                     "graph": graph,
+                                    "definition": definition,
                                 }, *devNull)
                         }
                     }
@@ -139,7 +219,7 @@ in {
                         new agentsTeamLastVersionCh in {
                             treeHashMap!("get", agentsTeamVersions, "latest", *agentsTeamLastVersionCh) |
                             for(@agentsTeamLastVersion <- agentsTeamLastVersionCh) {
-                                ret!(agentsTeamLastVersion.delete("graph").set("id", id))
+                                ret!(agentsTeamLastVersion.delete("graph").delete("definition").set("id", id))
                             }
                         }
                     } |
@@ -163,7 +243,7 @@ in {
 
             for(@agentsTeamVersions <- valueCh; treeHashMap, _ <<- treeHashMapCh; listOps <<- listOpsCh) {
                 contract toAgentsTeamHeader(@(version, agentsTeam), ret) = {
-                    ret!(agentsTeam.delete("graph").union({"id": id, "version": version}))
+                    ret!(agentsTeam.delete("graph").delete("definition").union({"id": id, "version": version}))
                 } |
 
                 treeHashMap!("toMap", agentsTeamVersions, *agentsTeamVersionsMapCh) |
@@ -192,7 +272,488 @@ in {
         }
     } |
 
-    contract agentsTeams(@"save", @id, @version, @created_at, @name, @description, @shard, @logo, @graph) = {
+    contract agentsTeams(@"beginRun", @run_id, @agents_team, @created_at, acknowledged) = {
+        new deployDataCh, deployerAddressCh, verifyExisting in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh) {
+                contract verifyExisting(@run, ret) = {
+                    all!([
+                        run.get("owner") == address,
+                        run.get("agents_team") == agents_team,
+                        run.get("created_at") == created_at
+                    ], *ret)
+                } |
+                registerRun!(run_id, {
+                        "owner": address,
+                        "run_id": run_id,
+                        "agents_team": agents_team,
+                        "created_at": created_at,
+                        "definition_hash": Nil,
+                        "revision": 0,
+                        "status": "running",
+                        "continuation_content_hash": Nil,
+                        "continuation_capability_hash": Nil,
+                        "command_id": Nil,
+                        "command_content_hash": Nil,
+                        "command_capability_hash": Nil,
+                        "command_actor": Nil,
+                        "command_class": Nil,
+                        "command_wait_id": Nil,
+                        "approval_authority_grants": [],
+                        "wait_ids": [],
+                        "due_at": Nil,
+                        "output_content_hash": Nil,
+                        "output_capability_hash": Nil,
+                        "events": [{"sequence": 0, "type": "runStarted"}]
+                    }, *verifyExisting, *acknowledged)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"beginDurableRun", @run_id, @agents_team, @created_at,
+                         @definition_hash, @request_content_hash, @request_capability_hash,
+                         @continuation_content_hash, @continuation_capability_hash, acknowledged) = {
+        new deployDataCh, deployerAddressCh, verifyExisting in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh) {
+                contract verifyExisting(@run, ret) = {
+                    all!([
+                        run.get("owner") == address,
+                        run.get("agents_team") == agents_team,
+                        run.get("created_at") == created_at,
+                        run.get("definition_hash") == definition_hash,
+                        run.get("request_content_hash") == request_content_hash,
+                        run.get("request_capability_hash") == request_capability_hash,
+                        run.get("continuation_content_hash") == continuation_content_hash,
+                        run.get("continuation_capability_hash") == continuation_capability_hash
+                    ], *ret)
+                } |
+                registerRun!(run_id, {
+                        "owner": address,
+                        "run_id": run_id,
+                        "agents_team": agents_team,
+                        "created_at": created_at,
+                        "definition_hash": definition_hash,
+                        "request_content_hash": request_content_hash,
+                        "request_capability_hash": request_capability_hash,
+                        "revision": 0,
+                        "status": "running",
+                        "continuation_content_hash": continuation_content_hash,
+                        "continuation_capability_hash": continuation_capability_hash,
+                        "command_id": Nil,
+                        "command_content_hash": Nil,
+                        "command_capability_hash": Nil,
+                        "command_actor": Nil,
+                        "command_class": Nil,
+                        "command_wait_id": Nil,
+                        "approval_authority_grants": [],
+                        "wait_ids": [],
+                        "due_at": Nil,
+                        "output_content_hash": Nil,
+                        "output_capability_hash": Nil,
+                        "events": [{"sequence": 0, "type": "runStarted"}]
+                    }, *verifyExisting, *acknowledged)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"claimCommand", @run_id, @expected_revision, @command_id,
+                         @command_class, @command_wait_id,
+                         @command_content_hash, @command_capability_hash, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @runs <- runsCh; @serviceAddress <<- serviceAddressCh) {
+                if (runs.contains(run_id)) {
+                    new runCh in {
+                        runCh!(runs.get(run_id)) |
+                        for(@run <- runCh) {
+                    new idempotentCh in {
+                        all!([
+                            run.get("command_id") == command_id,
+                            run.get("command_class") == command_class,
+                            run.get("command_wait_id") == command_wait_id,
+                            run.get("command_content_hash") == command_content_hash,
+                            run.get("command_capability_hash") == command_capability_hash
+                        ], *idempotentCh) |
+                        for(@idempotent <- idempotentCh) {
+                            if (idempotent) {
+                                runsCh!(runs) |
+                                acknowledged!(true)
+                            } else if (run.get("revision") == expected_revision) {
+                                new ownerOrServiceCh, authorizedCh in {
+                                    any!([
+                                        run.get("owner") == address,
+                                        address == serviceAddress
+                                    ], *ownerOrServiceCh) |
+                                    for(@ownerOrService <- ownerOrServiceCh) {
+                                        if (ownerOrService) {
+                                            authorizedCh!(true)
+                                        } else {
+                                            // Channel grants extend the wait-level delegated-approver
+                                            // ACL to run level: the grantee wallet may issue exactly
+                                            // the command classes the grantor delegated, but only on
+                                            // runs initiated under that same grant.
+                                            new delegatedCh, checkGrantAuthority in {
+                                                contract checkGrantAuthority(ret) = {
+                                                    if (run.contains("grant_id")) {
+                                                        for(@grants <<- grantsCh) {
+                                                            if (grants.contains(run.get("grant_id"))) {
+                                                                new grantCh in {
+                                                                    grantCh!(grants.get(run.get("grant_id"))) |
+                                                                    for(@grant <- grantCh) {
+                                                                        all!([
+                                                                            grant.get("grantee") == address,
+                                                                            grant.get("revoked") == false,
+                                                                            grant.get("authority").get("commands").contains(command_class)
+                                                                        ], *ret)
+                                                                    }
+                                                                }
+                                                            } else {
+                                                                ret!(false)
+                                                            }
+                                                        }
+                                                    } else {
+                                                        ret!(false)
+                                                    }
+                                                } |
+                                                new approvalClassCh in {
+                                                    any!([
+                                                        command_class == "approve",
+                                                        command_class == "reject"
+                                                    ], *approvalClassCh) |
+                                                    for(@approvalClass <- approvalClassCh) {
+                                                        if (approvalClass) {
+                                                            all!([
+                                                                run.get("wait_ids").contains(command_wait_id),
+                                                                run.get("approval_authority_grants").contains(command_wait_id ++ "|" ++ address)
+                                                            ], *delegatedCh)
+                                                        } else {
+                                                            delegatedCh!(false)
+                                                        }
+                                                    }
+                                                } |
+                                                for(@delegated <- delegatedCh) {
+                                                    if (delegated) {
+                                                        authorizedCh!(true)
+                                                    } else {
+                                                        checkGrantAuthority!(*authorizedCh)
+                                                    }
+                                                }
+                                            }
+                                        } |
+                                        for(@authorized <- authorizedCh) {
+                                            if (authorized) {
+                                                runsCh!(runs.set(run_id,
+                                                    run.set("status", "resuming")
+                                                       .set("command_id", command_id)
+                                                       .set("command_content_hash", command_content_hash)
+                                                       .set("command_capability_hash", command_capability_hash)
+                                                       .set("command_actor", address)
+                                                       .set("command_class", command_class)
+                                                       .set("command_wait_id", command_wait_id)
+                                                       .set("events", run.get("events") ++ [{
+                                                           "sequence": run.get("events").length(),
+                                                           "type": "commandClaimed"
+                                                       }])
+                                                )) |
+                                                acknowledged!(true)
+                                            } else {
+                                                abort!("command actor is unauthorized")
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                abort!("command revision is stale")
+                            }
+                        }
+                    }
+                        }
+                    }
+                } else {
+                    abort!("run capability not found")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"claimOutputReveal", @run_id, @reveal_id, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @runs <- runsCh) {
+                if (runs.contains(run_id)) {
+                    new runCh in {
+                        runCh!(runs.get(run_id)) |
+                        for(@run <- runCh) {
+                    if (run.get("output_content_hash") == Nil) {
+                        abort!("run has no recorded output")
+                    } else {
+                        new revealAuthorizedCh in {
+                            if (run.get("owner") == address) {
+                                revealAuthorizedCh!(true)
+                            } else {
+                                if (run.contains("grant_id")) {
+                                    // A channel grantee may reveal for delivery exactly
+                                    // while the grant stands: revocation cuts disclosure
+                                    // immediately without touching the run itself.
+                                    for(@grants <<- grantsCh) {
+                                        if (grants.contains(run.get("grant_id"))) {
+                                            new grantCh in {
+                                                grantCh!(grants.get(run.get("grant_id"))) |
+                                                for(@grant <- grantCh) {
+                                                    all!([
+                                                        grant.get("grantee") == address,
+                                                        grant.get("revoked") == false,
+                                                        grant.get("authority").get("reveal") == true
+                                                    ], *revealAuthorizedCh)
+                                                }
+                                            }
+                                        } else {
+                                            revealAuthorizedCh!(false)
+                                        }
+                                    }
+                                } else {
+                                    revealAuthorizedCh!(false)
+                                }
+                            } |
+                            for(@revealAuthorized <- revealAuthorizedCh) {
+                                if (revealAuthorized) {
+                                    // The reveal event carries no actor: publishing the
+                                    // revealer would de-anonymize the owner this ledger
+                                    // deliberately scrubs from reads.
+                                    runsCh!(runs.set(run_id,
+                                        run.set("events", run.get("events") ++ [{
+                                            "sequence": run.get("events").length(),
+                                            "type": "outputRevealed"
+                                        }])
+                                    )) |
+                                    acknowledged!({
+                                        "revealId": reveal_id,
+                                        "outputContentHash": run.get("output_content_hash"),
+                                        "outputCapabilityHash": run.get("output_capability_hash")
+                                    })
+                                } else {
+                                    abort!("output reveal actor is unauthorized")
+                                }
+                            }
+                        }
+                    }
+                        }
+                    }
+                } else {
+                    abort!("run capability not found")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"advanceRun", @run_id, @expected_revision, @status,
+                         @definition_hash, @continuation_content_hash,
+                         @continuation_capability_hash, @wait_ids, @due_at,
+                         @approval_authority_grants, @output_content_hash,
+                         @output_capability_hash, @event_type, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @serviceAddress <<- serviceAddressCh) {
+                if (address == serviceAddress) {
+                    for(@runs <- runsCh) {
+                        if (runs.contains(run_id)) {
+                            new runCh in {
+                                runCh!(runs.get(run_id)) |
+                                for(@run <- runCh) {
+                            if (run.get("revision") == expected_revision) {
+                                runsCh!(runs.set(run_id,
+                                    run.set("revision", expected_revision + 1)
+                                       .set("status", status)
+                                       .set("definition_hash", definition_hash)
+                                       .set("continuation_content_hash", continuation_content_hash)
+                                       .set("continuation_capability_hash", continuation_capability_hash)
+                                       .set("wait_ids", wait_ids)
+                                       .set("due_at", due_at)
+                                       .set("approval_authority_grants", approval_authority_grants)
+                                       .set("output_content_hash", output_content_hash)
+                                       .set("output_capability_hash", output_capability_hash)
+                                       .set("command_id", Nil)
+                                       .set("command_content_hash", Nil)
+                                       .set("command_capability_hash", Nil)
+                                       .set("command_actor", Nil)
+                                       .set("command_class", Nil)
+                                       .set("command_wait_id", Nil)
+                                       .set("events", run.get("events") ++ [{
+                                           "sequence": run.get("events").length(),
+                                           "type": event_type
+                                       }])
+                                )) |
+                                acknowledged!(true)
+                            } else {
+                                new idempotentCh in {
+                                    all!([
+                                        run.get("revision") == expected_revision + 1,
+                                        run.get("status") == status,
+                                        run.get("definition_hash") == definition_hash,
+                                        run.get("continuation_content_hash") == continuation_content_hash,
+                                        run.get("continuation_capability_hash") == continuation_capability_hash,
+                                        run.get("wait_ids") == wait_ids,
+                                        run.get("due_at") == due_at,
+                                        run.get("approval_authority_grants") == approval_authority_grants,
+                                        run.get("output_content_hash") == output_content_hash,
+                                        run.get("output_capability_hash") == output_capability_hash
+                                    ], *idempotentCh) |
+                                    for(@idempotent <- idempotentCh) {
+                                        if (idempotent) {
+                                            runsCh!(runs) |
+                                            acknowledged!(true)
+                                        } else {
+                                            abort!("run revision conflict")
+                                        }
+                                    }
+                                }
+                            }
+                                }
+                            }
+                        } else {
+                            abort!("run capability not found")
+                        }
+                    }
+                } else {
+                    abort!("run advancement requires the Embers service")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"clearCommand", @run_id, @expected_revision, @command_id, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @serviceAddress <<- serviceAddressCh) {
+                if (address == serviceAddress) {
+                    for(@runs <- runsCh) {
+                        if (runs.contains(run_id)) {
+                            new runCh in {
+                                runCh!(runs.get(run_id)) |
+                                for(@run <- runCh) {
+                            new identityCh in {
+                                all!([
+                                    run.get("revision") == expected_revision,
+                                    run.get("command_id") == command_id
+                                ], *identityCh) |
+                                for(@identityMatches <- identityCh) {
+                                    if (identityMatches) {
+                                        runsCh!(runs.set(run_id,
+                                            run.set("status", "suspended")
+                                               .set("command_id", Nil)
+                                               .set("command_content_hash", Nil)
+                                               .set("command_capability_hash", Nil)
+                                               .set("command_actor", Nil)
+                                               .set("command_class", Nil)
+                                               .set("command_wait_id", Nil)
+                                               .set("events", run.get("events") ++ [{
+                                                   "sequence": run.get("events").length(),
+                                                   "type": "commandRejected"
+                                               }])
+                                        )) |
+                                        acknowledged!(true)
+                                    } else if (run.get("command_id") == Nil) {
+                                        runsCh!(runs) |
+                                        acknowledged!(true)
+                                    } else {
+                                        abort!("command clear identity conflict")
+                                    }
+                                }
+                            }
+                                }
+                            }
+                        } else {
+                            abort!("run capability not found")
+                        }
+                    }
+                } else {
+                    abort!("command clearing requires the Embers service")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"finishRun", @run_id, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh)
+            } |
+            for(@address <- deployerAddressCh; @runs <- runsCh) {
+                if (runs.contains(run_id)) {
+                    new runCh in {
+                        runCh!(runs.get(run_id)) |
+                        for(@run <- runCh) {
+                    if (run.get("owner") == address) {
+                        runsCh!(runs.set(run_id,
+                            run.set("status", "returned")
+                               .set("events", run.get("events") ++ [{
+                                   "sequence": run.get("events").length(),
+                                   "type": "runReturned"
+                               }])
+                        )) |
+                        acknowledged!(true)
+                    } else {
+                        abort!("run capability owner mismatch")
+                    }
+                        }
+                    }
+                } else {
+                    abort!("run capability not found")
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"getRun", @run_id, ret) = {
+        for(@runs <<- runsCh) {
+            if (runs.contains(run_id)) {
+                ret!(runs.get(run_id).delete("owner"))
+            } else {
+                ret!(Nil)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"listRuns", ret) = {
+        for(@runs <<- runsCh; listOps <<- listOpsCh) {
+            new scrubRun in {
+                // grant_id is scrubbed here alongside owner: grant records are
+                // public and name their grantor, so a public run enumeration
+                // that carried grant_id would link runs back to the owner this
+                // ledger deliberately anonymizes. The capability-gated getRun
+                // keeps grant_id: possessing the run_id already is read authority.
+                contract scrubRun(@(_, run), result) = {
+                    result!(run.delete("owner").delete("grant_id"))
+                } |
+                match runs.toList() {
+                    [] => ret!([])
+                    run_entries => listOps!("parMap", run_entries, *scrubRun, *ret)
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"save", @id, @version, @created_at, @name, @description, @shard, @logo, @graph, @definition) = {
         new deployDataCh, deployerAddressCh, valueCh, errCh, insertAgentsTeamVersionCh in {
             deployData!(*deployDataCh) |
 
@@ -218,6 +779,7 @@ in {
                             "shard": shard,
                             "logo": logo,
                             "graph": graph,
+                            "definition": definition,
                         }, *devNull) |
                     treeHashMap!("set", agentsTeamVersions, "latest",
                         {
@@ -230,6 +792,7 @@ in {
                             "shard": shard,
                             "logo": logo,
                             "graph": graph,
+                            "definition": definition,
                         }, *devNull)
                 }
             } |
@@ -299,6 +862,346 @@ in {
     contract agentsTeams(@"getFireskyTokens", ret) = {
         for(@tokens <<- tokensCh; stack <<- stackCh) {
             stack!("toList", tokens, *ret)
+        }
+    } |
+
+    contract agentsTeams(@"createGrant", @grant_id, @grantee, @channel, @channel_principal,
+                         @agents_team, @caps, @authority, @require_token_hash, @min_auth,
+                         acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(@timestamp, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+                // The grantor is derived from the creating deploy's signer, never
+                // taken as a parameter: a grant can only ever bind its author.
+                for(@grantor <- deployerAddressCh; @grants <- grantsCh) {
+                    if (grants.contains(grant_id)) {
+                        new existingCh, verifiedCh in {
+                            existingCh!(grants.get(grant_id)) |
+                            for(@existing <- existingCh) {
+                                all!([
+                                    existing.get("grantor") == grantor,
+                                    existing.get("grantee") == grantee,
+                                    existing.get("channel") == channel,
+                                    existing.get("channel_principal") == channel_principal,
+                                    existing.get("agents_team") == agents_team,
+                                    existing.get("caps") == caps,
+                                    existing.get("authority") == authority,
+                                    existing.get("require_token_hash") == require_token_hash,
+                                    existing.get("min_auth") == min_auth
+                                ], *verifiedCh) |
+                                for(@verified <- verifiedCh) {
+                                    grantsCh!(grants) |
+                                    if (verified) {
+                                        acknowledged!(true)
+                                    } else {
+                                        abort!("grant identity conflict")
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        grantsCh!(grants.set(grant_id, {
+                            "grant_id": grant_id,
+                            "grantor": grantor,
+                            "grantee": grantee,
+                            "channel": channel,
+                            "channel_principal": channel_principal,
+                            "agents_team": agents_team,
+                            "caps": caps,
+                            "authority": authority,
+                            "require_token_hash": require_token_hash,
+                            "min_auth": min_auth,
+                            // deployData timestamps are milliseconds; the ledger's
+                            // datetime fields are read back as epoch seconds.
+                            "created_at": timestamp / 1000,
+                            "revoked": false,
+                            "runs_today": {"day": 0, "count": 0}
+                        })) |
+                        acknowledged!(true)
+                    }
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"revokeGrant", @grant_id, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+                for(@address <- deployerAddressCh; @grants <- grantsCh) {
+                    if (grants.contains(grant_id)) {
+                        new grantCh in {
+                            grantCh!(grants.get(grant_id)) |
+                            for(@grant <- grantCh) {
+                                if (grant.get("grantor") == address) {
+                                    // Idempotent: revoking a revoked grant re-acknowledges.
+                                    grantsCh!(grants.set(grant_id, grant.set("revoked", true))) |
+                                    acknowledged!(true)
+                                } else {
+                                    abort!("grant revocation requires the grantor")
+                                }
+                            }
+                        }
+                    } else {
+                        abort!("grant not found")
+                    }
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"getGrant", @grant_id, ret) = {
+        for(@grants <<- grantsCh) {
+            if (grants.contains(grant_id)) {
+                ret!(grants.get(grant_id))
+            } else {
+                ret!(Nil)
+            }
+        }
+    } |
+
+    contract agentsTeams(@"listGrantsByGrantor", @grantor, ret) = {
+        for(@grants <<- grantsCh) {
+            filterEntriesByField!(grants.toList(), "grantor", grantor, [], *ret)
+        }
+    } |
+
+    contract agentsTeams(@"listGrantsByGrantee", @grantee, ret) = {
+        for(@grants <<- grantsCh) {
+            filterEntriesByField!(grants.toList(), "grantee", grantee, [], *ret)
+        }
+    } |
+
+    contract agentsTeams(@"listGrantsForTeam", @agents_team, ret) = {
+        for(@grants <<- grantsCh) {
+            filterEntriesByField!(grants.toList(), "agents_team", agents_team, [], *ret)
+        }
+    } |
+
+    contract agentsTeams(@"beginDurableRunUnderGrant", @run_id, @grant_id, @agents_team, @created_at,
+                         @definition_hash, @request_content_hash, @request_capability_hash,
+                         @continuation_content_hash, @continuation_capability_hash, acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(@timestamp, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+                // Runs and grants are taken in one join so grant adjudication,
+                // the day-counter increment, and run registration commit
+                // atomically: no revocation or cap race can interleave.
+                for(@address <- deployerAddressCh; @runs <- runsCh; @grants <- grantsCh) {
+                    if (grants.contains(grant_id)) {
+                        new grantCh in {
+                            grantCh!(grants.get(grant_id)) |
+                            for(@grant <- grantCh) {
+                                if (runs.contains(run_id)) {
+                                    // A same-signed-contract resend re-registers
+                                    // idempotently and must not burn a second unit
+                                    // of the daily cap.
+                                    new existingCh, verifiedCh in {
+                                        existingCh!(runs.get(run_id)) |
+                                        for(@existing <- existingCh) {
+                                            all!([
+                                                existing.get("owner") == grant.get("grantor"),
+                                                existing.get("grant_id") == grant_id,
+                                                existing.get("agents_team") == agents_team,
+                                                existing.get("created_at") == created_at,
+                                                existing.get("definition_hash") == definition_hash,
+                                                existing.get("request_content_hash") == request_content_hash,
+                                                existing.get("request_capability_hash") == request_capability_hash,
+                                                existing.get("continuation_content_hash") == continuation_content_hash,
+                                                existing.get("continuation_capability_hash") == continuation_capability_hash
+                                            ], *verifiedCh) |
+                                            for(@verified <- verifiedCh) {
+                                                runsCh!(runs) |
+                                                grantsCh!(grants) |
+                                                if (verified) {
+                                                    acknowledged!(true)
+                                                } else {
+                                                    abort!("run identity conflict")
+                                                }
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    if (grant.get("revoked")) {
+                                        abort!("grant is revoked")
+                                    } else {
+                                        if (grant.get("grantee") == address) {
+                                            if (grant.get("agents_team") == agents_team) {
+                                                new admittedCh in {
+                                                    match grant.get("caps").get("max_runs_per_day") {
+                                                        Nil => admittedCh!(grant.get("runs_today"))
+                                                        max_runs_per_day => {
+                                                            // UTC epoch-day window: O(1) counter state;
+                                                            // the up-to-2x midnight boundary effect is a
+                                                            // documented property of this throttle.
+                                                            if (grant.get("runs_today").get("day") == timestamp / 86400000) {
+                                                                if (grant.get("runs_today").get("count") < max_runs_per_day) {
+                                                                    admittedCh!({
+                                                                        "day": timestamp / 86400000,
+                                                                        "count": grant.get("runs_today").get("count") + 1
+                                                                    })
+                                                                } else {
+                                                                    abort!("grant daily run cap exhausted")
+                                                                }
+                                                            } else {
+                                                                if (0 < max_runs_per_day) {
+                                                                    admittedCh!({
+                                                                        "day": timestamp / 86400000,
+                                                                        "count": 1
+                                                                    })
+                                                                } else {
+                                                                    abort!("grant daily run cap exhausted")
+                                                                }
+                                                            }
+                                                        }
+                                                    } |
+                                                    for(@runs_today <- admittedCh) {
+                                                        grantsCh!(grants.set(grant_id, grant.set("runs_today", runs_today))) |
+                                                        runsCh!(runs.set(run_id, {
+                                                            "owner": grant.get("grantor"),
+                                                            "grant_id": grant_id,
+                                                            "run_id": run_id,
+                                                            "agents_team": agents_team,
+                                                            "created_at": created_at,
+                                                            "definition_hash": definition_hash,
+                                                            "request_content_hash": request_content_hash,
+                                                            "request_capability_hash": request_capability_hash,
+                                                            "revision": 0,
+                                                            "status": "running",
+                                                            "continuation_content_hash": continuation_content_hash,
+                                                            "continuation_capability_hash": continuation_capability_hash,
+                                                            "command_id": Nil,
+                                                            "command_content_hash": Nil,
+                                                            "command_capability_hash": Nil,
+                                                            "command_actor": Nil,
+                                                            "command_class": Nil,
+                                                            "command_wait_id": Nil,
+                                                            "approval_authority_grants": [],
+                                                            "wait_ids": [],
+                                                            "due_at": Nil,
+                                                            "output_content_hash": Nil,
+                                                            "output_capability_hash": Nil,
+                                                            "events": [{"sequence": 0, "type": "runStarted"}]
+                                                        })) |
+                                                        acknowledged!(true)
+                                                    }
+                                                }
+                                            } else {
+                                                abort!("grant team mismatch")
+                                            }
+                                        } else {
+                                            abort!("grant grantee mismatch")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        abort!("grant not found")
+                    }
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"saveChannelBinding", @channel, @channel_address, @agents_team, @team_id,
+                         acknowledged) = {
+        new deployDataCh, deployerAddressCh, ownedCh, notOwnedCh in {
+            deployData!(*deployDataCh) |
+            for(@timestamp, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+                for(@address <- deployerAddressCh) {
+                    // Only the address the team lives under may bind it to a channel.
+                    visit!("agentsTeamVersions", address, team_id, *ownedCh, *notOwnedCh) |
+                    for(_ <- ownedCh; @bindings <- bindingsCh) {
+                        new bindingKeyCh in {
+                            bindingKeyCh!(channel ++ "|" ++ channel_address) |
+                            for(@binding_key <- bindingKeyCh) {
+                                if (bindings.contains(binding_key)) {
+                                    new existingCh in {
+                                        existingCh!(bindings.get(binding_key)) |
+                                        for(@existing <- existingCh) {
+                                            if (existing.get("team_id") == team_id) {
+                                                // Re-publishing the same team reactivates the
+                                                // binding; the address never changes hands here.
+                                                bindingsCh!(bindings.set(binding_key,
+                                                    existing.set("agents_team", agents_team)
+                                                            .set("active", true))) |
+                                                acknowledged!(true)
+                                            } else {
+                                                abort!("binding address already in use")
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    bindingsCh!(bindings.set(binding_key, {
+                                        "channel": channel,
+                                        "address": channel_address,
+                                        "agents_team": agents_team,
+                                        "team_id": team_id,
+                                        "owner": address,
+                                        "active": true,
+                                        // deployData timestamps are milliseconds; the ledger's
+                                        // datetime fields are read back as epoch seconds.
+                                        "created_at": timestamp / 1000
+                                    })) |
+                                    acknowledged!(true)
+                                }
+                            }
+                        }
+                    } |
+                    for(<- notOwnedCh) {
+                        abort!("binding requires the team owner")
+                    }
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"setChannelBindingActive", @channel, @channel_address, @active,
+                         acknowledged) = {
+        new deployDataCh, deployerAddressCh in {
+            deployData!(*deployDataCh) |
+            for(_, @deployerId, _ <- deployDataCh) {
+                revAddress!("fromDeployerId", deployerId, *deployerAddressCh) |
+                for(@address <- deployerAddressCh; @bindings <- bindingsCh) {
+                    new bindingKeyCh in {
+                        bindingKeyCh!(channel ++ "|" ++ channel_address) |
+                        for(@binding_key <- bindingKeyCh) {
+                            if (bindings.contains(binding_key)) {
+                                new bindingCh in {
+                                    bindingCh!(bindings.get(binding_key)) |
+                                    for(@binding <- bindingCh) {
+                                        if (binding.get("owner") == address) {
+                                            bindingsCh!(bindings.set(binding_key, binding.set("active", active))) |
+                                            acknowledged!(true)
+                                        } else {
+                                            abort!("binding update requires the team owner")
+                                        }
+                                    }
+                                }
+                            } else {
+                                abort!("binding not found")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    } |
+
+    contract agentsTeams(@"listChannelBindings", @channel, ret) = {
+        for(@bindings <<- bindingsCh) {
+            filterEntriesByField!(bindings.toList(), "channel", channel, [], *ret)
+        }
+    } |
+
+    contract agentsTeams(@"getChannelBindingsForTeam", @team_id, ret) = {
+        for(@bindings <<- bindingsCh) {
+            filterEntriesByField!(bindings.toList(), "team_id", team_id, [], *ret)
         }
     }
 }

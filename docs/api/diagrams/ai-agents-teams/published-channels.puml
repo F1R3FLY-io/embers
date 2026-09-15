@@ -1,0 +1,46 @@
+@startuml
+title GET /api/ai-agents-teams/{address}/{id}/published-channels — three-valued per-channel reachability
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Interfaces panel" as UI #FFD8C2
+participant "AgentsTeamsApiSdk\n.publishedChannels(id)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "Observer + PDS" as Sources #FFF1CC
+
+UI -> SDK : publishedChannels(id)
+SDK -> API : GET .../{address}/{id}/published-channels
+API -> Domain : aggregate
+
+group Three independent reads (a failure in one never blanks another)
+Domain -> Sources : f1r3sky: published_state — chain record\nreconciled against the PDS\n(account_exists stays three-valued)
+Domain -> Sources : mail: getChannelBindingsForTeam(id),\nfiltered to channel "mail"
+note right of Domain #FFF6C9
+Mail reachable is ALWAYS absent:
+embers does not probe SMTP, so the
+answer is unknown by design — never
+falsely asserted, never rendered
+as "missing".
+end note
+Domain -> Sources : chat: list every deployed version's URI\n(each deploy mints a fresh one), then\nlistGrantsForTeam per URI; count active\n(unrevoked) chat grants + distinct principals
+note right of Domain #FFF6C9
+The gateway dials out and exposes no
+status surface, so active grants are
+the honest maximum embers can report
+for chat.
+end note
+end
+
+Domain --> API : PublishedChannels { firesky?, mail[], chat }
+API --> SDK : 200 PublishedChannels
+SDK --> UI : rows rendered by the three-valued\ndiscipline (reachable / unknown / unreachable)
+@enduml

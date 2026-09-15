@@ -349,6 +349,7 @@ pub enum ApiTags {
 
 #[derive(Debug, Clone, Object)]
 pub struct InternalError {
+    /// Human-readable failure description.
     description: String,
 }
 
@@ -394,6 +395,65 @@ where
     }
 }
 
+/// A 200-or-500 response for operations whose only failure mode is an internal error.
+/// The handlers return `anyhow::Result<T>`, which otherwise maps to an undeclared 500;
+/// declaring it here gives generated clients a typed error boundary (an `InternalError`
+/// body) instead of a bare 200-only operation with a generic error path.
+#[derive(Debug, Clone, ApiResponse)]
+pub enum ApiResult<T>
+where
+    T: Type + ToJSON + Send + Sync,
+{
+    #[oai(status = 200)]
+    Ok(Json<T>),
+    #[oai(status = 422)]
+    ValidationError(Json<crate::api::agents_teams::models::ErrorBody>),
+    #[oai(status = 500)]
+    InternalError(Json<InternalError>),
+}
+
+impl<T, K> From<anyhow::Result<T>> for ApiResult<K>
+where
+    K: Type + ToJSON + Send + Sync + From<T>,
+{
+    fn from(value: anyhow::Result<T>) -> Self {
+        match value {
+            Ok(inner) => Self::Ok(Json(inner.into())),
+            Err(err) => match err.downcast_ref::<crate::domain::validation::ValidationError>() {
+                Some(validation) => {
+                    let mut body = crate::api::agents_teams::models::ErrorBody::new(
+                        &validation.code,
+                        &validation.description,
+                    );
+                    body.field_errors = Some(validation.fields.clone());
+                    Self::ValidationError(Json(body))
+                }
+                None => Self::InternalError(Json(err.into())),
+            },
+        }
+    }
+}
+
+/// A 200-empty-or-500 response for operations that return no body but can fail
+/// internally, so the 500 (`InternalError`) path a bare `poem::Result<()>` hides is
+/// declared for generated clients.
+#[derive(Debug, Clone, ApiResponse)]
+pub enum VoidResult {
+    #[oai(status = 200)]
+    Ok,
+    #[oai(status = 500)]
+    InternalError(Json<InternalError>),
+}
+
+impl From<anyhow::Result<()>> for VoidResult {
+    fn from(value: anyhow::Result<()>) -> Self {
+        match value {
+            Ok(()) => Self::Ok,
+            Err(err) => Self::InternalError(Json(err.into())),
+        }
+    }
+}
+
 #[derive(derive_more::Debug, Clone, Hash, NewType)]
 #[oai(to_header = false, from_multipart = false)]
 #[debug("{:?}", _0.0.short_hex(32))]
@@ -405,13 +465,19 @@ impl From<common::PreparedContract> for PreparedContract {
     }
 }
 
+/// A client-signed contract, ready to deploy: the send phase of the two-phase
+/// protocol carries it, and the chain is the verifier of record.
 #[derive(derive_more::Debug, Clone, Object)]
 pub struct SignedContract {
+    /// The exact prepared contract bytes that were signed.
     #[debug("{:?}", contract.0.short_hex(32))]
     pub contract: Base64<Vec<u8>>,
+    /// Signature over the contract's blake2b digest, per `sig_algorithm`.
     #[debug("{:?}", hex::encode(&sig.0))]
     pub sig: Base64<Vec<u8>>,
+    /// The signature algorithm; the platform signs with `secp256k1`.
     pub sig_algorithm: String,
+    /// The signing wallet's public key.
     #[debug("{:?}", hex::encode(&deployer.0))]
     pub deployer: Base64<Vec<u8>>,
 }
@@ -427,11 +493,19 @@ impl From<SignedContract> for firefly_client::models::SignedCode {
     }
 }
 
+/// The signed registry claim that authorizes publishing a deployment under a
+/// `rho:id:` URI.
 #[derive(Debug, Clone, Hash, Object)]
 pub struct RegistryDeploy {
+    /// Client-chosen instant the registry signature covers; also becomes the
+    /// contract's `DeployData` timestamp.
     pub timestamp: Stringified<DateTime<Utc>>,
+    /// Registry entry version; bump to re-deploy at the same URI.
     pub version: Stringified<i64>,
+    /// The registry key's public key; the URI derives from it.
     pub uri_pub_key: Stringified<PublicKey>,
+    /// The `insertSignedSignature` over `(timestamp, wallet public key,
+    /// version)`.
     pub signature: Base64<Vec<u8>>,
 }
 
@@ -448,6 +522,8 @@ impl From<RegistryDeploy> for common::RegistryDeploy {
 
 #[derive(Debug, Clone, Object)]
 pub struct SendResp {
+    /// The accepted deploy's identifier (lowercase hex of its signature);
+    /// finalization is still pending when this returns.
     pub deploy_id: String,
 }
 
@@ -470,7 +546,11 @@ pub struct PrepareResponse<T>
 where
     T: Type + ParseFromJSON + ToJSON,
 {
+    /// The operation-specific prepare payload, carrying the unsigned
+    /// contract(s) to sign.
     pub response: T,
+    /// JWT binding the send to exactly this prepare exchange; expires after
+    /// one day.
     pub token: String,
 }
 
@@ -513,9 +593,13 @@ where
     R: Type + ParseFromJSON + ToJSON,
     C: Type + ParseFromJSON + ToJSON,
 {
+    /// Byte-identical echo of the prepare request.
     pub prepare_request: R,
+    /// Byte-identical echo of the prepare response body.
     pub prepare_response: C,
+    /// The signed contract(s) for this operation.
     pub request: T,
+    /// The JWT issued by prepare; binds this send to that exchange.
     pub token: String,
 }
 

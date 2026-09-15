@@ -1,0 +1,39 @@
+@startuml
+title GET /api/ai-agents-teams/grants/by-grantor/{address} and /grants/by-grantee/{address}
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Grantor UI /\nchannel operator" as Caller #FFD8C2
+participant "AgentsTeamsApiSdk\n.grantsByGrantor() /\n.grantsByGrantee(addr)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "Observer\n(exploratory read)" as Obs #FFF1CC
+
+Caller -> SDK : list grants
+SDK -> API : GET .../grants/by-grantor/{address}\nor .../grants/by-grantee/{address}
+API -> Domain : list grants
+Domain -> Obs : render listGrantsByGrantor /\nlistGrantsByGrantee; exploratory deploy\n(costs nothing, finalizes nothing)
+Obs -> Obs : filterEntriesByField over the public\ngrants map: grantor == addr /\ngrantee == addr
+Obs --> Domain : [grant records]
+Domain --> API : [Grant] — revoked grants included, flagged
+API --> SDK : 200 [Grant]
+SDK --> Caller : rows for the management table /\nrouting cache refresh
+
+note over SDK, Obs #FFF0C7
+Grant records are PUBLIC authorization facts: no secrets
+travel here (require_token exists on chain only as its
+blake2b-256 digest). Channel services consume the
+observer-readable chain clauses directly — chain-read-first —
+and use these HTTP mirrors for UI and diagnostics; a stale
+answer costs one failed paid deploy, never a wrong
+authorization, because the chain re-adjudicates at claim time.
+end note
+@enduml

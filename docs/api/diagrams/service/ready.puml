@@ -1,0 +1,29 @@
+@startuml
+title GET /api/service/ready — HTTP liveness probe
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Operator /\norchestrator" as Op #FFD8C2
+participant "Client\n(generated ServiceApi)" as Client #D5EAF7
+participant "Embers API" as API #FFC9A8
+
+Op -> Client : readiness check
+Client -> API : GET /api/service/ready
+API --> Client : 200, no body
+Client --> Op : HTTP tier is serving
+
+note over API #FFF0C7
+The handler returns Ok(()) unconditionally
+(api/service/endpoints.rs:11-14). A 200 attests
+only that the HTTP tier is serving requests; it
+performs no chain, node, or dependency check.
+end note
+@enduml

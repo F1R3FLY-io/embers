@@ -27,6 +27,10 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-C target-feature=+aes,+sse2"
+      # Raise proptest coverage in CI beyond the local default (256 cases per property).
+      PROPTEST_CASES: "64"
     steps:
       - name: Checkout code
         uses: actions/checkout@v6

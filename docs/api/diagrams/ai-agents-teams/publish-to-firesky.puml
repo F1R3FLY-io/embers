@@ -1,0 +1,71 @@
+@startuml
+title POST /api/ai-agents-teams/{address}/{id}/publish-to-firesky/prepare + /send — give a deployed team a social account
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Team owner" as Owner #FFD8C2
+participant "AgentsTeamsApiSdk\n.publishToFiresky(id, req)" as SDK #D5EAF7
+participant "EmbersEvents\n(WebSocket)" as Events #E3D8F5
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3sky\n(PDS)" as Firesky #FFDFC4
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Owner -> SDK : publishToFiresky(id, { pds_url, email,\n  handle, password, invite_code? })
+
+group Phase 1 — prepare (account work happens here)
+SDK -> API : POST .../{address}/{id}/publish-to-firesky/prepare
+API -> Domain : prepare publication
+Domain -> Firesky : create or log into the account\n(handle, email, password, invite code)
+Domain -> Firesky : mint a per-publication app password\n(numbered from the names present:\n"Embers", "Embers 2", ...)
+Domain -> Firesky : write the com.f1r3sky.agentsteam.config\nrecord naming the CURRENT deployment URI
+Firesky --> Domain : account ready (did, handle)
+Domain -> Domain : render the contract pushing the\nENCRYPTED credential onto the\nteam's on-chain credential stack
+Domain --> API : PublishToFireskyResp { contract }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign, subscribe, send
+SDK -> SDK : signed = signContract(contract, privateKey)
+SDK -> Events : subscribeForDeploy(\n  hex(signed.sig).toLowerCase(), maxWait)
+SDK -> API : POST .../publish-to-firesky/send\n{ prepare_request, prepare_response,\n  request: signed, token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy signed contract
+Domain -> Chain : deploy (credential push)
+Chain --> Domain : accepted
+API <-- Domain : deploy id
+SDK <-- API : 200 SendResp { deploy_id }
+SDK --> Owner : { prepareResponse, sendResponse,\n  waitForFinalization }
+end
+
+group Finalization — observed on the WebSocket
+Chain --> Events : Finalized { deploy_id, ...,\n  node_type: Observer }
+Events --> Owner : waitForFinalization resolves
+end
+
+note over API #FAD8D8
+The prepare request carries PDS credentials
+(email, password, optional invite code) to the
+service. What reaches the chain is an encrypted
+per-publication app password, never the account
+password; still, treat this endpoint as a
+credential boundary and only ever call it over
+HTTPS against a service you trust.
+end note
+
+note over Domain #FFF0C7
+Publication is keyed by DEPLOYMENT URI, not team
+id: the config record names whichever deployment
+was current at publish time. Re-deploying mints
+a new URI, which is what published-state's
+is_latest_deployment reports on.
+end note
+@enduml

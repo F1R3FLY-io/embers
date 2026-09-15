@@ -22,5 +22,11 @@ pub struct Oslf {
     pub created_at: DateTime,
     pub name: String,
     pub description: Option<String>,
+    // Reverse the Rholang string escaping the tuplespace preserves (see
+    // `blockchain::common::unescape_rho_string`).
+    #[serde(
+        default,
+        deserialize_with = "crate::blockchain::common::deserialize_unescaped_opt"
+    )]
     pub query: Option<String>,
 }

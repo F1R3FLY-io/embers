@@ -2,7 +2,6 @@
 args          = ["clippy", "--workspace", "--all-targets", "--all-features"]
 command       = "cargo"
 install_crate = "clippy"
-toolchain     = "nightly"
 workspace     = false
 
 [tasks.generate-schema]
@@ -20,7 +19,6 @@ workspace     = false
 args          = ["fmt", "--all"]
 command       = "cargo"
 install_crate = "rustfmt"
-toolchain     = "nightly"
 workspace     = false
 
 [tasks.fmt]
@@ -30,37 +28,26 @@ alias = "format"
 args          = ["fmt", "--all", "--check"]
 command       = "cargo"
 install_crate = "rustfmt"
-toolchain     = "nightly"
 workspace     = false
 
 [tasks.docker-up]
-args = [
-    "compose",
-    "--file",
-    "docker/docker-compose.yaml",
-    "--project-name",
-    "embers",
-    "${@}",
-    "up",
-    "--build",
-    "--force-recreate",
-    "--detach",
-    "--wait",
-]
-command = "docker"
+script = '''
+COMPOSE_FILES="--file docker/docker-compose.yaml"
+if [ -f docker/docker-compose.override.yaml ]; then
+    COMPOSE_FILES="$COMPOSE_FILES --file docker/docker-compose.override.yaml"
+fi
+docker compose $COMPOSE_FILES --project-name embers "$@" up --build --force-recreate --detach --wait
+'''
 workspace = false
 
 [tasks.docker-down]
-args = [
-    "compose",
-    "--file",
-    "docker/docker-compose.yaml",
-    "--project-name",
-    "embers",
-    "${@}",
-    "down",
-]
-command = "docker"
+script = '''
+COMPOSE_FILES="--file docker/docker-compose.yaml"
+if [ -f docker/docker-compose.override.yaml ]; then
+    COMPOSE_FILES="$COMPOSE_FILES --file docker/docker-compose.override.yaml"
+fi
+docker compose $COMPOSE_FILES --project-name embers "$@" down
+'''
 workspace = false
 
 [tasks.embers]
@@ -69,3 +56,133 @@ cd packages/embers
 cargo make ${1}
 '''
 workspace = false
+
+# Regenerate the rendered-Rholang corpus, then feed it through the real rholang-rs
+# parser (the detached oracle crate). Fails loudly if any template renders Rholang
+# the current grammar rejects.
+[tasks.oracle-test]
+script = '''
+cargo test -p embers render_corpus
+cargo test --manifest-path oracle/Cargo.toml
+'''
+workspace = false
+
+# L2 (loopback dev-net) test orchestration. This manages ONLY the OpenAI stub and the
+# test runs — bringing up the dev-net (node + F1r3drive + optional PDS) is left to
+# whatever local launcher you use, so nothing here is coupled to a specific one. Point
+# the node's OPENAI_API_BASE at the stub (http://127.0.0.1:8571/v1). Everything is
+# loopback. See scripts/l2.sh and docs/testing/test-architecture.md.
+[tasks.l2-stub]
+script    = ["bash scripts/l2.sh stub"]
+workspace = false
+
+[tasks.l2-stub-stop]
+script    = ["bash scripts/l2.sh stub-stop"]
+workspace = false
+
+[tasks.l2-test]
+script    = ["bash scripts/l2.sh test"]
+workspace = false
+
+[tasks.l2-recovery]
+script    = ["bash scripts/l2.sh recovery"]
+workspace = false
+
+[tasks.l2-rust]
+script    = ["bash scripts/l2.sh rust"]
+workspace = false
+
+# Run the local OpenAI stub in the foreground (Ctrl-C to stop). Binds OPENAI_STUB_ADDR
+# (default 127.0.0.1:8571); point a node's OPENAI_API_BASE at http://127.0.0.1:8571/v1.
+[tasks.openai-stub-run]
+command = "cargo"
+args    = ["run", "-p", "openai-stub"]
+workspace = false
+
+# Deep property run: far more proptest cases than the default (the gxhash target
+# features come from .cargo/config.toml).
+[tasks.test-deep]
+command = "cargo"
+args    = ["test", "--workspace"]
+env     = { PROPTEST_CASES = "1024" }
+workspace = false
+
+# Egress guard: run the hermetic L1 suite in a loopback-only network namespace so any
+# accidental non-loopback traffic fails instead of escaping. Needs rootless unshare;
+# falls back to a plain run with a warning if unavailable.
+[tasks.test-sandboxed]
+script = '''
+if unshare -rn true 2>/dev/null; then
+  unshare -rn bash -c "ip link set lo up 2>/dev/null || true; cargo test --workspace"
+else
+  echo "warn: unshare -rn unavailable; running cargo test without the egress namespace" >&2
+  cargo test --workspace
+fi
+'''
+workspace = false
+
+# Formal-verification: check every SMT model under docs/formal/smt/ against its
+# recorded verdict sequence with both z3 and cvc5. Part of the `fv` aggregate.
+[tasks.fv-smt]
+script    = ["bash docs/formal/scripts/verify_smt.sh"]
+workspace = false
+
+# Formal-verification: run every TLA+ model under docs/formal/tla/ with TLC and
+# check each config's outcome (positive configs pass; witness configs falsify as
+# expected). Part of the `fv` aggregate.
+[tasks.fv-tlc]
+script    = ["bash docs/formal/scripts/verify_tlc.sh"]
+workspace = false
+
+# Formal-verification: run every ProVerif protocol model under docs/formal/proverif/
+# and check each query's true/false verdict against the recorded sequence. Part of
+# the `fv` aggregate.
+[tasks.fv-proverif]
+script    = ["bash docs/formal/scripts/verify_proverif.sh"]
+workspace = false
+
+# Formal-verification: run the Storm probabilistic models under docs/formal/storm/
+# and enforce each acceptance threshold (observer-retry flake < 1e-3). Part of `fv`.
+[tasks.fv-storm]
+script    = ["bash docs/formal/scripts/verify_storm.sh"]
+workspace = false
+
+# Formal-verification: linearize the mCRL2 choreography models under
+# docs/formal/mcrl2/ and solve their modal-mu formulas (deadlock-freedom +
+# join-progress). Part of the `fv` aggregate.
+[tasks.fv-mcrl2]
+script    = ["bash docs/formal/scripts/verify_mcrl2.sh"]
+workspace = false
+
+# Formal-verification: compile the Rocq proofs under docs/formal/rocq/ and gate on
+# them being fully constructive (no admits; Print Assumptions closed under the global
+# context). Compiles under a systemd-run resource cap. Part of the `fv` aggregate.
+[tasks.fv-rocq]
+script    = ["bash docs/formal/scripts/verify_rocq.sh"]
+workspace = false
+
+# Formal-verification: prove every Tamarin model under docs/formal/tamarin/
+# (run-command fencing, continuation capabilities) and require all lemmas verified.
+# Part of the `fv` aggregate.
+[tasks.fv-tamarin]
+script    = ["bash docs/formal/scripts/verify_tamarin.sh"]
+workspace = false
+
+# Formal-verification: explicit-state check of the lifecycle FSMs under
+# docs/formal/ctl/ (run / publication / reveal). Dependency-free (python3). Part of
+# the `fv` aggregate.
+[tasks.fv-ctl]
+script    = ["bash docs/formal/scripts/verify_ctl.sh"]
+workspace = false
+
+# Documentation checks: internal Markdown links resolve; every diagram .puml has a
+# committed .svg that re-renders byte-identically and is not an error image.
+[tasks.docs-check]
+script    = ["bash docs/scripts/check-docs.sh"]
+workspace = false
+
+# Formal-verification aggregate: run every model-checking task. Extended as more
+# tool tracks (uppaal/tamarin) land.
+[tasks.fv]
+dependencies = ["fv-smt", "fv-tlc", "fv-proverif", "fv-storm", "fv-mcrl2", "fv-rocq", "fv-ctl", "fv-tamarin"]
+workspace    = false

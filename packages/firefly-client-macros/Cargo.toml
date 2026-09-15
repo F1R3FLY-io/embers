@@ -13,6 +13,18 @@ proc-macro2 = { version = "1.0" }
 quote       = { version = "1.0" }
 syn         = { version = "2.0" }
 
+# firefly-client is a dev-only dependency: the derives expand to
+# `::firefly_client::rendering::…` paths, so the tests need the trait and Value
+# definitions to compile the generated code. firefly-client depends on this
+# crate, so this is a dev-dependency cycle, which Cargo permits (dev-deps do not
+# participate in the normal build graph).
+[dev-dependencies]
+# The Render derive expands to an Askama `#[derive(Template)]`, whose own
+# expansion references the `askama` crate by name, so the tests need it in scope.
+askama         = { version = "0.15" }
+firefly-client = { path = "../firefly-client" }
+trybuild       = { version = "1.0" }
+
 [lints.clippy]
 cast_possible_wrap    = "allow"
 cast_sign_loss        = "allow"

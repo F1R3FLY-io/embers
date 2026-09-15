@@ -1,0 +1,41 @@
+/*
+ * run_command_fencing.spthy — INV-D4/S7/S8: durable-run command fencing.
+ *
+ * A durable run advances one command at a time, fenced by its revision. Claiming a
+ * command is a compare-and-set on the run's current revision: it consumes the
+ * current RunState(run, rev) linear fact and installs the next revision. So each
+ * revision is claimed at most once, advancing requires a genuine prior claim, and a
+ * stale revision (already consumed) can never be re-claimed — even by a Dolev-Yao
+ * adversary who observes the revision tokens (they are sent Out).
+ *
+ * Lemmas (auto-proved by tamarin-prover --prove):
+ *   claim_unique          — at most one claim per (run, revision)      [INV-D4/S8]
+ *   advance_requires_claim — every advance has a prior matching claim   [INV-S7]
+ */
+theory RunCommandFencing
+begin
+
+rule Init_Run:
+  [ Fr(~run), Fr(~rev0) ]
+  --[ StartRun(~run) ]->
+  [ RunState(~run, ~rev0) ]
+
+rule Claim_Command:
+  [ RunState(run, rev), Fr(~next), Fr(~cmd) ]
+  --[ Claimed(run, rev, ~cmd) ]->
+  [ RunState(run, ~next), CommandClaim(run, rev, ~cmd), Out(rev) ]
+
+rule Advance_Run:
+  [ CommandClaim(run, rev, cmd) ]
+  --[ Advanced(run, rev, cmd) ]->
+  [ ]
+
+lemma claim_unique:
+  "All run rev c1 c2 #i #j.
+     Claimed(run, rev, c1) @ #i & Claimed(run, rev, c2) @ #j ==> #i = #j"
+
+lemma advance_requires_claim:
+  "All run rev cmd #i.
+     Advanced(run, rev, cmd) @ #i ==> (Ex #j. Claimed(run, rev, cmd) @ #j & #j < #i)"
+
+end

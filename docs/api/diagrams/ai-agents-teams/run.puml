@@ -1,0 +1,52 @@
+@startuml
+title POST /api/ai-agents-teams/run/prepare + /send — invoke a deployed team, read back its run ledger
+skinparam backgroundColor #F8FBFF
+skinparam shadowing false
+skinparam ArrowColor #294C60
+skinparam sequence {
+  ParticipantBackgroundColor #EAF5FF
+  ParticipantBorderColor #38789E
+  LifeLineBorderColor #6A92AA
+  GroupBackgroundColor #FFF3E8
+  GroupBorderColor #D97638
+}
+
+actor "Caller" as Caller #FFD8C2
+participant "AgentsTeamsApiSdk\n.run(agentTeamUri, prompt)" as SDK #D5EAF7
+participant "Embers API" as API #FFC9A8
+participant "AgentsTeamsService" as Domain #CDEACC
+participant "F1r3node\nchain + observer" as Chain #FFE4A6
+
+Caller -> SDK : run(agentTeamUri, prompt)
+
+group Phase 1 — prepare (mints the run capability; deploys nothing)
+SDK -> API : POST /api/ai-agents-teams/run/prepare\n{ agents_team: uri, prompt }
+API -> Domain : prepare_run_agents_team_contract
+Domain -> Domain : mint run_id = UUIDv7\n(the run capability);\ncompute request content and\ncapability hashes; render the\ninvocation contract
+Domain --> API : RunResp { run_id, contract, created_at,\n  durable, definition_hash?,\n  request/continuation hashes }
+API --> SDK : PrepareResponse { response, token }
+end
+
+group Sign and send — no finalization subscription
+SDK -> SDK : signed = signContract(contract, privateKey)
+SDK -> API : POST /api/ai-agents-teams/run/send\n{ prepare_request, prepare_response,\n  request: signed, token }
+API -> API : verify the echo hash binding
+API -> Domain : deploy and await finality
+Domain -> Chain : deploy signed invocation
+Chain --> Domain : finalized
+Domain -> Chain : observer readback of the\nrun ledger (post-state)
+Chain --> Domain : run-state JSON
+API <-- Domain : run-state JSON
+SDK <-- API : 200 (untyped run-state readback)
+SDK --> Caller : { prepareResponse, sendResponse }
+end
+
+note over API #FFF0C7
+The send response is the observer readback, not
+a deploy id: the caller sees the exact post-state
+it acted on. There is nothing to subscribe on —
+finality already happened inside send. Ongoing
+inspection is GET /runs/{run_id}, whose URL is
+the read capability minted at prepare.
+end note
+@enduml
