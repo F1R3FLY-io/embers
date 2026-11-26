@@ -17,6 +17,10 @@ from tests.key import SECP256k1
 
 DEFAULT_TIMEOUT = 30
 
+# The Rust node caps the phlo limit a deploy may declare at 20,000,000 by default
+# (F1R3FLY-io/f1r3node-rust#1081), so test deploys stay safely below that cap.
+FIRESKY_PHLO_LIMIT = 5_000_000
+
 FIRECAP_ID = bytes([0, 0, 0])
 FIRECAP_VERSION = bytes([0])
 
@@ -541,8 +545,14 @@ class AgentsTeamsApi:
             accepted=self._client.listeners[wallet.address].register(resp_next.json["deploy_id"]),
         )
 
-    def run_on_firesky(self, wallet: Wallet, prompt: str, uri: str) -> UpdateResponce:
-        prepare_request = {"prompt": prompt, "phlo_limit": "50000000", "agents_team": uri}
+    def run_on_firesky(
+        self,
+        wallet: Wallet,
+        prompt: str,
+        uri: str,
+        phlo_limit: int,
+    ) -> UpdateResponce:
+        prepare_request = {"prompt": prompt, "phlo_limit": str(phlo_limit), "agents_team": uri}
         resp = self._client.post("/ai-agents-teams/run-on-firesky/prepare", json=prepare_request)
         assert resp.status == 200
 
@@ -557,6 +567,8 @@ class AgentsTeamsApi:
         )
         assert resp_next.status == 200
 
+        # run-on-firesky/send waits for the run deploy to finalize and returns no
+        # deploy id, so there is nothing to sync against.
         accepted = threading.Event()
         accepted.set()
 
