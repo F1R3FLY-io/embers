@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from tests.client import AgentsTeam, ApiClient, Wallet
+from tests.client import FIRESKY_PHLO_LIMIT, AgentsTeam, ApiClient, Wallet
 from tests.conftest import GPT_COMPRESS_TEAM, insert_signed_deploy, public_key_to_uri
 from tests.key import SECP256k1
 
@@ -23,17 +23,21 @@ def test_publish_and_run_graph(client: ApiClient, funded_wallet: Wallet, agents_
     resp = client.agents_teams.deploy(
         funded_wallet,
         agents_team=agents_team,
-        phlo_limit=5_000_000,
+        phlo_limit=FIRESKY_PHLO_LIMIT,
         deploy=deploy,
     ).wait_for_sync()
     assert resp.first.status == 200
+    assert resp.second.status == 200
 
-    client.agents_teams.publish_to_firesky(funded_wallet, agents_team.id)
-    assert resp.first.status == 200
+    publish = client.agents_teams.publish_to_firesky(funded_wallet, agents_team.id)
+    assert publish.first.status == 200
+    assert publish.second.status == 200
 
-    client.agents_teams.run_on_firesky(
+    run = client.agents_teams.run_on_firesky(
         funded_wallet,
         prompt="describe our universe. max 300 graphemes",
         uri=public_key_to_uri(key.public_key),
-    )
-    assert resp.first.status == 200
+        phlo_limit=FIRESKY_PHLO_LIMIT,
+    ).wait_for_sync()
+    assert run.first.status == 200
+    assert run.second.status == 200
